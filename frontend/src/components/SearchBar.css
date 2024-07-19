@@ -1,0 +1,22 @@
+/* src/components/SearchBar.css */
+.search-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+  }
+  
+  .search-textfield-root {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.5rem;
+  }
+  
+  .search-icon-slot {
+    display: flex;
+    align-items: center;
+    padding-right: 0.5rem;
+  }
+  

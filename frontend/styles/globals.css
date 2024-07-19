@@ -1,0 +1,244 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    display: flex;
+    height: 100vh;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: 0.8rem;
+    line-height: 130%;
+    letter-spacing: 0.03em;
+}
+
+strong {
+    font-weight: bold;
+}
+
+.object-grid {
+    width: 100%;
+    height: 100%;
+    overflow-y: scroll;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    justify-content: space-around;
+    flex-direction: row;
+    align-items: center;
+    align-content: flex-start;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: white;
+    transition: height 0.3s;
+    z-index: 10;
+}
+
+.object-grid:after {
+    content: "";
+    flex: auto;
+}
+
+.object-card {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    width: 20vw;
+    height: auto;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.object-card img {
+    max-width: 100%;
+    max-height: 20vw;
+    object-fit: cover;
+    margin-bottom: 5px;
+}
+
+.object-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    margin-top: 1rem;
+}
+
+.object-info span {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    display: inline-block;
+}
+
+.object-info a {
+    color: blue;
+    text-decoration: none;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.modal-content img {
+    max-width: 100%;
+    max-height: 40vh;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 30;
+    right: 0;
+    top: 0;
+    width: 33vw;
+    height: 100vh;
+    overflow: auto;
+    background: white;
+}
+
+.modal-content {
+    margin: 0;
+    padding: 2rem;
+    background: #fff;
+    position: relative;
+    top: 3rem;
+}
+
+.close {
+    position: absolute;
+    margin: 1rem;
+    top: 0;
+    left: 0;
+    font-weight: lighter;
+    cursor: pointer;
+    color: #00000057;
+    margin: -2rem 1rem 1rem 1rem;
+    font-size: 1rem;
+    line-height: 130%;
+    letter-spacing: 0.03em;
+}
+
+.control-icons {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 20;
+}
+
+.info-icon {
+    position: absolute;
+    top: 9px;
+    left: 10px;
+    z-index: 20;
+    padding: 8px;
+    color: #00000057;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.info-icon:hover {
+    background-color: #bbb;
+}
+
+.icon {
+    padding: 8.5px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: lighter;
+    color: #00000057;
+    font-size: 0.8rem;
+}
+
+.icon:hover {
+    background-color: #bbb;
+}
+
+.search-container {
+    position: absolute;
+    top: 10px;
+    right: 55px;
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    border-radius: 5px;
+    z-index: 20;
+    max-width: 130px;
+    height: 14px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 10px;
+    color: #00000057;
+}
+
+.search-container input[type="text"] {
+    border: none;
+    outline: none;
+    border-radius: 5px;
+    margin-left: 20px;
+    flex: 1;
+    font-size: 0.8rem;
+    background: rgb(255 255 255 / 0%);
+    max-width: 130px;
+    touch-action: manipulation;
+    letter-spacing: 0.03em;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 99;
+}
+
+.truncate-link {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
+#locationInfoFooter {
+    position: fixed;
+    top: 17px;
+    left: 84px;
+    width: 50%;
+    text-align: left;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+    z-index: 100;
+    display: flex;
+    flex-direction: row;
+    align-content: flex-start;
+    grid-gap: 1rem;
+}
+
+#locationInfoTop, #locationInfoBottom {
+    display: block;
+}
+
+.object-grid.small-grid .object-card {
+    width: 10vw;
+    max-width: 10vw;
+    height: auto;
+}
+
+.object-grid.small-grid .object-card img {
+    max-height: 10vh;
+}

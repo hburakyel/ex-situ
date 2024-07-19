@@ -1,0 +1,48 @@
+/* Filter.css */
+.filter {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  position: absolute;
+  z-index: 9;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 210px;
+  background: white;
+  overflow-y: auto;
+}
+
+.table {
+  color: #333;
+  width: 100%;
+}
+
+.cell {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-transform: uppercase;
+}
+
+.field-name {
+  font-size: 0.6rem;
+  line-height: 100%;
+  letter-spacing: 0.03em;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.cell-content {
+  padding-bottom: 0.5rem;
+}
+
+.cell-content div {
+  cursor: pointer;
+  padding: 0.05rem 0;
+}
+
+.cell-content div:hover {
+  text-decoration: underline;
+  color: #007bff;
+}
