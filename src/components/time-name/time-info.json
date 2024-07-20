@@ -1,0 +1,19 @@
+{
+  "collectionName": "components_time_name_time_infos",
+  "info": {
+    "displayName": "time_info",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "time_name": {
+      "type": "string"
+    },
+    "time_start": {
+      "type": "string"
+    },
+    "time_end": {
+      "type": "string"
+    }
+  }
+}
