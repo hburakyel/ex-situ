@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/ex-situ/static/css/main.57a3cf11.css",
+    "main.js": "/ex-situ/static/js/main.e78efa90.js",
+    "index.html": "/ex-situ/index.html",
+    "main.57a3cf11.css.map": "/ex-situ/static/css/main.57a3cf11.css.map",
+    "main.e78efa90.js.map": "/ex-situ/static/js/main.e78efa90.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.57a3cf11.css",
+    "static/js/main.e78efa90.js"
+  ]
+}
