@@ -1,5 +1,5 @@
 // src/utils/fetchData.js
-export const strapiBaseUrl = 'http://127.0.0.1:1337/api/museum-objects';
+export const strapiBaseUrl = 'http://5.75.159.196:1337/api/museum-objects';
 
 export const fetchObjectsWithinBounds = async (bounds, page = 1) => {
   const sw = bounds.getSouthWest();
