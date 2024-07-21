@@ -38,7 +38,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://5.75.159.196:1337/api/museum-objects?filters[latitude][$gte]=${sw.lat}&filters[latitude][$lte]=${ne.lat}&filters[longitude][$gte]=${sw.lng}&filters[longitude][$lte]=${ne.lng}&pagination[page]=${page}&pagination[pageSize]=60&populate=*`
+        `https://5.75.159.196:1337/api/museum-objects?filters[latitude][$gte]=${sw.lat}&filters[latitude][$lte]=${ne.lat}&filters[longitude][$gte]=${sw.lng}&filters[longitude][$lte]=${ne.lng}&pagination[page]=${page}&pagination[pageSize]=60&populate=*`
       );
       if (!response.ok) {
         throw new Error(`Network response was not ok: ${response.statusText}`);
