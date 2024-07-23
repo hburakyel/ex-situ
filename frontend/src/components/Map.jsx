@@ -5,7 +5,7 @@ import { ArcLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import './Map.css';
 
-const strapiBaseUrl = 'https://5.75.159.196:1337/api/museum-objects';
+const strapiBaseUrl = 'http://5.75.159.196:1337/api/museum-objects';
 const mapboxToken = 'pk.eyJ1IjoiaGJ1cmFreWVsIiwiYSI6ImNsN2FoZmU0MTAyY3ozbm83cGJ5M3NjbTEifQ.bWrhIGqeJ_JHh3Crwwp9tA';
 mapboxgl.accessToken = mapboxToken;
 
