@@ -2,7 +2,13 @@ module.exports = [
   'strapi::logger',
   'strapi::errors',
   'strapi::security',
-  'strapi::cors',
+  {
+    name: 'strapi::cors',
+    config: {
+      enabled: true,
+      origin: ['https://exsitu.site'],
+    },
+  },
   'strapi::poweredBy',
   'strapi::query',
   'strapi::body',
