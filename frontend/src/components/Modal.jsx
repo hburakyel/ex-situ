@@ -13,24 +13,68 @@ const Modal = ({ isOpen, onClose, content }) => {
     placeName,
     inventoryNumber,
     linkText,
-    linkUrl
   } = content;
 
   return (
     <div className="modal">
       <div className="modal-content">
         <span className="close" onClick={onClose}><i class="fa-solid fa-xmark"></i></span>
-        <img src={imgUrl} alt={title} />
-        <ul>
-          <li><strong>Title:</strong> {title}</li>
-          <li><strong>Time:</strong> {timeInfo}</li>
-          <li><strong>From:</strong> {placeName}</li>
-          <li><strong>To:</strong> {institutionPlace}</li>
-          <li><strong>Institution:</strong> {institutionName}</li>
-          <li><strong>Inventory Number:</strong> {inventoryNumber}</li>
-          <li><strong>Source Link:</strong> <a href={linkUrl} target="_blank" rel="noopener noreferrer">{linkText}</a></li>
-        </ul>
+        
+        <div className='image-tab'><img src={imgUrl} alt={title} />
+        </div>
+        <div className='info-tab'>
+        
+        <div className="cell">
+  <span className="field-name">Title</span>
+</div>
+<div className="cell-content">
+  <span>{title}</span>
+</div>
+
+<div className="cell">
+  <span className="field-name">Time</span>
+</div>
+<div className="cell-content">
+  <span>{timeInfo}</span>
+</div>
+
+<div className="cell">
+  <span className="field-name">From</span>
+</div>
+<div className="cell-content">
+  <span>{placeName}</span>
+</div>
+
+<div className="cell">
+  <span className="field-name">To</span>
+</div>
+<div className="cell-content">
+  <span>{institutionPlace}</span>
+</div>
+
+<div className="cell">
+  <span className="field-name">Institution</span>
+</div>
+<div className="cell-content">
+  <span>{institutionName}</span>
+</div>
+
+<div className="cell">
+  <span className="field-name">Inventory Number</span>
+</div>
+<div className="cell-content">
+  <span>{inventoryNumber}</span>
+</div>
+
+<div className="cell">
+  <span className="field-name">Source Link</span>
+</div>
+<div className="cell-content">
+  <span><a href={linkText} target="_blank" rel="noopener noreferrer">{linkText}</a></span>
+</div>
+
       </div>
+    </div>
     </div>
   );
 };

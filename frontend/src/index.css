@@ -1,3 +1,5 @@
+@import '@radix-ui/themes/styles.css';
+
 body {
   font-family: Arial, sans-serif;
   margin: 0;
@@ -5,7 +7,7 @@ body {
   height: 100vh;
   flex-direction: column;
   overflow: hidden; /* Prevent body scroll */
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   line-height: 130%;
   letter-spacing: 0.03em;
 }

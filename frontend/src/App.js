@@ -3,17 +3,17 @@ import './App.css';
 import MapComponent from './components/Map';
 import ObjectContainer from './components/ObjectContainer';
 import Modal from './components/Modal';
-import SearchBar from './components/SearchBar';
 import Filter from './components/Filter';
 import { fetchLocation } from './utils/fetchData';
 import debounce from 'lodash.debounce';
+import mapboxgl from 'mapbox-gl';
 
 function App() {
   const [geojson, setGeojson] = useState({ type: 'FeatureCollection', features: [] });
   const [objects, setObjects] = useState([]);
   const [modalContent, setModalContent] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentSize, setCurrentSize] = useState('small');
+  const [currentSize, setCurrentSize] = useState('large');
   const [bounds, setBounds] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isFetching, setIsFetching] = useState(false);
@@ -32,6 +32,12 @@ function App() {
   const fetchObjectsWithinBounds = async (bounds, page = 1, reset = false) => {
     if (isFetching) return;
     setIsFetching(true);
+
+    if (!bounds || typeof bounds.getSouthWest !== 'function' || typeof bounds.getNorthEast !== 'function') {
+      console.error('Bounds object is not in the correct format');
+      setIsFetching(false);
+      return;
+    }
 
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
@@ -98,7 +104,7 @@ function App() {
         setLocationInfo({
           location: placeName,
           arcCount: uniqueArcs,
-          objectCount: data.meta.pagination.total, // Use total count here
+          objectCount: data.meta.pagination.total,
           fromPlaces: Array.from(fromPlaces.entries()).map(([place, count]) => `${place} (${count})`).join(', '),
           toPlaces: [...toPlaces].join(', '),
           institutionNames: [...institutionNames].join(', '),
@@ -113,6 +119,41 @@ function App() {
     }
   };
 
+  const fetchInitialData = async () => {
+    try {
+      const response = await fetch('https://exsitu.site/api/museum-objects?pagination[page]=1&pagination[pageSize]=1');
+      const data = await response.json();
+      const objects = data.data;
+      if (objects.length > 0) {
+        const randomObject = objects[Math.floor(Math.random() * objects.length)];
+        const attributes = randomObject.attributes;
+        const initialCoordinates = [parseFloat(attributes.longitude), parseFloat(attributes.latitude)];
+        mapRef.current = new mapboxgl.Map({
+          container: 'map',
+          style: 'mapbox://styles/mapbox/streets-v11',
+          center: initialCoordinates,
+          zoom: 10
+        });
+        mapRef.current.on('load', () => {
+          setBounds(mapRef.current.getBounds());
+        });
+      } else {
+        mapRef.current = new mapboxgl.Map({
+          container: 'map',
+          style: 'mapbox://styles/mapbox/streets-v11',
+          center: [0, 0],
+          zoom: 2
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
   useEffect(() => {
     if (bounds) {
       fetchObjectsWithinBounds(bounds, 1, true);
@@ -124,15 +165,15 @@ function App() {
       const data = await fetchLocation(location);
       if (data.length > 0) {
         const { lat, lon, boundingbox } = data[0];
-        const bounds = [
+        const bounds = new mapboxgl.LngLatBounds(
           [parseFloat(boundingbox[2]), parseFloat(boundingbox[0])],
           [parseFloat(boundingbox[3]), parseFloat(boundingbox[1])]
-        ];
+        );
         mapRef.current.fitBounds(bounds, { padding: { top: 10, bottom: 25, left: 15, right: 5 } });
         setTimeout(() => {
           setBounds(bounds);
-          setCurrentPage(1); // Reset to first page on new search
-          setObjects([]); // Reset objects when bounds change
+          setCurrentPage(1);
+          fetchObjectsWithinBounds(bounds, 1, true);
         }, 100);
       } else {
         alert('Location not found');
@@ -226,17 +267,16 @@ function App() {
   const handleLocationClick = (type, location) => {
     if (type === 'from') {
       const coordinatesList = locationInfo.fromCoordinates[location];
-      console.log(`handleLocationClick - type: ${type}, location: ${location}, coordinatesList: ${coordinatesList}`);
-
-      if (!coordinatesList) {
+  
+      if (!Array.isArray(coordinatesList)) {
         console.error(`Invalid coordinates for from location: ${location}`);
         return;
       }
-
+  
       const uniqueCoordinates = [...new Set(coordinatesList.map(JSON.stringify))].map(JSON.parse);
-
+  
       if (uniqueCoordinates.length > 0) {
-        const [lat, lng] = uniqueCoordinates[0];  // Take the first unique coordinates pair
+        const [lat, lng] = uniqueCoordinates[0];
         if (!isNaN(lat) && !isNaN(lng)) {
           mapRef.current.flyTo({ center: [lng, lat], zoom: 10 });
         } else {
@@ -249,6 +289,7 @@ function App() {
       // Handle 'to' location if needed
     }
   };
+  
 
   const getPlaceName = async (lat, lng) => {
     try {
@@ -273,7 +314,7 @@ function App() {
     } catch (error) {
       console.error('Error fetching place name:', error);
     }
-    return 'Unknown Location';
+    return '';
   };
 
   return (
@@ -281,16 +322,14 @@ function App() {
       <nav className="navbar">
         <div className="control-icons">
           <div className="icon" onClick={toggleContainerSize}><i className="fas fa-expand"></i></div>
-          {/* Commented out filter toggle button */}
-          {/* <div className="icon" onClick={toggleFilterVisibility}><i className="fas fa-filter"></i></div> */}
-        </div>
-        <div className="navbar-info">
-          Ex-Situ {locationInfo.location} ({locationInfo.arcCount} Arcs / {locationInfo.objectCount} Artefacts)
-        </div>
-        <SearchBar onSearch={debouncedHandleSearch} />
+          <div className="icon" onClick={toggleFilterVisibility}><i className="fas fa-search"></i></div>       </div>
+         <div className="navbar-info">
+         <span id="locationInfo">Ex-Situ {locationInfo.location}</span>
+         <div className="field-name">{locationInfo.objectCount}</div>
+        </div>  
       </nav>
       <ObjectContainer objects={objects} onScroll={handleScroll} currentSize={currentSize} onObjectClick={handleObjectClick} />
-      {filterVisible && <Filter locationInfo={locationInfo} onZoom={handleLocationClick} />}
+      {filterVisible && <Filter locationInfo={locationInfo} onZoom={handleLocationClick} filterVisible={filterVisible} onSearch={debouncedHandleSearch} />}
       <Modal isOpen={isModalOpen} onClose={handleCloseModal} content={modalContent} />
       <MapComponent 
         mapRef={mapRef} 

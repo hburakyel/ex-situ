@@ -12,7 +12,7 @@ const ObjectContainer = ({ objects, onScroll, currentSize, onObjectClick }) => {
     }
   }, [onScroll]);
 
-  const containerHeight = currentSize === 'large' ? '100vh' : currentSize === 'small' ? '25vh' : '0vh';
+  const containerHeight = currentSize === 'large' ? '100vh' : currentSize === 'small' ? '30vh' : '0vh';
 
   return (
     <div id="objectContainer" className="object-grid" style={{ height: containerHeight, overflowY: 'auto', width: '100vw' }}>

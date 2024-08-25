@@ -134,6 +134,12 @@ const MapComponent = ({ setBounds, setLocationInfo, mapRef }) => {
       });
 
       setGeojson({ type: 'FeatureCollection', features });
+
+      // Zoom to a random arc
+      if (features.length > 0) {
+        const randomFeature = features[Math.floor(Math.random() * features.length)];
+        mapRef.current.flyTo({ center: randomFeature.geometry.coordinates, zoom: 10 });
+      }
     } catch (error) {
       setError(error.message);
       console.error('Error fetching all objects for arcs:', error);
@@ -256,7 +262,7 @@ const MapComponent = ({ setBounds, setLocationInfo, mapRef }) => {
     } catch (error) {
       console.error('Error fetching place name:', error);
     }
-    return 'Unknown Location';
+    return '';
   }
 
   const showTooltip = (x, y, content) => {

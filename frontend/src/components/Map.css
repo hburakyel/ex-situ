@@ -5,3 +5,8 @@
   position: absolute;
   top: 0;
 }
+
+.map-container canvas {
+  height: 100vh !important;
+  width: 100% !important;
+}
