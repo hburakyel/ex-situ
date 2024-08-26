@@ -1,61 +1,36 @@
-<<<<<<< HEAD
-# ex-situ
-=======
-# 🚀 Getting started with Strapi
+Ex-Situ
+Ex-Situ is a long-term web-based research and archive project that aims to create a cartographic visualization of the digital archives of museums in Europe and North America. The project focuses on the migration of artefacts from diverse cultures in Global South. By utilizing hyperlinks collected from various institutional websites and geolocating the migration of these artefacts, this project establishes connections not only to the physical migrations of artefacts but also to digital spaces like web domains.
 
-Strapi comes with a full featured [Command Line Interface](https://docs.strapi.io/dev-docs/cli) (CLI) which lets you scaffold and manage your project in seconds.
+The project reappropriates and exposes museums’ collection policies, contextualizing, and repractices for the digital age.
 
-### `develop`
+Project Creation Process
+The creation of the Ex-Situ project repository involves three main steps:
+1. Collection of Museum Objects: Gather data from museum APIs or public digital archives, focusing on artefacts categorized as ethnological, Islamic, Egyptian, or from the Middle East, Anatolia, the Balkans, Latin America, and Africa. Specific datasets used include and aim to grow:
+    * met_museum_objects_art_africa.json
+    * smb_islamische_kunst_objects.json
+    * ethnologisches_museum_objects.json
+    * met_museum_objects_islamic_art.json
+    * smb_agyptisches_papyrussammlung_objects.json
+    * smb_antikensammlung_objects.json
+    * smb_museum_asiatische_kunst_objects.json
+    * smb_vorderasiatisches_museum_objects.json
+2. Geolocating: Determine the origin locations of the artefacts based on the provided information, enabling accurate or approximate geolocation.
+3. Displaying on the Map: Visualize the artefacts on an interactive map, showcasing their migration routes and current locations.
 
-Start your Strapi application with autoReload enabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-develop)
+Disclaimer
+All images and related content displayed on this website are hosted on third-party museum websites and are not stored on our servers. This project uses hyperlinks to reference these images, adhering to the terms and conditions set by the content owners. The use of images and information is solely for educational and non-commercial purposes, in compliance with the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) license. Proper attribution is provided for all referenced materials. Users are encouraged to visit the original sources through the provided links for more information.
 
-```
-npm run develop
-# or
-yarn develop
-```
+Project Structure
+* frontend/: React frontend application
+* backend/: Strapi backend application
 
-### `start`
+Setup Instructions
 
-Start your Strapi application with autoReload disabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-start)
+Prerequisites
+* Node.js
+* npm
+* PostgreSQL (for the backend)
+* Nginx (for reverse proxy)
 
-```
-npm run start
-# or
-yarn start
-```
-
-### `build`
-
-Build your admin panel. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-build)
-
-```
-npm run build
-# or
-yarn build
-```
-
-## ⚙️ Deployment
-
-Strapi gives you many possible deployment options for your project including [Strapi Cloud](https://cloud.strapi.io). Browse the [deployment section of the documentation](https://docs.strapi.io/dev-docs/deployment) to find the best solution for your use case.
-
-## 📚 Learn more
-
-- [Resource center](https://strapi.io/resource-center) - Strapi resource center.
-- [Strapi documentation](https://docs.strapi.io) - Official Strapi documentation.
-- [Strapi tutorials](https://strapi.io/tutorials) - List of tutorials made by the core team and the community.
-- [Strapi blog](https://strapi.io/blog) - Official Strapi blog containing articles made by the Strapi team and the community.
-- [Changelog](https://strapi.io/changelog) - Find out about the Strapi product updates, new features and general improvements.
-
-Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/strapi). Your feedback and contributions are welcome!
-
-## ✨ Community
-
-- [Discord](https://discord.strapi.io) - Come chat with the Strapi community including the core team.
-- [Forum](https://forum.strapi.io/) - Place to discuss, ask questions and find answers, show your Strapi project and get feedback or just talk with other Community members.
-- [Awesome Strapi](https://github.com/strapi/awesome-strapi) - A curated list of awesome things related to Strapi.
-
----
-
-<sub>🤫 Psst! [Strapi is hiring](https://strapi.io/careers).</sub>
->>>>>>> f3f06855eda05fc6f57d96a16fcd172b99a987bd
+License
+This project is licensed under the MIT License.
