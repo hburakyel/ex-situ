@@ -3,11 +3,7 @@ Ex-Situ
 
 Ex-Situ is a long-term web-based research and archive project that aims to create a cartographic visualization of the digital archives of museums in Europe and North America. The project focuses on the migration of artefacts from diverse cultures in Global South. By utilizing hyperlinks collected from various institutional websites and geolocating the migration of these artefacts, this project establishes connections not only to the physical migrations of artefacts but also to digital spaces like web domains. The project reappropriates and exposes museums’ collection policies, contextualizing, and re:presenting practices for the digital age.
 
-
-Project Creation Process
-
-The creation of the Ex-Situ project repository involves three main steps:
-1. Collection of Museum Objects: Gather data from museum APIs or public digital archives, focusing on artefacts categorized by museums as ethnological, Islamic, Egyptian, or from the Middle East, Anatolia, the Balkans, Latin America, and Africa. Specific datasets used include and aim to grow:
+Specific datasets used include and aim to grow:
     * met_museum_objects_art_africa.json
     * smb_islamische_kunst_objects.json
     * ethnologisches_museum_objects.json
@@ -16,9 +12,6 @@ The creation of the Ex-Situ project repository involves three main steps:
     * smb_antikensammlung_objects.json
     * smb_museum_asiatische_kunst_objects.json
     * smb_vorderasiatisches_museum_objects.json
-2. Geolocating: Determine the origin locations of the artefacts based on the provided information, enabling accurate or approximate geolocation.
-3. Displaying on the Map: Visualize the artefacts on an interactive map, showcasing their migration routes and current locations.
-
 
 Disclaimer
 
