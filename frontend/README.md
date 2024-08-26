@@ -5,7 +5,7 @@ The project reappropriates and exposes museums’ collection policies, contextua
 
 Project Creation Process
 The creation of the Ex-Situ project repository involves three main steps:
-1. Collection of Museum Objects: Gather data from museum APIs or public digital archives, focusing on artefacts categorized as ethnological, Islamic, Egyptian, or from the Middle East, Anatolia, the Balkans, Latin America, and Africa. Specific datasets used include and aim to grow:
+1. Collection of Museum Objects: Gather data from museum APIs or public digital archives, focusing on artefacts categorized by museums as ethnological, Islamic, Egyptian, or from the Middle East, Anatolia, the Balkans, Latin America, and Africa. Specific datasets used include and aim to grow:
     * met_museum_objects_art_africa.json
     * smb_islamische_kunst_objects.json
     * ethnologisches_museum_objects.json
