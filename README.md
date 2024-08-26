@@ -3,16 +3,6 @@ Ex-Situ
 
 Ex-Situ is a long-term web-based research and archive project that aims to create a cartographic visualization of the digital archives of museums in Europe and North America. The project focuses on the migration of artefacts from diverse cultures in Global South. By utilizing hyperlinks collected from various institutional websites and geolocating the migration of these artefacts, this project establishes connections not only to the physical migrations of artefacts but also to digital spaces like web domains. The project reappropriates and exposes museums’ collection policies, contextualizing, and re:presenting practices for the digital age.
 
-Specific datasets used include and aim to grow:
-    * met_museum_objects_art_africa.json
-    * smb_islamische_kunst_objects.json
-    * ethnologisches_museum_objects.json
-    * met_museum_objects_islamic_art.json
-    * smb_agyptisches_papyrussammlung_objects.json
-    * smb_antikensammlung_objects.json
-    * smb_museum_asiatische_kunst_objects.json
-    * smb_vorderasiatisches_museum_objects.json
-
 Disclaimer
 
 All images and related content displayed on this website are hosted on third-party museum websites and are not stored on our servers. This project uses hyperlinks to reference these images, adhering to the terms and conditions set by the content owners. The use of images and information is solely for educational and non-commercial purposes, in compliance with the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) license. Proper attribution is provided for all referenced materials. Users are encouraged to visit the original sources through the provided links for more information.
