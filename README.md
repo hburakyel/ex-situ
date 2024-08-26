@@ -1,7 +1,6 @@
-Ex-Situ
+Overview
 
-
-Ex-Situ is a long-term web-based research and archive project that aims to create a cartographic visualization of the digital archives of museums in Europe and North America. The project focuses on the migration of artefacts from diverse cultures in Global South. By utilizing hyperlinks collected from various institutional websites and geolocating the migration of these artefacts, this project establishes connections not only to the physical migrations of artefacts but also to digital spaces like web domains. The project reappropriates and exposes museums’ collection policies, contextualizing, and re:presenting practices for the digital age.
+Ex-Situ is a research and archive project that aims to create a cartographic visualization of the digital collections of museums in Europe and North America. The project focuses on the migration of artefacts from diverse cultures in Global South. By utilizing hyperlinks collected from various institutional websites and geolocating the migration of these artefacts, this project establishes connections not only to the physical migrations of artefacts but also to digital spaces like web domains. The project reappropriates and exposes museums’ collection policies, contextualizing, and re:presenting practices for the digital age.
 
 Disclaimer
 
