@@ -20,8 +20,3 @@ Prerequisites
 * npm
 * PostgreSQL (for the backend)
 * Nginx (for reverse proxy)
-
-
-License
-
-This project is licensed under the MIT License.
