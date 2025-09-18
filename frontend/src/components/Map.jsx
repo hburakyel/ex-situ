@@ -5,7 +5,7 @@ import { ArcLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import './Map.css';
 
-const strapiBaseUrl = 'https://exsitu.site/api/museum-objects';
+const strapiBaseUrl = 'http://5.75.159.196:1337/api/museum-objects';
 const mapboxToken = 'pk.eyJ1IjoiaGJ1cmFreWVsIiwiYSI6ImNsN2FoZmU0MTAyY3ozbm83cGJ5M3NjbTEifQ.bWrhIGqeJ_JHh3Crwwp9tA';
 mapboxgl.accessToken = mapboxToken;
 
@@ -135,7 +135,6 @@ const MapComponent = ({ setBounds, setLocationInfo, mapRef }) => {
 
       setGeojson({ type: 'FeatureCollection', features });
 
-      // Zoom to a random arc
       if (features.length > 0) {
         const randomFeature = features[Math.floor(Math.random() * features.length)];
         mapRef.current.flyTo({ center: randomFeature.geometry.coordinates, zoom: 10 });
@@ -189,7 +188,6 @@ const MapComponent = ({ setBounds, setLocationInfo, mapRef }) => {
         features: [...prevGeojson.features, ...features],
       }));
 
-      // Calculate the unique arc count
       const uniqueArcs = new Set(features.map(f => JSON.stringify([f.properties.sourceCoordinates, f.properties.targetCoordinates]))).size;
 
       let fromPlaces = new Map();
@@ -208,7 +206,6 @@ const MapComponent = ({ setBounds, setLocationInfo, mapRef }) => {
             fromPlaces.set(placeName, 1);
           }
 
-          // Handle multiple names with same coordinates
           if (!fromCoordinates[placeName]) {
             fromCoordinates[placeName] = [];
           }
@@ -247,17 +244,7 @@ const MapComponent = ({ setBounds, setLocationInfo, mapRef }) => {
       }
       const data = await response.json();
       if (data && data.address) {
-        let placeName = '';
-        if (data.address.city) {
-          placeName = data.address.city;
-        } else if (data.address.town) {
-          placeName = data.address.town;
-        } else if (data.address.village) {
-          placeName = data.address.village;
-        } else if (data.address.country) {
-          placeName = data.address.country;
-        }
-        return placeName;
+        return data.address.city || data.address.town || data.address.village || data.address.country || '';
       }
     } catch (error) {
       console.error('Error fetching place name:', error);
