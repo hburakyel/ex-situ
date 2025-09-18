@@ -4,6 +4,7 @@ import MapComponent from './components/Map';
 import ObjectContainer from './components/ObjectContainer';
 import Modal from './components/Modal';
 import Filter from './components/Filter';
+import Info from './components/Info';
 import { fetchLocation } from './utils/fetchData';
 import debounce from 'lodash.debounce';
 import mapboxgl from 'mapbox-gl';
@@ -18,6 +19,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isFetching, setIsFetching] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [locationInfo, setLocationInfo] = useState({
     location: '',
     arcCount: 0,
@@ -29,6 +31,11 @@ function App() {
   });
   const mapRef = useRef(null);
 
+  const toggleInfoVisibility = () => {
+    setInfoVisible(prevState => !prevState);
+  };
+
+  // fetchObjectsWithinBounds fonksiyonu
   const fetchObjectsWithinBounds = async (bounds, page = 1, reset = false) => {
     if (isFetching) return;
     setIsFetching(true);
@@ -44,7 +51,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `https://exsitu.site/api/museum-objects?filters[latitude][$gte]=${sw.lat}&filters[latitude][$lte]=${ne.lat}&filters[longitude][$gte]=${sw.lng}&filters[longitude][$lte]=${ne.lng}&pagination[page]=${page}&pagination[pageSize]=60&populate=*`
+        `http://5.75.159.196:1337/api/museum-objects?filters[latitude][$gte]=${sw.lat}&filters[latitude][$lte]=${ne.lat}&filters[longitude][$gte]=${sw.lng}&filters[longitude][$lte]=${ne.lng}&pagination[page]=${page}&pagination[pageSize]=30&populate=*`
       );
       if (!response.ok) {
         throw new Error(`Network response was not ok: ${response.statusText}`);
@@ -87,11 +94,7 @@ function App() {
           const attributes = obj.attributes;
           const placeName = attributes.place_name;
           if (placeName) {
-            if (fromPlaces.has(placeName)) {
-              fromPlaces.set(placeName, fromPlaces.get(placeName) + 1);
-            } else {
-              fromPlaces.set(placeName, 1);
-            }
+            fromPlaces.set(placeName, (fromPlaces.get(placeName) || 0) + 1);
           }
           toPlaces.add(attributes.institution_place);
           institutionNames.add(attributes.institution_name);
@@ -119,9 +122,10 @@ function App() {
     }
   };
 
+  // fetchInitialData fonksiyonu
   const fetchInitialData = async () => {
     try {
-      const response = await fetch('https://exsitu.site/api/museum-objects?pagination[page]=1&pagination[pageSize]=1');
+      const response = await fetch('http://5.75.159.196:1337/api/museum-objects?pagination[page]=1&pagination[pageSize]=1');
       const data = await response.json();
       const objects = data.data;
       if (objects.length > 0) {
@@ -321,12 +325,21 @@ function App() {
     <div className="App">
       <nav className="navbar">
         <div className="control-icons">
-          <div className="icon" onClick={toggleContainerSize}><i className="fas fa-expand"></i></div>
-          <div className="icon" onClick={toggleFilterVisibility}><i className="fas fa-search"></i></div>       </div>
-         <div className="navbar-info">
-         <span id="locationInfo">Ex-Situ {locationInfo.location}</span>
-         <div className="field-name">{locationInfo.objectCount}</div>
-        </div>  
+          <div className="icon" onClick={toggleFilterVisibility}><svg width="20" height="20" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg></div>       
+          <div className="icon" onClick={toggleContainerSize}><svg width="20" height="20" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 3.04999C11.7485 3.04999 11.95 3.25146 11.95 3.49999V7.49999C11.95 7.74852 11.7485 7.94999 11.5 7.94999C11.2515 7.94999 11.05 7.74852 11.05 7.49999V4.58639L4.58638 11.05H7.49999C7.74852 11.05 7.94999 11.2515 7.94999 11.5C7.94999 11.7485 7.74852 11.95 7.49999 11.95L3.49999 11.95C3.38064 11.95 3.26618 11.9026 3.18179 11.8182C3.0974 11.7338 3.04999 11.6193 3.04999 11.5L3.04999 7.49999C3.04999 7.25146 3.25146 7.04999 3.49999 7.04999C3.74852 7.04999 3.94999 7.25146 3.94999 7.49999L3.94999 10.4136L10.4136 3.94999L7.49999 3.94999C7.25146 3.94999 7.04999 3.74852 7.04999 3.49999C7.04999 3.25146 7.25146 3.04999 7.49999 3.04999L11.5 3.04999Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg></div>
+          <div className="icon" onClick={toggleInfoVisibility}><svg width="20" height="20" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.49991 0.876892C3.84222 0.876892 0.877075 3.84204 0.877075 7.49972C0.877075 11.1574 3.84222 14.1226 7.49991 14.1226C11.1576 14.1226 14.1227 11.1574 14.1227 7.49972C14.1227 3.84204 11.1576 0.876892 7.49991 0.876892ZM1.82707 7.49972C1.82707 4.36671 4.36689 1.82689 7.49991 1.82689C10.6329 1.82689 13.1727 4.36671 13.1727 7.49972C13.1727 10.6327 10.6329 13.1726 7.49991 13.1726C4.36689 13.1726 1.82707 10.6327 1.82707 7.49972ZM8.24992 4.49999C8.24992 4.9142 7.91413 5.24999 7.49992 5.24999C7.08571 5.24999 6.74992 4.9142 6.74992 4.49999C6.74992 4.08577 7.08571 3.74999 7.49992 3.74999C7.91413 3.74999 8.24992 4.08577 8.24992 4.49999ZM6.00003 5.99999H6.50003H7.50003C7.77618 5.99999 8.00003 6.22384 8.00003 6.49999V9.99999H8.50003H9.00003V11H8.50003H7.50003H6.50003H6.00003V9.99999H6.50003H7.00003V6.99999H6.50003H6.00003V5.99999Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg></div> {/* New Info button */}
+        </div>
+        <div className="navbar-info">
+  <span id="locationInfo">
+    <div className="logo">Ex-Situ</div>
+    <div className="location">
+      {locationInfo.location ? locationInfo.location : ""}
+    </div>
+  </span>
+  <div className="field-name">
+    {locationInfo.objectCount || "Loading..."}
+  </div>
+</div>
       </nav>
       <ObjectContainer objects={objects} onScroll={handleScroll} currentSize={currentSize} onObjectClick={handleObjectClick} />
       {filterVisible && <Filter locationInfo={locationInfo} onZoom={handleLocationClick} filterVisible={filterVisible} onSearch={debouncedHandleSearch} />}
@@ -336,6 +349,7 @@ function App() {
         setBounds={setBounds} 
         setLocationInfo={setLocationInfo} 
       />
+      {infoVisible && <Info onClose={toggleInfoVisibility} />} {/* Conditionally render Info component with close handler */}
     </div>
   );
 }
