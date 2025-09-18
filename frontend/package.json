@@ -2,7 +2,7 @@
   "name": "ex-situ",
   "version": "0.1.0",
   "private": true,
-  "homepage": "",
+  "homepage": ".",
   "dependencies": {
     "@deck.gl/core": "^9.0.21",
     "@deck.gl/layers": "^9.0.21",
