@@ -9,11 +9,52 @@
   grid-gap: 10px;
 }
 
-.navbar-info {
+#locationInfo {
+  display: flex;
+  grid-gap: 10px;
+}
+
+.logo {
   display: flex;
   flex-direction: row;
+  position: relative;
+  z-index: 99999;
+  grid-gap: 10px;
+}
+
+.location {
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  z-index: 99999;
+  grid-gap: 10px;
+}
+
+.navbar-info {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  grid-gap: 8px;
+  justify-content: center;
+
+  color: var(--foreground-primary, rgb(0, 0, 0)); /* fallback to white */
+  background-color: rgba(255, 255, 255, 0.06); /* glass-like */
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+
+  font-size: 1rem; /* text-body equivalent */
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  padding-left: 1rem; /* px-4 */
+  padding-right: 1rem;
+
+  gap: 14px; /* gap-x-3.5 = 0.875rem */
+  border-radius: 12px;
+
+  height: var(--button-dimension-large, 48px);
+  width: var(--button-dimension-large, auto); /* fallback if no var */
 }
 
 
@@ -42,20 +83,36 @@
 }
 
 .icon {
-  padding: 8.5px;
-  border-radius: 5px;
-  display: flex;
+  position: relative;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  font-weight: lighter;
-  color: #00000057;
-    font-size:  0.9rem;
 
+  color: var(--foreground-primary, rgb(0, 0, 0)); /* fallback to white */
+  background-color: rgba(255, 255, 255, 0.06); /* glass-like */
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+
+  font-size: 1rem; /* text-body equivalent */
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  padding-left: 1rem; /* px-4 */
+  padding-right: 1rem;
+
+  gap: 14px; /* gap-x-3.5 = 0.875rem */
+  border-radius: 12px;
+
+  height: var(--button-dimension-large, 48px);
+  width: var(--button-dimension-large, auto); /* fallback if no var */
+  
+  pointer-events: auto;
 }
 
 .icon:hover {
-  background-color: #bbb;
+  background-color: rgba(255, 255, 255, 0.12); /* hover color */
 }
 
 
@@ -111,3 +168,4 @@
 .object-grid.small-grid .object-card img {
   max-height: 10vh;
 }
+
