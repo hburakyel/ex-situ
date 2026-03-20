@@ -87,8 +87,6 @@ ex-situ/
 ├── frontend/       # Next.js app (map, search, artifact views)
 ├── backend/        # Strapi CMS + PostGIS API + geospatial endpoints
 │   └── scripts/    # One-off data migration / admin scripts
-├── etl/            # Python pipeline: scraping, geocoding, enrichment
-└── deploy/         # Bash scripts for Hetzner deployment
 ```
 
 ---
