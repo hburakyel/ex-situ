@@ -69,14 +69,7 @@ pnpm dev          # development
 # pnpm build && pnpm start  # production
 ```
 
-### 4 — ETL
 
-```bash
-cd etl
-python -m venv .venv && source .venv/bin/activate
-# export DATABASE_PASSWORD=your_password
-python export_for_llm.py
-```
 
 ---
 
@@ -87,6 +80,7 @@ ex-situ/
 ├── frontend/       # Next.js app (map, search, artifact views)
 ├── backend/        # Strapi CMS + PostGIS API + geospatial endpoints
 │   └── scripts/    # One-off data migration / admin scripts
+
 ```
 
 ---
