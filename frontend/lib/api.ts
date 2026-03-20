@@ -474,10 +474,6 @@ export async function fetchGeospatialData(
   filters?: { institutions?: string[]; countries?: string[]; cities?: string[] }
 ): Promise<GeospatialResponse> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-  if (!apiBaseUrl) {
-    console.error("API_BASE_URL is not set")
-    throw new Error("API_BASE_URL is not set")
-  }
 
   const floorZoom = Math.floor(zoom)
   
