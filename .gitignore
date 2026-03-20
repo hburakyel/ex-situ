@@ -1,0 +1,85 @@
+# Dependencies
+node_modules/
+
+# Environment variables — NEVER commit
+.env
+.env.local
+.env.development
+.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+.env.backup
+.env.bak
+**/.env
+**/.env.local
+**/.env.production
+**/.env.development
+
+# OS files
+*.DS_Store
+Thumbs.db
+
+# Backend (Strapi)
+backend/build/
+backend/.tmp/
+backend/.cache/
+backend/.strapi-updater.json
+backend/dist/
+backend/exports/
+
+# Frontend (Next.js)
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/tsconfig.tsbuildinfo
+
+# Python ETL
+etl/__pycache__/
+etl/env/
+etl/venv/
+etl/myenv/
+etl/.venv/
+*.pyc
+
+# Credentials / keys
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*.code-workspace
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Database dumps — large binary, never commit
+*.dump
+*.sql.gz
+
+# Large binary tiles
+*.pmtiles
+
+# ETL output / sensitive data
+etl/coordinates.json
+etl/geocode_cache.json
+temp_geo_data/
+
+# Dev notes
+memory.md
+
+# Script data outputs
+backend/scripts/*.csv
+backend/scripts/*.log
+backend/scripts/*.json
+!backend/scripts/pre-strapi.js

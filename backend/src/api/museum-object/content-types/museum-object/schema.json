@@ -1,0 +1,77 @@
+{
+  "kind": "collectionType",
+  "collectionName": "museum_objects",
+  "info": {
+    "singularName": "museum-object",
+    "pluralName": "museum-objects",
+    "displayName": "museum-object",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "object_id": {
+      "type": "biginteger"
+    },
+    "title": {
+      "type": "text"
+    },
+    "img_url": {
+      "type": "text"
+    },
+    "latitude": {
+      "type": "float"
+    },
+    "longitude": {
+      "type": "float"
+    },
+    "institution_place": {
+      "type": "string"
+    },
+    "source_link": {
+      "type": "text"
+    },
+    "institution_name": {
+      "type": "string"
+    },
+    "place_name": {
+      "type": "text"
+    },
+    "time": {
+      "type": "component",
+      "repeatable": true,
+      "component": "time-name.time-info"
+    },
+    "inventory_number": {
+      "type": "string"
+    },
+    "object_links": {
+      "type": "component",
+      "repeatable": true,
+      "component": "object-links.object-link-info"
+    },
+    "institution_longitude": {
+      "type": "float"
+    },
+    "institution_latitude": {
+      "type": "float"
+    },
+    "country_en": {
+      "type": "string"
+    },
+    "city_en": {
+      "type": "string"
+    },
+    "city_native": {
+      "type": "string"
+    },
+    "country_native": {
+      "type": "string"
+    },
+    "institution_country": {
+      "type": "string"
+    }
+  }
+}

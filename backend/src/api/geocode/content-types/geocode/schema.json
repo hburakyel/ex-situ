@@ -1,0 +1,14 @@
+{
+  "kind": "collectionType",
+  "collectionName": "geocodes",
+  "info": {
+    "singularName": "geocode",
+    "pluralName": "geocodes",
+    "displayName": "Geocode"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {}
+}

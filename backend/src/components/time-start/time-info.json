@@ -1,0 +1,15 @@
+{
+  "collectionName": "components_time_start_time_infos",
+  "info": {
+    "displayName": "time_info"
+  },
+  "options": {},
+  "attributes": {
+    "time_info": {
+      "displayName": "time_info",
+      "type": "component",
+      "repeatable": false,
+      "component": "time-end.time-info"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "backend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A Strapi application",
+  "scripts": {
+    "predev": "node scripts/pre-strapi.js",
+    "develop": "node scripts/pre-strapi.js && strapi develop",
+    "prestart": "node scripts/pre-strapi.js",
+    "start": "node scripts/pre-strapi.js && strapi start",
+    "build": "strapi build",
+    "strapi": "strapi",
+    "delete-entries": "node ./scripts/deleteAllEntries.js",
+    "publish-entries": "node ./scripts/publishAllEntries.js",
+    "setup-postgis": "node ./scripts/setupPostGIS.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@strapi/plugin-cloud": "^4.26.1",
+    "@strapi/plugin-i18n": "^4.26.1",
+    "@strapi/plugin-users-permissions": "^4.26.1",
+    "@strapi/strapi": "^4.26.1",
+    "axios": "^1.7.2",
+    "better-sqlite3": "8.6.0",
+    "deck.gl": "^9.0.0",
+    "maplibre-gl": "^3.0.0",
+    "pg": "^8.13.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-map-gl": "^7.1.0",
+    "react-router-dom": "5.3.4",
+    "styled-components": "5.3.3"
+  },
+  "author": {
+    "name": "A Strapi developer"
+  },
+  "strapi": {
+    "uuid": "13444a80-c460-46a8-a41d-593817da0e01"
+  },
+  "engines": {
+    "node": ">=18.0.0 <=20.x.x",
+    "npm": ">=6.0.0"
+  },
+  "license": "AGPL-3.0"
+}

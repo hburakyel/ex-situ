@@ -1,0 +1,768 @@
+@import "@radix-ui/themes/styles.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    /* Light mode specific styles */
+    --panel-bg: 0 0% 100%;
+    --panel-border: 0 0% 90%;
+    --panel-text: 0 0% 0%;
+    --panel-text-muted: 0 0% 45%;
+    --panel-backdrop: 0 0% 100% / 0.9;
+  }
+}
+
+@layer base {
+  * {
+    @apply font-mono font-normal;
+    font-size: 0.875rem;
+    color: black;
+    font-weight: 400;
+  }
+
+  .gallery-image-bg .relative {
+  background-image: none !important;
+  background-color: white !important;
+}
+
+.gallery-image-bg img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  width: auto;
+  height: auto;
+  display: block;
+  margin: auto;
+}
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    font-family: ui-monospace, monospace;
+  }
+
+  html,
+  body {
+    height: 100%;
+    width: 100%;
+  }
+
+  /* Optimize font rendering */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Apply monospace font to all text elements */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  a,
+  button,
+  input,
+  textarea,
+  select,
+  label,
+  div {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+}
+
+/* Map container styles — MapLibre GL */
+
+.maplibregl-map {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.maplibregl-canvas {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  outline: none;
+  z-index: 2;
+  /* Safari: force GPU compositing to prevent canvas flicker */
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+}
+
+/* Safari: prevent deck.gl overlay canvas from flipping */
+.maplibregl-map canvas + canvas {
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+}
+
+.map-container {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Add z-index rules for map elements */
+.maplibregl-control-container {
+  z-index: 10;
+}
+
+/* Ensure UI elements are above map layers */
+.map-controls {
+  z-index: 40;
+}
+
+.data-status-panel {
+  z-index: 40;
+}
+
+/* Make sure tooltips and popups are above everything */
+.maplibregl-popup {
+  z-index: 60;
+}
+
+/* Map tooltip styles */
+.maplibregl-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  pointer-events: none;
+  z-index: 60;
+  max-width: 300px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar styles */
+.sidebar {
+  transition: width 0.3s ease-in-out;
+  will-change: width;
+  contain: layout style;
+}
+
+/* Optimize image loading */
+img {
+  content-visibility: auto;
+  contain: content;
+}
+
+/* Optimize animations */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Optimize scrolling */
+.overflow-auto,
+.overflow-y-auto {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent layout shifts */
+.h-screen {
+  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+/* Fix for mobile viewport height */
+:root {
+  --vh: 1vh;
+}
+
+/* Optimize for GPU rendering */
+.transform,
+.transition,
+.animate-spin {
+  will-change: transform;
+}
+
+/* Prevent FOUC (Flash of Unstyled Content) */
+.invisible-until-loaded {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.loaded {
+  opacity: 1;
+}
+
+/* Add optimizations for arc rendering */
+.deck-layer {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  contain: content;
+}
+
+/* Optimize arc animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.arc-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Optimize the full-screen grid view */
+.full-screen-grid {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.grid-container {
+  contain: content;
+  content-visibility: auto;
+}
+
+/* Improve image loading performance */
+.grid-image {
+  content-visibility: auto;
+  contain: layout style paint;
+}
+
+/* RGB Green stroke border for image hover */
+.group-hover\:ring-\[rgb\$0\,255\,0\$\] {
+  box-shadow: 0 0 0 2px rgb(0, 255, 0);
+}
+
+/* Optimize image gallery transitions */
+.image-gallery-enter {
+  opacity: 0;
+}
+
+.image-gallery-enter-active {
+  opacity: 1;
+  transition: opacity 300ms;
+}
+
+.image-gallery-exit {
+  opacity: 1;
+}
+
+.image-gallery-exit-active {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+/* Blue highlight for selected image */
+.ring-blue-500 {
+  box-shadow: 0 0 0 2px rgb(59, 130, 246);
+}
+
+/* Masonry-like grid layout */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: minmax(0, auto);
+  grid-gap: 10px;
+}
+
+/* Custom modal styling to match reference */
+.resizable-panel {
+  backdrop-filter: blur(4px);
+  background-color: rgba(229, 229, 229, 0.9);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+/* Image gallery styling */
+.image-gallery-modal {
+  background-color: rgba(255, 255, 255, 0.98);
+  border-radius: 8px;
+  max-width: 100%;
+  overflow: hidden;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.image-container {
+  background-color: white;
+  border-radius: 8px;
+  margin: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Image gallery overlay */
+.image-gallery-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 49;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Image gallery animation */
+@keyframes galleryFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.image-gallery-modal {
+  animation: galleryFadeIn 0.2s ease-out;
+}
+
+/* Mobile image gallery animation */
+@keyframes galleryMobileFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .image-gallery-modal {
+    animation: galleryMobileFadeIn 0.2s ease-out;
+  }
+}
+
+/* Map control styles */
+.maplibregl-ctrl-group {
+  background-color: white !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.maplibregl-ctrl-group button {
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  color: black !important;
+  background-color: transparent !important;
+  border: none !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.maplibregl-ctrl-group button span {
+  filter: none !important;
+  /* Remove invert filter */
+}
+
+/* Style the globe button */
+.maplibregl-ctrl-globe {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Style the globe icon */
+.maplibregl-ctrl-globe svg {
+  width: 16px !important;
+  height: 16px !important;
+  stroke: black !important;
+  stroke-width: 2px !important;
+}
+
+/* Position the world view control below the navigation control */
+.world-view-control {
+  margin-top: 5px !important;
+}
+
+/* Hide MapLibre logo */
+.maplibregl-ctrl-logo {
+  display: none !important;
+}
+
+/* Hide attribution controls */
+.maplibregl-ctrl-attrib {
+  display: none !important;
+}
+
+/* Desktop: bottom-left controls */
+.maplibregl-ctrl-bottom-left {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  margin: 0 0 40px 40px !important;
+}
+
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl {
+  margin: 0 !important;
+}
+
+/* Mobile: top-right controls */
+.maplibregl-ctrl-top-right {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 10px !important;
+  margin: 20px 20px 0 0 !important;
+}
+
+.maplibregl-ctrl-top-right .maplibregl-ctrl {
+  margin: 0 !important;
+}
+
+/* Expanded panel: full-screen overlay → hide controls */
+[data-panel="mobile-expanded"] .maplibregl-ctrl-top-right {
+  display: none !important;
+}
+
+
+/* Arc tooltip styles */
+.arc-tooltip {
+  background-color: rgba(0, 0, 0, 0.85) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+  padding: 0 !important;
+  max-width: 300px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  z-index: 1000 !important;
+  /* Ensure tooltip is above other elements */
+}
+
+.arc-tooltip .maplibregl-popup-content {
+  background-color: transparent !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+}
+
+.arc-tooltip-content {
+  padding: 10px 12px;
+  color: white;
+  font-size: 12px;
+}
+
+.arc-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.arc-tooltip-label {
+  color: rgba(255, 255, 255, 0.7);
+  margin-right: 12px;
+  min-width: 50px;
+}
+
+.arc-tooltip-value {
+  color: white;
+  font-weight: 400;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Highlight the arc when hovering */
+.arc-hover {
+  stroke-width: 5px !important;
+  stroke: rgb(120, 255, 120) !important;
+  stroke-opacity: 1 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Cross-browser image gallery fixes */
+.image-gallery-modal img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Ensure consistent flexbox behavior */
+.flex {
+  display: flex;
+}
+
+.flex-1 {
+  flex: 1;
+  min-height: 0;
+  /* Important for Safari */
+}
+
+/* Ensure consistent object-fit behavior */
+.object-contain {
+  object-fit: contain;
+}
+
+/* Ensure consistent fixed positioning */
+.fixed {
+  position: fixed;
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+/* Vercel-style loading gradient */
+.loading-gradient {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(0, 255, 0, 0.1) 50%, rgba(0, 0, 0, 0) 100%);
+  background-size: 200% 100%;
+  animation: gradientMove 1.5s infinite;
+}
+
+@keyframes gradientMove {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Panel styling for light mode only */
+.panel {
+  background-color: hsl(var(--panel-bg));
+  color: hsl(var(--panel-text));
+  border-color: hsl(var(--panel-border));
+  backdrop-filter: blur(8px);
+}
+
+.panel-backdrop {
+  background-color: hsl(var(--panel-backdrop));
+}
+
+.panel-border {
+  border: 1px solid hsl(var(--panel-border));
+}
+
+.panel-text-muted {
+  color: hsl(var(--panel-text-muted));
+}
+
+/* Add these styles at the end of the file */
+.bg-white {
+  background-color: white !important;
+}
+
+/* Ensure consistent border colors */
+.border-gray-200 {
+  border-color: #e5e5e5 !important;
+}
+
+/* Ensure consistent text colors */
+.text-gray-500 {
+  color: #6b7280 !important;
+}
+
+/* Ensure consistent spacing */
+.gap-2 {
+  gap: 0.5rem !important;
+}
+
+.gap-3 {
+  gap: 0.75rem !important;
+}
+
+.gap-4 {
+  gap: 1rem !important;
+}
+
+/* Improve mobile responsiveness */
+@media (max-width: 640px) {
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .grid-cols-1 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Remove all borders — REMOVED (INC-06): Tailwind border classes are now source of truth.
+ * Components that need borderless look should use explicit border-0. */
+
+/* Map control buttons retain border:none since they override browser defaults */
+
+/* Padding overrides — REMOVED (INC-04): Tailwind's spacing scale is source of truth.
+ * Components needing 12px should use p-3 explicitly. */
+
+/* Add subtle shadow instead of borders for separation */
+.shadow-subtle {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Improve separation between items without borders */
+.space-y-2>*+* {
+  margin-top: 0.5rem !important;
+}
+
+/* Custom map control icon styles – only target the button-level ctrl-icon
+   used by our custom controls (Info, Layers, Globe). Do NOT override the
+   span.maplibregl-ctrl-icon inside MapLibre's NavigationControl – that span
+   uses background-image for its +/- icons.                               */
+button.maplibregl-ctrl-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 29px !important;
+  height: 29px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background-color: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+}
+
+button.maplibregl-ctrl-icon:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+button.maplibregl-ctrl-icon svg {
+  width: 15px !important;
+  height: 15px !important;
+  display: block !important;
+}
+
+/* Map provider dropdown menu */
+.map-provider-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  min-width: 140px;
+  z-index: 1000;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.map-provider-option {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.map-provider-option:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.map-provider-option.active {
+  background-color: rgba(0, 0, 0, 0.08);
+  font-weight: 400;
+}
+
+.map-provider-option svg {
+  margin-right: 8px;
+  width: 14px;
+  height: 14px;
+}
+
+/* ─── Resolver Dashboard utilities ─── */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #3a3a37;
+  border-radius: 2px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Scope resolver-dashboard to prevent global style bleed */
+.resolver-dashboard-root {
+  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

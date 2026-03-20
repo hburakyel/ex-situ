@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "statistics",
+  "info": {
+    "singularName": "stats",
+    "pluralName": "statistics",
+    "displayName": "stats",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "total_objects": {
+      "type": "integer"
+    },
+    "country_en": {
+      "type": "string"
+    },
+    "city_en": {
+      "type": "string"
+    },
+    "institution_name": {
+      "type": "string"
+    }
+  }
+}
