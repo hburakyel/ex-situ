@@ -186,10 +186,7 @@ export async function fetchStatsData() {
 // Function to fetch museum objects with optimized fields based on zoom level
 export async function fetchMuseumObjects(bounds: MapBounds, page = 1, pageSize = 50, zoom = 0) {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-  if (!apiBaseUrl) {
-    console.error("API_BASE_URL is not set")
-    throw new Error("API_BASE_URL is not set")
-  }
+ 
 
   // Ensure bounds are valid and not too restrictive
   const validBounds = {
@@ -328,10 +325,7 @@ export async function searchMuseumObjects(query: string, page = 1, pageSize = 50
 // Function to fetch a limited set of objects for initial filtering
 export async function fetchAllMuseumObjects(pageSize = 50) {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-  if (!apiBaseUrl) {
-    console.error("API_BASE_URL is not set")
-    throw new Error("API_BASE_URL is not set")
-  }
+ 
 
   try {
     // First, get the total count with a small request
@@ -610,10 +604,7 @@ export function clearApiCache() {
  */
 export async function fetchMuseumObjectById(id: string | number): Promise<MuseumObject | null> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-  if (!apiBaseUrl) {
-    console.error("API_BASE_URL is not set")
-    throw new Error("API_BASE_URL is not set")
-  }
+ 
 
   const cacheKey = `object:${id}`
 
