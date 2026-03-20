@@ -98,15 +98,10 @@ ex-situ/
 - **Map tiles** — [Protomaps](https://protomaps.com) (OpenStreetMap-derived, [ODbL](https://opendatacommons.org/licenses/odbl/))
 - **Base geodata** — © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)
 - **Reverse geocoding** — [Nominatim](https://nominatim.org) / OpenStreetMap
-- **Institutional sources** — Staatliche Museen zu Berlin (SMB), The Metropolitan Museum of Art, The British Museum, Ethnologisches Museum Berlin
+- **Institutional sources** — Staatliche Museen zu Berlin (SMB), The Metropolitan Museum of Art
 
 ---
 
-## Contributing
-
-See CONTRIBUTING.md for how to add new institution resolvers.
-
----
 
 ## License
 
