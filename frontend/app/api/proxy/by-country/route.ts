@@ -8,9 +8,9 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
-  if (!apiBaseUrl) {
-    return NextResponse.json({ error: "API_BASE_URL is not configured" }, { status: 500 })
-  }
+   const resolvedUrl = apiBaseUrl 
+    ? apiBaseUrl.replace("localhost", "127.0.0.1")
+    : "http://127.0.0.1:1337/api"
 
   const country = searchParams.get("country")
   if (!country) {
@@ -26,9 +26,7 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  try {
-    const resolvedBaseUrl = apiBaseUrl.replace("localhost", "127.0.0.1")
-    // Only forward known safe parameters — prevent Strapi filter injection
+try {
     const ALLOWED_PARAMS = new Set(['country', 'site', 'institution', 'page', 'pageSize'])
     const safeParams = new URLSearchParams()
     for (const [key, value] of searchParams.entries()) {
@@ -36,7 +34,7 @@ export async function GET(request: NextRequest) {
         safeParams.set(key, value)
       }
     }
-    const apiURL = `${resolvedBaseUrl}/museum-objects/by-country?${safeParams.toString()}`
+    const apiURL = `${resolvedUrl}/museum-objects/by-country?${safeParams.toString()}`
 
     const response = await fetch(apiURL, {
       headers: { "Content-Type": "application/json", "User-Agent": "ExSitu/1.0" },
