@@ -202,7 +202,7 @@ Please open an issue before submitting a pull request.
 
 ## Funding
 
-This project has received support from [HAB Hessen-Abschlussförderung](https://hessische-kulturstiftung.de) (2022).
+This project has received support from [HAB Hessen-Abschlussförderung](https://hab-hessen.de) (2022).
 
 ---
 
