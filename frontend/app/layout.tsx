@@ -39,6 +39,6 @@ export default function RootLayout({
 }
 
 export const metadata = {
-  title: 'Ex Situ',
-  description: 'Mapping displaced cultural heritage objects',
+  title: 'Ex Situ — Relational Spatial Index',
+  description: 'An open-source geospatial infrastructure that transforms institutional hyperlinks into a unified spatial index of cultural heritage provenance.',
 };
