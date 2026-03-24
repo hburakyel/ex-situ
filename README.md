@@ -15,7 +15,7 @@ Ex Situ is an open-source spatial digital commons platform and geospatial infras
 
 ## How It Works
 
-Ex Situ functions as a **Relational Spatial Index** — an indexer, not a hoster. It is institutionally friendly and legally clean, built around opt-in contribution rather than adversarial scraping.
+Ex Situ functions as a **Relational Spatial Index** — an indexer, not a hoster. It built around opt-in contribution rather than adversarial scraping.
 
 Three foundational concepts:
 
