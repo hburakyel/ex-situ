@@ -271,15 +271,8 @@ export default function ObjectPanel({
     onFacetedFiltersChange?.({ institutions: [], countries: [], cities: [] })
   }, [onFacetedFiltersChange])
 
-  // Display name: only show geocoded name (not locationName fallback)
+   // Display name: only show geocoded name (not locationName fallback)
   const displayName = geocodedName || ''
-  // Split on first comma for two-line display: "Bergama," / "Aegean Region, Turkey"
-  const [displayLine1, displayLine2] = useMemo(() => {
-    if (!displayName) return ['', '']
-    const idx = displayName.indexOf(',')
-    if (idx === -1) return [displayName, '']
-    return [displayName.slice(0, idx + 1), displayName.slice(idx + 1).trim()]
-  }, [displayName])
   // Show resolved line when both names exist and differ
   const showResolved = !!(geocodedName && locationName && geocodedName.toLowerCase() !== locationName.toLowerCase())
 
@@ -592,21 +585,18 @@ export default function ObjectPanel({
               {/* Unified header — artifact count + context */}
               <div className="flex items-start justify-between gap-2">
                 <div className="text-sm min-w-0">
-                  <span className="flex items-center flex-wrap">
-                    <span className="text-black">{totalCount}</span>
+                  <div className="flex items-baseline flex-wrap leading-tight">
+                    <span className="text-black font-medium">{totalCount}</span>
                     <span className="ml-1">
                       artifact{totalCount !== 1 ? "s" : ""}
                       {drillLevel === "global"
                         ? (collectionCount > 0 ? ` from ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "")
-                        : activeSite
-                          ? (displayLine1 ? ` from ${displayLine1}` : "")
-                          : (locationName ? ` from ${locationName}` : "")}
+                        : (displayName || locationName)
+                          ? ` from ${displayName || locationName}`
+                          : ""}
                     </span>
-                    {isLoading && <Spinner className="ml-2 h-3 w-3" />}
-                  </span>
-                  {drillLevel !== "global" && activeSite && displayLine2 && (
-                    <span className="block text-sm">{displayLine2}</span>
-                  )}
+                    {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {/* Three-dot menu with Share & Download */}
