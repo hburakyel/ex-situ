@@ -713,7 +713,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           if (info.layer.id === 'arc-layer-geospatial') {
             const curZ = mapRef.getZoom()
             if (curZ < 4) animateToZoomLevel([lng, lat], 5, { mode: 'level-shift', duration: 950 })
-            else animateToZoomLevel([lng, lat], 10, { mode: 'level-shift', duration: 900 })
+            else animateToZoomLevel([lng, lat], 6, { mode: 'level-shift', duration: 900 })
           } else if (info.layer.id === 'arc-layer-objects') {
             animateToZoomLevel([lng, lat], 14, { mode: 'detail', duration: 800 })
           } else {
