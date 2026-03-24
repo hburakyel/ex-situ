@@ -579,16 +579,16 @@ export default function ObjectPanel({
             </div>
           )}
 
-          {/* Everything below breadcrumb: hidden when mobile minimized */}
-          {!(isMobile && containerSize === "minimized") && (
+        {!(isMobile && containerSize === "minimized") && (
             <>
-              {/* Unified header — artifact count + context */}
               <div className="flex items-start justify-between gap-2">
-                <div className="text-sm min-w-0">
-                  <div className="flex items-baseline flex-wrap leading-tight">
-                    <span className="text-black font-medium">{totalCount}</span>
-                    <span className="ml-1">
-                      artifact{totalCount !== 1 ? "s" : ""}
+                <div className="text-sm min-w-0 flex-1">
+                  <div className="leading-normal text-left">
+                    <span className="inline-block whitespace-nowrap">
+                      <span className="text-black font-medium">{totalCount}</span>
+                      <span className="ml-1">artifact{totalCount !== 1 ? "s" : ""}</span>
+                    </span>
+                    <span>
                       {drillLevel === "global"
                         ? (collectionCount > 0 ? ` from ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "")
                         : (displayName || locationName)
@@ -598,8 +598,7 @@ export default function ObjectPanel({
                     {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {/* Three-dot menu with Share & Download */}
+                <div className="flex items-center gap-2 shrink-0">
                   {objects.length > 0 && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
