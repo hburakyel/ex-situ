@@ -225,7 +225,7 @@ return (
     <div
       className={
         [
-          "relative inline-flex overflow-hidden bg-white rounded-[10px]",
+          "relative inline-flex overflow-hidden bg-white rounded-[4px]",
           loadedImages[object.id] && isSelected ? "ring-2 ring-blue-500" : "",
           loadedImages[object.id] ? "group-hover:ring-2 group-hover:ring-blue-500" : ""
         ].join(" ")
@@ -252,7 +252,7 @@ return (
             src={object.attributes.img_url!}
             alt={object.attributes?.title || "Museum object"}
             className="block"
-            imgClassName="block max-h-36 w-auto bg-white"
+            imgClassName="block max-h-44 w-auto bg-white"
             onLoad={() => handleImageLoad(object.id)}
             onError={() => handleImageError(object.id)}
             loading="lazy"
