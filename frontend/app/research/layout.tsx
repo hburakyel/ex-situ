@@ -10,10 +10,6 @@ import type { ArcData, PlaceResult } from "@/hooks/use-unified-search"
 const NAV_ITEMS = [
   { label: "research", href: "/research" },
   { label: "map", href: "/map" },
-  { label: "about", href: "/about" },
-  { label: "community", href: "/community" },
-  { label: "api", href: "/api" },
-  { label: "help", href: "/help" },
 ]
 
 export default function ResearchLayout({ children }: { children: React.ReactNode }) {
