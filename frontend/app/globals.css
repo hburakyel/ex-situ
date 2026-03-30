@@ -749,20 +749,3 @@ button.maplibregl-ctrl-icon svg {
   height: 14px;
 }
 
-/* ─── Resolver Dashboard utilities ─── */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 3px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #3a3a37;
-  border-radius: 2px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* Scope resolver-dashboard to prevent global style bleed */
-.resolver-dashboard-root {
-  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
