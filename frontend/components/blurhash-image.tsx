@@ -22,6 +22,17 @@ interface BlurhashImageProps {
 const MAX_BLURHASH_CACHE_SIZE = 500
 const blurhashCache = new Map<string, string>()
 
+function toProxySrc(src: string): string {
+  try {
+    if (new URL(src).hostname === "id.smb.museum") {
+      return `/api/img?url=${encodeURIComponent(src)}`
+    }
+  } catch {
+    // not a valid absolute URL — return as-is
+  }
+  return src
+}
+
 /** LRU-style eviction: when cache exceeds limit, drop oldest entries */
 function blurhashCacheSet(key: string, value: string) {
   // If already cached, delete first so re-insert moves it to the end (recent)
@@ -176,7 +187,7 @@ export default function BlurhashImage({
     >
       <img
         ref={imgRef}
-        src={imageSrc}
+        src={toProxySrc(imageSrc)}
         alt={alt}
         loading={loading}
         decoding="async"

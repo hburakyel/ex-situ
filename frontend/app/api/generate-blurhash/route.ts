@@ -96,7 +96,10 @@ export async function GET(request: NextRequest) {
 
     const blurhash = encode(new Uint8ClampedArray(data), info.width, info.height, 4, 4)
 
-    return NextResponse.json({ blurhash, width: info.width, height: info.height })
+    return NextResponse.json(
+      { blurhash, width: info.width, height: info.height },
+      { headers: { "Cache-Control": "public, max-age=86400" } },
+    )
   } catch {
     return NextResponse.json({ error: "Failed to process image" }, { status: 500 })
   }
