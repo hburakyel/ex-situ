@@ -179,11 +179,22 @@ Production deployment uses Nginx as reverse proxy with Let's Encrypt SSL.
 
 ## Attribution
 
-- **Map tiles** — [Protomaps](https://protomaps.com) (OpenStreetMap-derived, [BSD 2-Clause](https://github.com/protomaps/basemaps/blob/main/LICENSE))
-- **Base geodata** — © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright) ([ODbL](https://opendatacommons.org/licenses/odbl/))
-- **Reverse geocoding** — [Nominatim](https://nominatim.org) / OpenStreetMap
-- **Natural Earth** — Public domain geodata for gazetteer
-- **Institutional sources** — Staatliche Museen zu Berlin (SMB-AM), The Metropolitan Museum of Art
+### Map & Visualization
+
+- **[Protomaps](https://protomaps.com)** — PMTiles tile format and basemap renderer ([BSD 2-Clause](https://github.com/protomaps/basemaps/blob/main/LICENSE))
+- **[MapLibre GL JS](https://maplibre.org)** — Open-source WebGL map rendering engine ([BSD 2-Clause](https://github.com/maplibre/maplibre-gl-js/blob/main/LICENSE.txt))
+- **[Deck.gl](https://deck.gl)** — WebGL-powered geospatial visualization layers by [vis.gl](https://vis.gl) ([MIT](https://github.com/visgl/deck.gl/blob/master/LICENSE))
+
+### Geodata
+
+- **© [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)** — Base map data ([ODbL 1.0](https://opendatacommons.org/licenses/odbl/)). Map data is open data, licensed under the Open Data Commons Open Database License.
+- **[Nominatim](https://nominatim.org)** — Reverse geocoding and place name resolution, powered by OpenStreetMap data
+- **[Natural Earth](https://www.naturalearthdata.com)** — Public domain geodata for country and region boundaries
+
+### Institutional Data Sources
+
+- **[Staatliche Museen zu Berlin](https://www.smb.museum)** — SMB-Digital / SMB-AM collection metadata
+- **[The Metropolitan Museum of Art](https://www.metmuseum.org)** — Open Access collection data ([CC0](https://creativecommons.org/publicdomain/zero/1.0/))
 
 ---
 
