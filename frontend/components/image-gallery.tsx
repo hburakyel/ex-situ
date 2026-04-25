@@ -169,49 +169,33 @@ export default function ImageGallery({
         }}
       >
         {/* Header with navigation controls */}
-        <div
-          style={{
-            padding: isMobile ? "16px" : "12px",
-            borderBottom: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            backgroundColor: "white",
-          }}
-        >
-          <div style={{ fontSize: "14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: "1 1 0" }}>
-            <span style={{ color: "black" }}>
-              {currentIndex + 1} / {objects.length}
-            </span>
+
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 bg-white">
+          <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm" style={{fontSize:14}}>
+            <span className="text-black">{currentIndex + 1} / {objects.length}</span>
             {currentObject.attributes.inventory_number && (
-              <span style={{ color: "#666", marginLeft: "8px" }}>
-                ID: <span style={{ color: "black" }}>{currentObject.attributes.inventory_number}</span>
+              <span className="text-[#666] ml-2">
+                ID: <span className="text-black">{currentObject.attributes.inventory_number}</span>
               </span>
             )}
           </div>
-
-          <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-8 w-8">
+          <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-6 w-6">
               <ChevronLeftIcon className="h-4 w-4" />
             </Button>
-
-            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={handleNext} className="h-6 w-6">
               <ChevronRightIcon className="h-4 w-4" />
             </Button>
-
-            {/* Object detail page link */}
             <Link href={`/artifact/${currentObject.id}`} onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-6 w-6"
                 title="Object Details"
               >
                 <Info className="h-4 w-4" />
               </Button>
             </Link>
-
-            {/* Source link — opens in new tab */}
             {getLinkUrl() && (
               <Button
                 variant="ghost"
@@ -221,14 +205,13 @@ export default function ImageGallery({
                   const url = getLinkUrl()
                   if (url) window.open(url, "_blank", "noopener,noreferrer")
                 }}
-                className="h-8 w-8"
+                className="h-6 w-6"
                 title="View Source"
               >
                 <IconSource className="h-4 w-4" />
               </Button>
             )}
-
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6">
               <IconClose className="h-4 w-4" />
             </Button>
           </div>

@@ -200,8 +200,10 @@ function MapContent() {
     const source = activeInstitution && filteredSubArcs.length > 0
       ? filteredSubArcs.filter((a) => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
       : filteredSubArcs
-    const map = new Map<string, { totalCount: number; institutions: Set<string>; lat: number; lng: number }>()
+    // Prefer place_name_normalized for display if available
+    const map = new Map<string, { totalCount: number; institutions: Set<string>; lat: number; lng: number; displayName: string }>()
     source.forEach((arc) => {
+      const displayName = arc.place_name_normalized || arc.place_name
       const existing = map.get(arc.place_name)
       if (existing) {
         existing.totalCount += arc.object_count
@@ -212,6 +214,7 @@ function MapContent() {
           institutions: new Set([arc.institution_name]),
           lat: arc.latitude,
           lng: arc.longitude,
+          displayName,
         })
       }
     })
@@ -222,6 +225,7 @@ function MapContent() {
         institutions: Array.from(data.institutions),
         lat: data.lat,
         lng: data.lng,
+        displayName: data.displayName,
       }))
       .sort((a, b) => b.totalCount - a.totalCount)
   }, [filteredSubArcs, activeInstitution])
@@ -259,7 +263,8 @@ function MapContent() {
     // Always show "Ex Situ" as root
     segments.push({ label: "Ex Situ", level: "global" })
     if (activeCountry) segments.push({ label: activeCountry, level: "country" })
-    if (activeSite) segments.push({ label: activeSite, level: "objects" })
+    // Deduplication: if activeSite === activeCountry, skip site segment
+    if (activeSite && activeSite !== activeCountry) segments.push({ label: activeSite, level: "objects" })
     if (activeInstitution && !activeSite) segments.push({ label: activeInstitution, level: "objects" })
     return segments
   }, [activeCountry, activeSite, activeInstitution])

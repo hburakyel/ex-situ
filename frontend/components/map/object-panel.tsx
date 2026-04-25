@@ -15,19 +15,20 @@ import BlurhashImage from "@/components/blurhash-image"
 import type { MuseumObject } from "@/types"
 import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
+import InfoPanel from "./info-panel"
 
 export type ContainerSize = "default" | "expanded" | "minimized"
 
 export type FacetedFilters = { institutions: string[]; countries: string[]; cities: string[] }
 
-type DrillLevel = "global" | "country" | "objects"
+export type DrillLevel = "global" | "country" | "objects"
 
-interface BreadcrumbSegment {
+export interface BreadcrumbSegment {
   label: string
   level: DrillLevel
 }
 
-interface GroupedOrigin {
+export interface GroupedOrigin {
   country: string
   totalCount: number
   institutions: string[]
@@ -35,7 +36,7 @@ interface GroupedOrigin {
   lng: number
 }
 
-interface GroupedSite {
+export interface GroupedSite {
   name: string
   totalCount: number
   institutions: string[]
@@ -43,7 +44,7 @@ interface GroupedSite {
   lng: number
 }
 
-interface InstitutionItem {
+export interface InstitutionItem {
   name: string
   count: number
 }
@@ -503,6 +504,7 @@ export default function ObjectPanel({
 
   const containerStyle = getContainerStyle()
 
+
   return (
     <div
       ref={containerRef}
@@ -549,220 +551,149 @@ export default function ObjectPanel({
             <div className="w-9 h-1 rounded-full bg-gray-300" />
           </div>
         )}
-        {/* Header */}
-        <div className="sticky top-0 z-30 p-4 pt-2 flex flex-col bg-white">
-          {/* Mobile breadcrumb + search row — always visible */}
-          {isMobile && (
-            <div className="flex items-center justify-between pb-1.5 text-sm">
-              <div className="min-w-0 leading-snug">
-                {breadcrumb.map((seg, i) => (
-                  <span key={i}>
-                    {i > 0 && <span className="text-black/40 text-sm mx-1">/</span>}
-                    {i < breadcrumb.length - 1 ? (
-                      <button
-                        className="text-black/60 hover:text-black hover:underline transition-colors"
-                        onClick={() => onBreadcrumbClick?.(seg.level)}
-                      >
-                        {seg.label}
-                      </button>
-                    ) : (
-                      <span className="text-black font-medium">{seg.label}</span>
-                    )}
-                  </span>
-                ))}
+        {/* Header: Desktop and Mobile layouts */}
+        {isMobile ? (
+          <div className="sticky top-0 z-30 flex flex-col bg-white">
+            <div className="flex items-center justify-between text-sm min-w-0 px-4 pt-0">
+              <div className="flex items-center min-w-0 flex-1 overflow-hidden">
+                {breadcrumb.map((seg, i) => {
+                  const isLast = i === breadcrumb.length - 1
+                  return (
+                    <span
+                      key={i}
+                      className={`flex items-center ${isLast ? "min-w-0 overflow-hidden" : "flex-shrink-0"}`}
+                    >
+                      {i > 0 && <span className="text-black/30 mx-1 flex-shrink-0">/</span>}
+                      {isLast ? (
+                        <span
+                          className="text-black font-medium truncate"
+                          title={seg.label}
+                        >
+                          {seg.label}
+                        </span>
+                      ) : (
+                        <button
+                          className="text-black/60 hover:text-black underline-offset-2 hover:underline transition-colors whitespace-nowrap"
+                          onClick={() => onBreadcrumbClick?.(seg.level)}
+                        >
+                          {seg.label}
+                        </button>
+                      )}
+                    </span>
+                  )
+                })}
               </div>
-              {onCommandPaletteOpen && (
-                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 ml-2" onClick={onCommandPaletteOpen} title="Search (⌘K)">
-                  <IconSearch className="w-4 h-4 text-gray-500" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                {onCommandPaletteOpen && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
+                    <IconSearch className="w-4 h-4 text-gray-500" />
+                  </Button>
+                )}
+              </div>
             </div>
-          )}
-
-        {!(isMobile && containerSize === "minimized") && (
-            <>
-              <div className="flex items-start justify-between gap-2">
-                <div className="text-sm min-w-0 flex-1">
-                  <div className="leading-normal text-left">
-                    <span className="inline-block whitespace-nowrap">
-                      <span className="text-black font-medium">{totalCount}</span>
-                      <span className="ml-1">artifact{totalCount !== 1 ? "s" : ""}</span>
-                    </span>
-                    <span>
-                      {drillLevel === "global"
-                        ? (collectionCount > 0 ? ` from ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "")
-                        : (displayName || locationName)
-                          ? ` from ${displayName || locationName}`
-                          : ""}
-                    </span>
-                    {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {objects.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" title="More options">
-                          <MoreHorizontal className="h-4 w-4 text-gray-500" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-[160px]">
-                        <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
-                          {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4" />}
-                          {showCopied ? "Link copied!" : "Share link"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={downloadObjectsAsCSV} className="gap-2 cursor-pointer">
-                          <IconDownloadCsv className="h-4 w-4" />
-                          Download CSV
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                  {/* Expand/minimize — desktop only */}
-                  {!isMobile && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={toggleSize}>
-                      {containerSize === "expanded" ? <IconMinimize className="h-4 w-4 text-gray-500" /> : <IconExpand className="h-4 w-4 text-gray-500" />}
+            <InfoPanel
+                isMobile={isMobile}
+                containerSize={containerSize}
+                breadcrumb={[]}
+                onBreadcrumbClick={undefined}
+                onCommandPaletteOpen={undefined}
+                actionSlot={objects.length > 0 ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="More options">
+                        <MoreHorizontal className="h-4 w-4 text-gray-500" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-[160px]">
+                      <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
+                        {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4" />}
+                        {showCopied ? "Link copied!" : "Share link"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={downloadObjectsAsCSV} className="gap-2 cursor-pointer">
+                        <IconDownloadCsv className="h-4 w-4" />
+                        Download CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : undefined}
+                totalCount={totalCount}
+                collectionCount={collectionCount}
+                isLoading={isLoading}
+                drillLevel={drillLevel}
+                groupedOrigins={groupedOrigins}
+                isLoadingOrigins={isLoadingOrigins}
+                onOriginClick={onOriginClick}
+                groupedSites={groupedSites}
+                activeSite={activeSite}
+                onToggleSite={onToggleSite}
+                isLoadingSubArcs={isLoadingSubArcs}
+                drillInstitutions={drillInstitutions}
+                activeInstitution={activeInstitution}
+                onToggleInstitution={onToggleInstitution}
+                facetedFilters={facetedFilters}
+                removeFilter={removeFilter}
+                clearAllFilters={clearAllFilters}
+                locationName={locationName}
+                geocodedName={geocodedName}
+              />
+          </div>
+        ) : (
+          <div className="sticky top-0 z-30 flex flex-row items-start bg-white">
+            <div className="flex-1 min-w-0">
+              <InfoPanel
+                isMobile={isMobile}
+                containerSize={containerSize}
+                breadcrumb={[]}
+                onBreadcrumbClick={undefined}
+                onCommandPaletteOpen={undefined}
+                totalCount={totalCount}
+                collectionCount={collectionCount}
+                isLoading={isLoading}
+                drillLevel={drillLevel}
+                groupedOrigins={groupedOrigins}
+                isLoadingOrigins={isLoadingOrigins}
+                onOriginClick={onOriginClick}
+                groupedSites={groupedSites}
+                activeSite={activeSite}
+                onToggleSite={onToggleSite}
+                isLoadingSubArcs={isLoadingSubArcs}
+                drillInstitutions={drillInstitutions}
+                activeInstitution={activeInstitution}
+                onToggleInstitution={onToggleInstitution}
+                facetedFilters={facetedFilters}
+                removeFilter={removeFilter}
+                clearAllFilters={clearAllFilters}
+                locationName={locationName}
+                geocodedName={geocodedName}
+              />
+            </div>
+            <div className="flex items-center gap-2 shrink-0 pt-2 pr-4">
+              {objects.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="More options">
+                      <MoreHorizontal className="h-4 w-4 text-gray-500" />
                     </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Mobile: Drill-down sections (after artifact count) */}
-              {isMobile && (
-                <div className="text-sm">
-                  {/* Places (global) */}
-                  {drillLevel === "global" && groupedOrigins.length > 0 && (
-                    <div className="pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="panel-text-muted">
-                          Places
-                          {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
-                          onClick={() => setShowOrigins(!showOrigins)}
-                        >
-                          {showOrigins ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      {showOrigins && (
-                        <div className="mt-1 pl-2">
-                          <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
-                            {groupedOrigins.map((origin, index) => (
-                                <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
-                                  onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
-                                >
-                                  <span className="truncate max-w-[70%]">{origin.country}</span>
-                                  <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
-                                </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Sites (country) */}
-                  {drillLevel !== "global" && groupedSites.length > 0 && (
-                    <div className="pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="panel-text-muted">
-                          Sites
-                          {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
-                          onClick={() => setShowSites(!showSites)}
-                        >
-                          {showSites ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      {showSites && (
-                        <div className="mt-1 pl-2">
-                          <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
-                            {groupedSites.map((site, index) => (
-                              <div key={index}
-                                className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-blue-50 ring-1 ring-blue-200" : ""}`}
-                                onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
-                              >
-                                <span className="truncate max-w-[70%]">{site.name}</span>
-                                <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Institutions (country) */}
-                  {drillLevel !== "global" && drillInstitutions.length > 0 && (
-                    <div className="pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="panel-text-muted">
-                          Collections
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
-                          onClick={() => setShowCollections(!showCollections)}
-                        >
-                          {showCollections ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      {showCollections && (
-                        <div className="mt-1 pl-2">
-                          <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
-                            {drillInstitutions.map((inst, index) => (
-                              <div key={index}
-                                className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-amber-50 ring-1 ring-amber-200" : ""}`}
-                                onClick={() => onToggleInstitution?.(inst.name)}
-                              >
-                                <span className="truncate max-w-[70%]">{inst.name}</span>
-                                <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[160px]">
+                    <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
+                      {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4" />}
+                      {showCopied ? "Link copied!" : "Share link"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={downloadObjectsAsCSV} className="gap-2 cursor-pointer">
+                      <IconDownloadCsv className="h-4 w-4" />
+                      Download CSV
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-
-              {/* Filter chips */}
-              {activeFilterCount > 0 && (
-                <div className="flex flex-wrap items-center gap-1 pt-1">
-                  {facetedFilters.countries.map(c => (
-                    <span key={`c-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-sm">
-                      {c}
-                      <button onClick={() => removeFilter('countries', c)} className="hover:bg-blue-100 rounded-md p-0.5">
-                        <IconClose className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                  {facetedFilters.cities.map(c => (
-                    <span key={`s-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-sm">
-                      {c}
-                      <button onClick={() => removeFilter('cities', c)} className="hover:bg-blue-100 rounded-md p-0.5">
-                        <IconClose className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                  {facetedFilters.institutions.map(c => (
-                    <span key={`i-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 text-sm">
-                      {c}
-                      <button onClick={() => removeFilter('institutions', c)} className="hover:bg-orange-100 rounded-md p-0.5">
-                        <IconClose className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                  {activeFilterCount > 1 && (
-                    <button onClick={clearAllFilters} className="text-sm text-gray-400 hover:text-gray-600 px-1">
-                      Clear all
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+              {/* Expand/minimize — desktop only */}
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={toggleSize}>
+                {containerSize === "expanded" ? <IconMinimize className="h-4 w-4 text-gray-500" /> : <IconExpand className="h-4 w-4 text-gray-500" />}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Content — objects */}
         {containerSize !== "minimized" && (
@@ -869,7 +800,7 @@ export default function ObjectPanel({
                         {linkCard.attributes.place_name || linkCard.attributes.country_en || ''}
                       </span>
                     </div>
-                  </div>,
+                  </div>
                 ])}
               </div>
             </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from "react"
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, useMemo, Fragment } from "react"
 import maplibregl from "maplibre-gl"
 import { Protocol } from "pmtiles"
 import { MapboxOverlay } from "@deck.gl/mapbox"
@@ -391,7 +391,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       // ── MapboxOverlay (deck.gl as MapLibre control — identical API) ──
       try {
         deckOverlay.current = new MapboxOverlay({ interleaved: true, layers: [] })
-        mapInstance.addControl(deckOverlay.current)
+        mapInstance.addControl(deckOverlay.current as unknown as maplibregl.IControl)
       } catch (error) {
         console.error("Error creating deck.gl overlay:", error)
       }
@@ -551,7 +551,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         // Cancel any pending debounced bounds change
         debouncedBoundsChangeRef.current.cancel()
         if (deckOverlay.current) {
-          try { mapInstance.removeControl(deckOverlay.current) } catch (e) {}
+          try { mapInstance.removeControl(deckOverlay.current as unknown as maplibregl.IControl) } catch (e) {}
           deckOverlay.current = null
         }
         if (mapInstance) {
@@ -858,7 +858,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             </button>
             {/* Image */}
             {selectedDoc.img_url && (
-              <div className="w-full h-40 bg-gray-50 flex items-center justify-center overflow-hidden">
+              <div className="w-full h-40  bg-blue-50 flex items-center justify-center overflow-hidden">
                 <img
                   src={selectedDoc.img_url}
                   alt={selectedDoc.title}
@@ -893,24 +893,27 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         <div className="absolute top-10 left-10 sm:w-80 z-20">
         <div className="bg-white rounded-2xl shadow-lg flex flex-col relative">
           {/* ── Breadcrumb header with controls ── */}
-          <div className="flex items-center justify-between px-4 pt-2 pb-2">
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1 flex-wrap text-sm text-black flex-1">
-              {breadcrumb.map((seg, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-black text-sm">/</span>}
-                  {i < breadcrumb.length - 1 ? (
-                    <button
-                      className="text-black hover:underline transition-colors whitespace-normal text-left"
-                      onClick={() => onBreadcrumbClick?.(seg.level)}
-                    >
-                      {seg.label}
-                    </button>
-                  ) : (
-                    <span className="text-black font-medium break-words whitespace-normal">{seg.label}</span>
-                  )}
-                </span>
-              ))}
+            <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm text-black">
+              {breadcrumb.map((seg, i) => {
+                const isLast = i === breadcrumb.length - 1
+                return (
+                  <Fragment key={i}>
+                    {i > 0 && <span className="text-black/30 px-1 flex-shrink-0">/</span>}
+                    {isLast ? (
+                      <span className="font-medium truncate min-w-0" title={seg.label}>{seg.label}</span>
+                    ) : (
+                      <button
+                        className="hover:underline transition-colors whitespace-nowrap flex-shrink-0 text-left"
+                        onClick={() => onBreadcrumbClick?.(seg.level)}
+                      >
+                        {seg.label}
+                      </button>
+                    )}
+                  </Fragment>
+                )
+              })}
             </div>
             {/* Controls */}
             <div className="flex items-center gap-2 ml-2">
@@ -950,7 +953,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             </div>
           )}
 
-          <div className="px-2 pb-2 text-sm">
+          <div className="px-4 pb-4 text-sm">
             {/* ── Places Section (drill-down) ── */}
             {drillLevel === "global" && groupedOrigins.length > 0 && (
               <div className="pt-2 mt-1">
@@ -970,7 +973,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   <div className="mt-1 pl-2">
                     <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                       {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <span className="truncate max-w-[70%]">{origin.country}</span>
@@ -1003,7 +1006,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                     <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                       {groupedSites.map((site, index) => (
                         <div key={index}
-                          className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-blue-50 ring-1 ring-blue-200" : ""}`}
+                          className={`flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-blue-100  " : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                         >
                           <span className="truncate max-w-[70%]">{site.name}</span>
@@ -1035,7 +1038,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                     <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                       {drillInstitutions.map((inst, index) => (
                         <div key={index}
-                          className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-amber-50 ring-1 ring-amber-200" : ""}`}
+                          className={`flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-amber-100" : ""}`}
                           onClick={() => onToggleInstitution?.(inst.name)}
                         >
                           <span className="truncate max-w-[70%]">{inst.name}</span>
