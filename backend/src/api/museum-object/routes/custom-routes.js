@@ -28,6 +28,16 @@ module.exports = {
     },
     {
       method: 'GET',
+      path: '/museum-objects/by-inventory/:inventoryNo',
+      handler: 'museum-object.byInventoryNumber',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
       path: '/museum-objects/resolver-stats',
       handler: 'museum-object.resolverStats',
       config: {

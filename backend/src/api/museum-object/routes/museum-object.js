@@ -1,18 +1,10 @@
 'use strict';
 
-module.exports = {
-  routes: [
-    {
-      method: 'GET',
-      path: '/museum-objects/geospatial',
-      handler: 'museum-object.geospatial',
-      config: { auth: false, policies: [], middlewares: [] },
-    },
-    {
-      method: 'GET',
-      path: '/museum-objects/by-country',
-      handler: 'museum-object.byCountry',
-      config: { auth: false, policies: [], middlewares: [] },
-    },
-  ],
-};
+const { createCoreRouter } = require('@strapi/strapi').factories;
+
+module.exports = createCoreRouter('api::museum-object.museum-object', {
+  config: {
+    find:    { auth: false, policies: [], middlewares: [] },
+    findOne: { auth: false, policies: [], middlewares: [] },
+  },
+});

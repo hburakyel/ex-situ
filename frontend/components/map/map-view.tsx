@@ -894,7 +894,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         <div className="absolute top-10 left-10 sm:w-80 z-20">
         <div className="bg-white rounded-2xl shadow-lg flex flex-col relative">
           {/* ── Breadcrumb header with controls ── */}
-          <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <div className="flex items-center justify-between px-4 pt-2 pb-2">
             {/* Breadcrumb */}
             <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm text-black">
               {breadcrumb.map((seg, i) => {
@@ -956,7 +956,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             </div>
           )}
 
-          <div className="px-4 pb-4 text-sm">
+          <div className="px-4 pb-3 text-sm">
             {/* ── Places Section (drill-down) ── */}
             {drillLevel === "global" && groupedOrigins.length > 0 && (
               <div className="pt-0 mt-1">

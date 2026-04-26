@@ -603,6 +603,113 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
   },
 
   /**
+   * Fetch a single object by inventory_number (exact match).
+   * Returns the Strapi-shaped { id, attributes } object or null.
+   */
+  async getObjectByInventoryNumber(inventoryNumber) {
+    const db = strapi.db.connection;
+
+    try {
+      const hasManual = await hasManualCoords(db);
+      const latExpr = hasManual ? 'COALESCE(manual_latitude, latitude)' : 'latitude';
+      const lonExpr = hasManual ? 'COALESCE(manual_longitude, longitude)' : 'longitude';
+
+      const dataQuery = `
+        SELECT
+          id,
+          object_id,
+          title,
+          img_url,
+          place_name,
+          city_en,
+          city_native,
+          country_en,
+          country_native,
+          institution_name,
+          institution_place,
+          institution_city_en,
+          institution_city_native,
+          institution_country_en,
+          inventory_number,
+          source_link,
+          cultural_context,
+          transfer_method,
+          historical_relation,
+          enrichment_confidence,
+          origin_type,
+          normalized_origin,
+          geocoded_country,
+          geocoded_region,
+          geocoder_source,
+          geocoding_confidence,
+          geocoding_status,
+          geocoding_notes,
+          ${latExpr} as latitude,
+          ${lonExpr} as longitude,
+          institution_latitude,
+          institution_longitude,
+          (SELECT ol.link_text FROM museum_objects_components moc
+           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
+           WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
+           ORDER BY moc."order" LIMIT 1) as object_link_url,
+          (SELECT ol.link_display FROM museum_objects_components moc
+           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
+           WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
+           ORDER BY moc."order" LIMIT 1) as object_link_display
+        FROM museum_objects
+        WHERE published_at IS NOT NULL AND inventory_number = :inventoryNumber
+        LIMIT 1
+      `;
+
+      const result = await db.raw(dataQuery, { inventoryNumber });
+      const rows = this.getRows(result);
+      if (!rows.length) return null;
+
+      const row = rows[0];
+      return {
+        id: row.id,
+        attributes: {
+          object_id: row.object_id,
+          title: row.title,
+          img_url: row.img_url,
+          place_name: row.place_name,
+          city_en: row.city_en,
+          city_native: row.city_native,
+          country_en: row.country_en,
+          country_native: row.country_native,
+          institution_name: row.institution_name,
+          institution_place: row.institution_place,
+          institution_city_en: row.institution_city_en,
+          institution_city_native: row.institution_city_native,
+          institution_country_en: row.institution_country_en,
+          inventory_number: row.inventory_number,
+          source_link: row.object_link_url || row.source_link,
+          object_links: row.object_link_url ? [{ link_text: row.object_link_url, link_display: row.object_link_display }] : null,
+          cultural_context: row.cultural_context,
+          transfer_method: row.transfer_method,
+          historical_relation: row.historical_relation,
+          enrichment_confidence: row.enrichment_confidence,
+          origin_type: row.origin_type,
+          normalized_origin: row.normalized_origin,
+          geocoded_country: row.geocoded_country,
+          geocoded_region: row.geocoded_region,
+          geocoder_source: row.geocoder_source,
+          geocoding_confidence: row.geocoding_confidence ? parseFloat(row.geocoding_confidence) : null,
+          geocoding_status: row.geocoding_status,
+          geocoding_notes: row.geocoding_notes,
+          latitude: row.latitude ? parseFloat(row.latitude) : null,
+          longitude: row.longitude ? parseFloat(row.longitude) : null,
+          institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,
+          institution_longitude: row.institution_longitude ? parseFloat(row.institution_longitude) : null,
+        },
+      };
+    } catch (error) {
+      strapi.log.error('Error in getObjectByInventoryNumber:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Check if a materialized view exists in the database.
    * Cached after first check to avoid repeated pg_matviews queries.
    */

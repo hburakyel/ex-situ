@@ -137,6 +137,32 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
   },
 
   /**
+   * Fetch a single object by inventory number (exact match)
+   * GET /api/museum-objects/by-inventory/:inventoryNo
+   */
+  async byInventoryNumber(ctx) {
+    try {
+      const { inventoryNo } = ctx.params;
+      if (!inventoryNo) {
+        return ctx.badRequest('inventoryNo parameter is required');
+      }
+
+      const data = await strapi
+        .service('api::museum-object.museum-object')
+        .getObjectByInventoryNumber(decodeURIComponent(inventoryNo));
+
+      if (!data) {
+        return ctx.notFound('Object not found');
+      }
+
+      ctx.send({ data });
+    } catch (error) {
+      strapi.log.error('byInventoryNumber endpoint error:', error.message);
+      ctx.internalServerError('Query failed');
+    }
+  },
+
+  /**
    * Resolver stats endpoint — returns per-institution aggregation for the resolver dashboard
    * GET /api/museum-objects/resolver-stats
    */

@@ -79,7 +79,7 @@ export default function InfoPanel({
   const showResolved = !!(geocodedName && locationName && geocodedName.toLowerCase() !== locationName.toLowerCase())
 
   return (
-    <div className={`${isMobile ? "px-4 pt-2 pb-4" : "p-4 pt-3"} flex flex-col bg-white`}>
+    <div className={`${isMobile ? "px-4 pt-0 pb-4" : "p-4 pt-2"} flex flex-col bg-white`}>
       {/* Mobile breadcrumb + search row — always visible */}
 
       {breadcrumb.length > 0 && (
