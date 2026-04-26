@@ -186,16 +186,23 @@ export default function ImageGallery({
             <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8">
               <ChevronRightIcon className="h-5 w-5 text-gray-500" />
             </Button>
-            <Link href={`/artifact/${currentObject.id}`} onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title="Object Details"
-              >
-                <Info className="h-5 w-5 text-gray-500" />
-              </Button>
-            </Link>
+            {(() => {
+              const rawId = currentObject.id
+              const numId = Number(rawId)
+              const hasValidId = rawId && !String(rawId).startsWith('wiki-') && !isNaN(numId) && numId > 0
+              return hasValidId ? (
+                <Link href={`/artifact/${rawId}`} onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title="Object Details"
+                  >
+                    <Info className="h-5 w-5 text-gray-500" />
+                  </Button>
+                </Link>
+              ) : null
+            })()}
             {getLinkUrl() && (
               <Button
                 variant="ghost"
