@@ -180,20 +180,20 @@ export default function ImageGallery({
             )}
           </div>
           <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-6 w-6">
-              <ChevronLeftIcon className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-8 w-8">
+              <ChevronLeftIcon className="h-5 w-5 text-gray-500" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleNext} className="h-6 w-6">
-              <ChevronRightIcon className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8">
+              <ChevronRightIcon className="h-5 w-5 text-gray-500" />
             </Button>
             <Link href={`/artifact/${currentObject.id}`} onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="h-8 w-8"
                 title="Object Details"
               >
-                <Info className="h-4 w-4" />
+                <Info className="h-5 w-5 text-gray-500" />
               </Button>
             </Link>
             {getLinkUrl() && (
@@ -205,14 +205,14 @@ export default function ImageGallery({
                   const url = getLinkUrl()
                   if (url) window.open(url, "_blank", "noopener,noreferrer")
                 }}
-                className="h-6 w-6"
+                className="h-8 w-8"
                 title="View Source"
               >
-                <IconSource className="h-4 w-4" />
+                <IconSource className="h-5 w-5 text-gray-500" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6">
-              <IconClose className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+              <IconClose className="h-5 w-5 text-gray-500" />
             </Button>
           </div>
         </div>

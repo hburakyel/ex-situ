@@ -1,4 +1,5 @@
 "use client"
+import "maplibre-gl/dist/maplibre-gl.css"
 
 import type React from "react"
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, useMemo, Fragment } from "react"
@@ -477,7 +478,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           const btn = document.createElement("button")
           btn.className = `${ctrlPrefix}-ctrl-icon`
           btn.setAttribute("aria-label", "About")
-          btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 1C3.91 1 1 3.91 1 7.5S3.91 14 7.5 14 14 11.09 14 7.5 11.09 1 7.5 1Zm0 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm-.5 3h1v1h-1V5Zm0 2h1v4h-1V7Z" fill="currentColor"/></svg>'
+          btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 1C3.91 1 1 3.91 1 7.5S3.91 14 7.5 14 14 11.09 14 7.5 11.09 1 7.5 1Zm0 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm-.5 3h1v1h-1V5Zm0 2h1v4h-1V7Z" fill="currentColor"/></svg>'
           btn.addEventListener("click", (e) => {
             e.stopPropagation()
             if (this._popup) { this._popup.remove(); this._popup = null; return }
@@ -526,7 +527,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           const btn = document.createElement("button")
           btn.className = `${ctrlPrefix}-ctrl-icon`
           btn.setAttribute("aria-label", "Global View")
-          btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.49996 1.80002C4.35194 1.80002 1.79996 4.352 1.79996 7.50002C1.79996 10.648 4.35194 13.2 7.49996 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.352 10.648 1.80002 7.49996 1.80002ZM0.899963 7.50002C0.899963 3.85494 3.85488 0.900024 7.49996 0.900024C11.145 0.900024 14.1 3.85494 14.1 7.50002C14.1 11.1451 11.145 14.1 7.49996 14.1C3.85488 14.1 0.899963 11.1451 0.899963 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M13.4999 7.89998H1.49994V7.09998H13.4999V7.89998Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M7.09991 13.5V1.5H7.89991V13.5H7.09991zM10.375 7.49998C10.375 5.32724 9.59364 3.17778 8.06183 1.75656L8.53793 1.24341C10.2396 2.82218 11.075 5.17273 11.075 7.49998 11.075 9.82724 10.2396 12.1778 8.53793 13.7566L8.06183 13.2434C9.59364 11.8222 10.375 9.67273 10.375 7.49998zM3.99969 7.5C3.99969 5.17611 4.80786 2.82678 6.45768 1.24719L6.94177 1.75281C5.4582 3.17323 4.69969 5.32389 4.69969 7.5 4.6997 9.67611 5.45822 11.8268 6.94179 13.2472L6.45769 13.7528C4.80788 12.1732 3.9997 9.8239 3.99969 7.5z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>'
+          btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.49996 1.80002C4.35194 1.80002 1.79996 4.352 1.79996 7.50002C1.79996 10.648 4.35194 13.2 7.49996 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.352 10.648 1.80002 7.49996 1.80002ZM0.899963 7.50002C0.899963 3.85494 3.85488 0.900024 7.49996 0.900024C11.145 0.900024 14.1 3.85494 14.1 7.50002C14.1 11.1451 11.145 14.1 7.49996 14.1C3.85488 14.1 0.899963 11.1451 0.899963 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M13.4999 7.89998H1.49994V7.09998H13.4999V7.89998Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M7.09991 13.5V1.5H7.89991V13.5H7.09991zM10.375 7.49998C10.375 5.32724 9.59364 3.17778 8.06183 1.75656L8.53793 1.24341C10.2396 2.82218 11.075 5.17273 11.075 7.49998 11.075 9.82724 10.2396 12.1778 8.53793 13.7566L8.06183 13.2434C9.59364 11.8222 10.375 9.67273 10.375 7.49998zM3.99969 7.5C3.99969 5.17611 4.80786 2.82678 6.45768 1.24719L6.94177 1.75281C5.4582 3.17323 4.69969 5.32389 4.69969 7.5 4.6997 9.67611 5.45822 11.8268 6.94179 13.2472L6.45769 13.7528C4.80788 12.1732 3.9997 9.8239 3.99969 7.5z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>'
           btn.addEventListener("click", () => {
             // Trigger parent's breadcrumb "global" handler to clear drill state
             onBreadcrumbClickRef.current?.("global" as any)
@@ -918,30 +919,32 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             {/* Controls */}
             <div className="flex items-center gap-2 ml-2">
               {/* Objects panel toggle */}
-              <button
+              <Button
                 onClick={toggleObjectContainerVisibility}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
                 title="Toggle objects panel"
-                className="flex items-center justify-center  w-6 h-6 rounded-md hover:bg-gray-100 transition-colors"
               >
                 {isObjectContainerVisible ? (
-                  <IconPanelOpen width={16} height={16} className="" />
+                  <IconPanelOpen className="h-5 w-5 text-gray-500" />
                 ) : (
-                  <IconPanelClosed width={16} height={16} className="" />
+                  <IconPanelClosed className="h-5 w-5 text-gray-500" />
                 )}
-              </button>
+              </Button>
               {/* Search */}
-              <Button variant="ghost" size="icon" className="h-6 w-6"
+              <Button variant="ghost" size="icon" className="h-8 w-8"
                 onClick={() => onCommandPaletteOpen?.()}
                 title="Search (⌘K)"
               >
-                <IconSearch className="w-4 h-4" />
+                <IconSearch className="w-5 h-5" />
               </Button>
             </div>
           </div>
 
           {/* ── Artifact count (only when object container is closed) ── */}
           {!isObjectContainerVisible && (
-            <div className="px-2 pb-1">
+            <div className="px-4 pb-1">
               <span className="text-sm text-gray-700 block">
                 {totalCount} artifact{totalCount !== 1 ? "s" : ""}{locationName ? ` from ${locationName}` : ""}
               </span>
@@ -956,24 +959,24 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           <div className="px-4 pb-4 text-sm">
             {/* ── Places Section (drill-down) ── */}
             {drillLevel === "global" && groupedOrigins.length > 0 && (
-              <div className="pt-2 mt-1">
+              <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
                     Places
                     {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </span>
-                  <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowArcs(!showArcs)}
                   >
-                    {showArcs ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
                 </div>
 
                 {showArcs && (
-                  <div className="mt-1 pl-2">
+                  <div className="mt-1">
                     <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                       {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5"
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <span className="truncate max-w-[70%]">{origin.country}</span>
@@ -988,25 +991,25 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
             {/* ── Sites Section (country drill-down) ── */}
             {drillLevel !== "global" && groupedSites.length > 0 && (
-              <div className="pt-2 mt-1">
+              <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
                     Sites
                     {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </span>
-                  <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowArcs(!showArcs)}
                   >
-                    {showArcs ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
                 </div>
 
                 {showArcs && (
-                  <div className="mt-1 pl-2">
+                  <div className="mt-1 pl-0">
                     <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                       {groupedSites.map((site, index) => (
                         <div key={index}
-                          className={`flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-blue-100  " : ""}`}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                         >
                           <span className="truncate max-w-[70%]">{site.name}</span>
@@ -1021,24 +1024,23 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
             {/* ── Institutions Section (country drill-down) ── */}
             {drillLevel !== "global" && drillInstitutions.length > 0 && (
-              <div className="pt-2 mt-1">
+              <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
                     Collections
                   </span>
-                  <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowCollections(!showCollections)}
                   >
-                    {showCollections ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {showCollections ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
                 </div>
-
                 {showCollections && (
-                  <div className="mt-1 pl-2">
+                  <div className="mt-1 pl-0">
                     <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                       {drillInstitutions.map((inst, index) => (
                         <div key={index}
-                          className={`flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-amber-100" : ""}`}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleInstitution?.(inst.name)}
                         >
                           <span className="truncate max-w-[70%]">{inst.name}</span>

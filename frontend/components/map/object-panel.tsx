@@ -585,8 +585,8 @@ export default function ObjectPanel({
               </div>
               <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                 {onCommandPaletteOpen && (
-                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
-                    <IconSearch className="w-4 h-4 text-gray-500" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
+                    <IconSearch className="w-5 h-5 text-gray-500" />
                   </Button>
                 )}
               </div>
@@ -600,17 +600,17 @@ export default function ObjectPanel({
                 actionSlot={objects.length > 0 ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="More options">
-                        <MoreHorizontal className="h-4 w-4 text-gray-500" />
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="More options">
+                        <MoreHorizontal className="h-5 w-5 text-gray-500" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-[160px]">
                       <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
-                        {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4" />}
+                        {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4 text-gray-500" />}
                         {showCopied ? "Link copied!" : "Share link"}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={downloadObjectsAsCSV} className="gap-2 cursor-pointer">
-                        <IconDownloadCsv className="h-4 w-4" />
+                        <IconDownloadCsv className="h-4 w-4 text-gray-500" />
                         Download CSV
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -671,25 +671,25 @@ export default function ObjectPanel({
               {objects.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="More options">
-                      <MoreHorizontal className="h-4 w-4 text-gray-500" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="More options">
+                      <MoreHorizontal className="h-5 w-5 text-gray-500" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-[160px]">
                     <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
-                      {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4" />}
+                      {showCopied ? <Check className="h-5 w-5 text-green-500" /> : <IconShare className="h-5 w-5" />}
                       {showCopied ? "Link copied!" : "Share link"}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={downloadObjectsAsCSV} className="gap-2 cursor-pointer">
-                      <IconDownloadCsv className="h-4 w-4" />
+                      <IconDownloadCsv className="h-5 w-5" />
                       Download CSV
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
               {/* Expand/minimize — desktop only */}
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={toggleSize}>
-                {containerSize === "expanded" ? <IconMinimize className="h-4 w-4 text-gray-500" /> : <IconExpand className="h-4 w-4 text-gray-500" />}
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSize}>
+                {containerSize === "expanded" ? <IconMinimize className="h-5 w-5 text-gray-500" /> : <IconExpand className="h-5 w-5 text-gray-500" />}
               </Button>
             </div>
           </div>
@@ -794,7 +794,7 @@ export default function ObjectPanel({
                       )}
                     </div>
                     {/* Bottom row */}
-                    <div className="flex items-end justify-between mt-1">
+                    <div className="flex items-end justify-between mt-1 pl-0">
                       <span className="text-[9px] text-gray-400 leading-none">Wikipedia</span>
                       <span className="text-[9px] text-gray-400 leading-none truncate ml-1 max-w-[60%] text-right">
                         {linkCard.attributes.place_name || linkCard.attributes.country_en || ''}

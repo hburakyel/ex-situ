@@ -408,8 +408,8 @@ img {
 }
 
 .maplibregl-ctrl-group button {
-  width: 28px !important;
-  height: 28px !important;
+  width: 32px !important;
+  height: 32px !important;
   margin: 0 !important;
   color: black !important;
   background-color: transparent !important;
@@ -434,8 +434,8 @@ img {
 
 /* Style the globe icon */
 .maplibregl-ctrl-globe svg {
-  width: 16px !important;
-  height: 16px !important;
+  width: 20px !important;
+  height: 20px !important;
   stroke: black !important;
   stroke-width: 2px !important;
 }
@@ -687,8 +687,8 @@ button.maplibregl-ctrl-icon {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 29px !important;
-  height: 29px !important;
+  width: 32px !important;
+  height: 32px !important;
   padding: 0 !important;
   margin: 0 !important;
   background-color: transparent !important;
@@ -701,8 +701,8 @@ button.maplibregl-ctrl-icon:hover {
 }
 
 button.maplibregl-ctrl-icon svg {
-  width: 15px !important;
-  height: 15px !important;
+  width: 20px !important;
+  height: 20px !important;
   display: block !important;
 }
 

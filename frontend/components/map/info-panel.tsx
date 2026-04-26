@@ -79,11 +79,11 @@ export default function InfoPanel({
   const showResolved = !!(geocodedName && locationName && geocodedName.toLowerCase() !== locationName.toLowerCase())
 
   return (
-    <div className={`${isMobile ? "px-4 pt-0 pb-2" : "p-4 pt-3"} flex flex-col bg-white`}>
+    <div className={`${isMobile ? "px-4 pt-2 pb-4" : "p-4 pt-3"} flex flex-col bg-white`}>
       {/* Mobile breadcrumb + search row — always visible */}
 
       {breadcrumb.length > 0 && (
-        <div className="flex items-center justify-between gap-2 pb-1.5">
+        <div className="flex py-1 items-center justify-between gap-2 pb-1.5">
           <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm">
             {breadcrumb.map((seg, i) => {
               const isLast = i === breadcrumb.length - 1
@@ -114,16 +114,25 @@ export default function InfoPanel({
             })}
           </div>
           {onCommandPaletteOpen && (
-            <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
-              <IconSearch className="w-4 h-4 text-gray-500" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
+              <IconSearch className="w-5 h-5 text-gray-500" />
             </Button>
           )}
         </div>
       )}
 
+      {isMobile && containerSize === "minimized" && actionSlot && (
+        <div className="flex items-center justify-between py-1">
+          <span className="text-sm text-black/60 truncate min-w-0 flex-1">
+            {displayName || locationName || ""}
+          </span>
+          <div className="flex-shrink-0">{actionSlot}</div>
+        </div>
+      )}
+
       {!(isMobile && containerSize === "minimized") && (
         <>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex py-1 items-center justify-between gap-2">
             <div className="text-sm min-w-0 flex-1">
               <div className="leading-normal text-left">
                 <span className="inline-block whitespace-nowrap">
@@ -147,33 +156,31 @@ export default function InfoPanel({
 
           {/* Mobile: Drill-down sections (after artifact count) */}
           {isMobile && (
-            <div className="text-sm">
+            <div>
               {/* Places (global) */}
               {drillLevel === "global" && groupedOrigins.length > 0 && (
-                <div className="pt-2">
+                <div>
                   <div className="flex items-center justify-between">
                     <span className="panel-text-muted">
                       Places
                       {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                     </span>
-                    <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                       onClick={() => setShowOrigins(!showOrigins)}
                     >
-                      {showOrigins ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      {showOrigins ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                     </Button>
                   </div>
                   {showOrigins && (
-                    <div className="mt-1 pl-2">
-                      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                         {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5"
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <span className="truncate max-w-[70%]">{origin.country}</span>
                             <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
                           </div>
                         ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -181,31 +188,29 @@ export default function InfoPanel({
 
               {/* Sites (country) */}
               {drillLevel !== "global" && groupedSites.length > 0 && (
-                <div className="pt-2">
+                <div>
                   <div className="flex items-center justify-between">
                     <span className="panel-text-muted">
                       Sites
                       {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                     </span>
-                    <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                       onClick={() => setShowSites(!showSites)}
                     >
-                      {showSites ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      {showSites ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                     </Button>
                   </div>
                   {showSites && (
-                    <div className="mt-1 pl-2">
-                      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                         {groupedSites.map((site, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-blue-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-blue-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
                             <span className="truncate max-w-[70%]">{site.name}</span>
                             <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
                           </div>
                         ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -213,30 +218,28 @@ export default function InfoPanel({
 
               {/* Institutions (country) */}
               {drillLevel !== "global" && drillInstitutions.length > 0 && (
-                <div className="pt-2">
+                <div>
                   <div className="flex items-center justify-between">
                     <span className="panel-text-muted">
                       Collections
                     </span>
-                    <Button variant="ghost" size="sm" className="h-5 px-1 py-0 text-sm flex items-center gap-1"
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                       onClick={() => setShowCollections(!showCollections)}
                     >
-                      {showCollections ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      {showCollections ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                     </Button>
                   </div>
                   {showCollections && (
-                    <div className="mt-1 pl-2">
-                      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
                         {drillInstitutions.map((inst, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-amber-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-amber-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleInstitution?.(inst.name)}
                           >
                             <span className="truncate max-w-[70%]">{inst.name}</span>
                             <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
                           </div>
                         ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -272,7 +275,7 @@ export default function InfoPanel({
                 </span>
               ))}
               {activeFilterCount > 1 && (
-                <button onClick={clearAllFilters} className="text-sm text-gray-400 hover:text-gray-600 px-1">
+                <button onClick={clearAllFilters} className="text-sm text-gray-400 hover:text-gray-600 px-0">
                   Clear all
                 </button>
               )}
