@@ -61,7 +61,6 @@ module.exports = {
       path: '/museum-objects/pending-corrections',
       handler: 'museum-object.pendingCorrections',
       config: {
-        auth: false,
         policies: [],
         middlewares: [],
       },
@@ -71,7 +70,6 @@ module.exports = {
       path: '/museum-objects/:id/correct',
       handler: 'museum-object.applyCorrection',
       config: {
-        auth: false,
         policies: [],
         middlewares: [],
       },
