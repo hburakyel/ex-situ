@@ -18,9 +18,17 @@ module.exports = [
   {
     name: 'strapi::cors',
     config: {
-      origin: [process.env.FRONTEND_URL || 'http://localhost:3000'],
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      headers: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
+      origin: [
+        process.env.FRONTEND_URL || 'http://localhost:3000',
+        process.env.PUBLIC_URL || 'http://localhost:1337',
+        'https://exsitu.app',
+        'https://www.exsitu.app',
+        'http://localhost:3000',
+        'http://localhost:1337',
+      ],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+      headers: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With'],
+      credentials: true,
     },
   },
   // strapi::poweredBy intentionally removed — hides technology stack
