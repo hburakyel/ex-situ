@@ -72,6 +72,18 @@
     },
     "institution_country": {
       "type": "string"
+    },
+    "manual_latitude": {
+      "type": "float"
+    },
+    "manual_longitude": {
+      "type": "float"
+    },
+    "place": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::place.place",
+      "inversedBy": "museum_objects"
     }
   }
 }

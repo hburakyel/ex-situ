@@ -53,6 +53,12 @@
     },
     "source": {
       "type": "string"
+    },
+    "museum_objects": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::museum-object.museum-object",
+      "mappedBy": "place"
     }
   }
 }
