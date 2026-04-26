@@ -10,5 +10,21 @@
     "draftAndPublish": false
   },
   "pluginOptions": {},
-  "attributes": {}
+  "attributes": {
+    "place_name": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "decimal"
+    },
+    "longitude": {
+      "type": "decimal"
+    },
+    "country": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    }
+  }
 }

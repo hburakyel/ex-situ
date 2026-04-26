@@ -1,0 +1,58 @@
+{
+  "kind": "collectionType",
+  "collectionName": "places",
+  "info": {
+    "singularName": "place",
+    "pluralName": "places",
+    "displayName": "Place",
+    "description": "Canonical geographic place or archaeological site linked to museum objects"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "name_native": {
+      "type": "string"
+    },
+    "site_type": {
+      "type": "enumeration",
+      "enum": [
+        "archaeological_site",
+        "region",
+        "city",
+        "country",
+        "museum",
+        "other"
+      ]
+    },
+    "latitude": {
+      "type": "decimal"
+    },
+    "longitude": {
+      "type": "decimal"
+    },
+    "country_en": {
+      "type": "string"
+    },
+    "country_native": {
+      "type": "string"
+    },
+    "city_en": {
+      "type": "string"
+    },
+    "city_native": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text"
+    },
+    "source": {
+      "type": "string"
+    }
+  }
+}
