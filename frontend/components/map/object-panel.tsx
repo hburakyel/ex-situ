@@ -142,8 +142,11 @@ export default function ObjectPanel({
   // "idle" → no gesture | "deciding" → figuring out scroll vs drag | "dragging" → sheet is being dragged
   const touchPhase = useRef<"idle" | "deciding" | "dragging">("idle")
   const touchStartScrollTop = useRef(0)
-  // Cooldown: timestamp after which new gestures are accepted (prevents double-snap on fast swipes)
+  // Cooldown: timestamp after which new touch gestures are accepted (prevents double-snap on fast swipes)
   const snapCooldownUntil = useRef(0)
+  // Wheel: separate debounce timer — extends as long as wheel events keep firing (momentum scroll)
+  const wheelLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wheelLocked = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
   const prefersReducedMotion = useRef(false)
@@ -362,38 +365,55 @@ export default function ObjectPanel({
   }, [isMobile, setContainerSize])
 
   // ── Wheel-to-resize (mobile only) ──
-  // deltaY > 0 → finger/scroll DOWN  → sheet expands
-  // deltaY < 0 → finger/scroll UP    → sheet shrinks (only when no scrollable content or at top with no content)
-  // Desktop: completely disabled — wheel always scrolls content normally.
+  // Debounce-lock pattern: the first wheel event in a gesture fires the snap.
+  // Every subsequent event (including momentum scroll) resets a 600ms timer.
+  // The lock lifts only after wheel events fully stop — so momentum can never
+  // trigger a second snap within the same gesture.
+  // Desktop: completely disabled.
   useEffect(() => {
     if (!isMobile) return
     const panel = containerRef.current
     if (!panel) return
+
+    const unlock = () => { wheelLocked.current = false }
+
     const onWheel = (e: WheelEvent) => {
-      // Guard: one snap per scroll gesture — a single finger swipe fires many wheel events,
-      // without this they cascade (expanded → default → minimized in one motion).
-      if (Date.now() < snapCooldownUntil.current) return
       const scrollEl = scrollContainerRef.current
       if (scrollEl && !scrollEl.contains(e.target as Node)) return
+
+      // Always extend the debounce timer — this keeps the lock alive during momentum
+      if (wheelLockTimer.current) clearTimeout(wheelLockTimer.current)
+      wheelLockTimer.current = setTimeout(unlock, 600)
+
+      // If already locked after a snap, suppress this event entirely
+      if (wheelLocked.current) {
+        e.preventDefault()
+        return
+      }
+
       const atTop = (scrollEl?.scrollTop ?? 0) <= 2
       const order: ContainerSize[] = ["minimized", "default", "expanded"]
       const idx = order.indexOf(containerSizeRef.current)
       const hasScrollableContent = !!(scrollEl && scrollEl.scrollHeight > scrollEl.clientHeight + 4)
 
       if (e.deltaY > 0 && atTop && idx < order.length - 1) {
-        // Scroll DOWN → expand sheet (one step)
+        // Scroll DOWN → expand sheet (one step), then lock
         e.preventDefault()
         setContainerSize(order[idx + 1])
-        snapCooldownUntil.current = Date.now() + 450
+        wheelLocked.current = true
       } else if (e.deltaY < 0 && idx > 0 && !hasScrollableContent) {
-        // Scroll UP → shrink sheet (one step, only when no scrollable content)
+        // Scroll UP → shrink sheet (one step), then lock
         e.preventDefault()
         setContainerSize(order[idx - 1])
-        snapCooldownUntil.current = Date.now() + 450
+        wheelLocked.current = true
       }
     }
+
     panel.addEventListener("wheel", onWheel, { passive: false })
-    return () => panel.removeEventListener("wheel", onWheel)
+    return () => {
+      panel.removeEventListener("wheel", onWheel)
+      if (wheelLockTimer.current) clearTimeout(wheelLockTimer.current)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobile, setContainerSize])
 
