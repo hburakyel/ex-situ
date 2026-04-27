@@ -561,17 +561,21 @@ export default function ObjectPanel({
   const getContainerStyle = (): React.CSSProperties => {
     if (isMobile) {
       const shadow = "0 -2px 20px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07)"
-      // Snappy but subtle: 260ms is below perceptual threshold for "heavy"
-      const transition = prefersReducedMotion.current ? "none" : "height 0.26s cubic-bezier(0.4,0,0.2,1), border-radius 0.22s cubic-bezier(0.4,0,0.2,1), left 0.22s cubic-bezier(0.4,0,0.2,1), right 0.22s cubic-bezier(0.4,0,0.2,1), bottom 0.22s cubic-bezier(0.4,0,0.2,1)"
+      // iOS-style spring: fast start, soft settle. 350ms feels natural without being heavy.
+      const ease = "cubic-bezier(0.32,0.72,0,1)"
+      const transition = prefersReducedMotion.current
+        ? "none"
+        : `height 0.35s ${ease}, border-radius 0.30s ${ease}, left 0.30s ${ease}, right 0.30s ${ease}, bottom 0.30s ${ease}`
       // Respect iPhone home indicator / notch
       const safeBottom = "max(16px, env(safe-area-inset-bottom))"
 
       if (liveHeight !== null) {
+        // During drag: always bottom-anchored so sheet grows/shrinks upward
         const isNearExpanded = liveHeight >= window.innerHeight * 0.9
         return {
-          top: isNearExpanded ? 0 : "auto",
+          top: "auto",
           transition: "none",
-          height: isNearExpanded ? "100dvh" : liveHeight,
+          height: liveHeight,
           bottom: isNearExpanded ? 0 : safeBottom,
           left: isNearExpanded ? 0 : 12,
           right: isNearExpanded ? 0 : 12,
@@ -582,7 +586,8 @@ export default function ObjectPanel({
 
       switch (containerSize) {
         case "expanded":
-          return { transition, top: 0, bottom: 0, left: 0, right: 0, height: "100dvh", borderRadius: 0, boxShadow: "none" }
+          // Keep top:"auto" + bottom:0 so height animation always grows upward from bottom
+          return { transition, top: "auto", bottom: 0, left: 0, right: 0, height: "100dvh", borderRadius: 0, boxShadow: "none" }
         case "minimized":
           return { transition, top: "auto", bottom: safeBottom, left: 12, right: 12, height: 88, borderRadius: 24, boxShadow: shadow }
         case "default":
