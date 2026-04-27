@@ -355,10 +355,9 @@ export default function ObjectPanel({
     }
   }, [isMobile, setContainerSize])
 
-  // ── Wheel-to-resize: scroll up at top → expand; scroll down at top → shrink ──
-  // Works for both mobile (mouse testing) and desktop panel.
-  // Attaches to containerRef so it's always available regardless of containerSize.
+  // ── Wheel-to-resize (mobile only): scroll up at top → expand; scroll down at top → shrink ──
   useEffect(() => {
+    if (!isMobile) return
     const panel = containerRef.current
     if (!panel) return
     const onWheel = (e: WheelEvent) => {
@@ -382,7 +381,7 @@ export default function ObjectPanel({
     return () => panel.removeEventListener("wheel", onWheel)
   // containerRef is stable; setContainerSize is stable (from useState setter)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setContainerSize])
+  }, [isMobile, setContainerSize])
 
   // Share current URL to clipboard
   const handleShare = useCallback(async () => {
