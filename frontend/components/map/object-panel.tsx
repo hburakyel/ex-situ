@@ -209,6 +209,22 @@ export default function ObjectPanel({
       )
     }
 
+    // Returns true if `el` is inside a scrollable container that isn't the main scroll root.
+    // This prevents accordion / nested-scroll areas from triggering sheet expansion.
+    const isInsideNestedScroll = (target: EventTarget | null): boolean => {
+      let el = target as HTMLElement | null
+      const root = scrollContainerRef.current
+      while (el && el !== root) {
+        const style = window.getComputedStyle(el)
+        const oy = style.overflowY
+        if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight) {
+          return true
+        }
+        el = el.parentElement
+      }
+      return false
+    }
+
     const onTouchStart = (e: TouchEvent) => {
       if (!containerRef.current?.contains(e.target as Node)) return
       dragStartY.current = e.touches[0].clientY
@@ -216,7 +232,16 @@ export default function ObjectPanel({
       dragStartSize.current = containerSizeRef.current
       touchStartScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0
       // Handle area: commit to dragging immediately (no ambiguity)
-      touchPhase.current = handleRef.current?.contains(e.target as Node) ? "dragging" : "deciding"
+      if (handleRef.current?.contains(e.target as Node)) {
+        touchPhase.current = "dragging"
+      } else if (isInsideNestedScroll(e.target)) {
+        // Touch started inside a nested scrollable (e.g. accordion list)
+        // Only allow downward (shrink) gestures when main scroll is at top;
+        // never intercept upward scrolls so nested content scrolls freely.
+        touchPhase.current = "nested-scroll" as any
+      } else {
+        touchPhase.current = "deciding"
+      }
     }
 
     const onTouchMove = (e: TouchEvent) => {
@@ -239,6 +264,16 @@ export default function ObjectPanel({
         else {
           // Scroll inside content — let browser handle it, map won't move due to overscroll-behavior
           touchPhase.current = "idle"
+          return
+        }
+      }
+
+      // nested-scroll: only allow sheet shrink on downward drag when main scroll is at top
+      if ((touchPhase.current as string) === "nested-scroll") {
+        if (deltaY > 8 && touchStartScrollTop.current <= 4) {
+          touchPhase.current = "dragging"
+        } else {
+          // let the nested element scroll freely — don't preventDefault
           return
         }
       }
