@@ -142,8 +142,6 @@ export default function ObjectPanel({
   // "idle" → no gesture | "deciding" → figuring out scroll vs drag | "dragging" → sheet is being dragged
   const touchPhase = useRef<"idle" | "deciding" | "dragging">("idle")
   const touchStartScrollTop = useRef(0)
-  // Tracks whether the grid has items — used to decide shrink vs scroll intent
-  const objectsRef = useRef<number>(0)
   // Cooldown: timestamp after which new touch gestures are accepted (prevents double-snap on fast swipes)
   const snapCooldownUntil = useRef(0)
   // Wheel: separate debounce timer — extends as long as wheel events keep firing (momentum scroll)
@@ -151,6 +149,9 @@ export default function ObjectPanel({
   const wheelLocked = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
+  // headerRef covers the sticky header area — both touch and wheel there trigger sheet resize.
+  // Touch/wheel on content (scrollContainerRef) always scrolls freely.
+  const headerRef = useRef<HTMLDivElement>(null)
   const prefersReducedMotion = useRef(false)
   const [liveHeight, setLiveHeight] = useState<number | null>(null)
 
@@ -158,9 +159,8 @@ export default function ObjectPanel({
     prefersReducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches
   }, [])
 
-  // Keep containerSizeRef and objectsRef in sync
+  // Keep containerSizeRef in sync
   useEffect(() => { containerSizeRef.current = containerSize }, [containerSize])
-  useEffect(() => { objectsRef.current = objects.length }, [objects.length])
 
   // Lock background body scroll when sheet is expanded on mobile (prevents page scroll behind)
   useEffect(() => {
@@ -245,15 +245,14 @@ export default function ObjectPanel({
         // Handle: always allow drag regardless of current size
         touchPhase.current = "dragging"
       } else if (containerSizeRef.current === "expanded") {
-        // In expanded state, content area touches must never intercept the scroll.
-        // The handle is the only affordance to shrink the sheet.
+        // In expanded state, only the handle can shrink the sheet — content scrolls freely
         touchPhase.current = "idle"
-      } else if (isInsideNestedScroll(e.target)) {
-        // Touch inside a nested scrollable (e.g. accordion list):
-        // only allow downward (shrink) gesture when main scroll is at top.
-        touchPhase.current = "nested-scroll" as any
-      } else {
+      } else if (headerRef.current?.contains(e.target as Node)) {
+        // Header zone: vertical drag resizes the sheet
         touchPhase.current = "deciding"
+      } else {
+        // Content zone: always let the browser scroll — never intercept
+        touchPhase.current = "idle"
       }
     }
 
@@ -264,33 +263,19 @@ export default function ObjectPanel({
       const deltaY = e.touches[0].clientY - dragStartY.current
 
       if (touchPhase.current === "deciding") {
-        if (Math.abs(deltaY) < 8) return // not committed yet, wait for clearer intent
-        // Upward drag (negative deltaY) → expand sheet, unless already expanded
+        if (Math.abs(deltaY) < 8) return
+        // Any meaningful vertical drag in the header zone → resize
         if (deltaY < 0 && dragStartSize.current !== "expanded") {
           touchPhase.current = "dragging"
-        }
-        // Downward drag → shrink ONLY when scroll is at top AND there are no items.
-        // If there are items (even unloaded images), treat downward as scroll intent.
-        // The handle is the correct affordance for shrinking when content exists.
-        else if (deltaY > 0 && touchStartScrollTop.current <= 4 && objectsRef.current === 0) {
+        } else if (deltaY > 0) {
           touchPhase.current = "dragging"
-        }
-        else {
-          // Let the browser scroll — map won't move due to overscroll-behavior
+        } else {
           touchPhase.current = "idle"
           return
         }
       }
 
-      // nested-scroll: only allow sheet shrink on downward drag when main scroll is at top
-      if ((touchPhase.current as string) === "nested-scroll") {
-        if (deltaY > 8 && touchStartScrollTop.current <= 4) {
-          touchPhase.current = "dragging"
-        } else {
-          // let the nested element scroll freely — don't preventDefault
-          return
-        }
-      }
+      // nested-scroll block removed — content area is now always idle (never intercepts)
 
       if (touchPhase.current === "dragging") {
         e.preventDefault()
@@ -385,33 +370,30 @@ export default function ObjectPanel({
     const unlock = () => { wheelLocked.current = false }
 
     const onWheel = (e: WheelEvent) => {
-      const scrollEl = scrollContainerRef.current
-      if (scrollEl && !scrollEl.contains(e.target as Node)) return
+      // Only intercept wheel events originating from the header zone.
+      // Wheel on the content area (grid) always scrolls freely.
+      const inHeader = headerRef.current?.contains(e.target as Node)
+      if (!inHeader) return
 
-      // Always extend the debounce timer — this keeps the lock alive during momentum
+      // Debounce-lock: extends as long as wheel events keep firing (absorbs momentum)
       if (wheelLockTimer.current) clearTimeout(wheelLockTimer.current)
       wheelLockTimer.current = setTimeout(unlock, 600)
 
-      // If already locked after a snap:
-      // - In expanded state, let content scroll freely (don't block the grid).
-      // - In other states, suppress the event so momentum can't re-trigger a snap.
       if (wheelLocked.current) {
-        if (containerSizeRef.current !== "expanded") e.preventDefault()
+        e.preventDefault()
         return
       }
 
-      const atTop = (scrollEl?.scrollTop ?? 0) <= 2
       const order: ContainerSize[] = ["minimized", "default", "expanded"]
       const idx = order.indexOf(containerSizeRef.current)
-      const hasScrollableContent = !!(scrollEl && scrollEl.scrollHeight > scrollEl.clientHeight + 4)
 
-      if (e.deltaY > 0 && atTop && idx < order.length - 1) {
-        // Scroll DOWN → expand sheet (one step), then lock
+      if (e.deltaY < 0 && idx < order.length - 1) {
+        // Scroll UP on header → expand (one step)
         e.preventDefault()
         setContainerSize(order[idx + 1])
         wheelLocked.current = true
-      } else if (e.deltaY < 0 && idx > 0 && !hasScrollableContent) {
-        // Scroll UP → shrink sheet (one step), then lock
+      } else if (e.deltaY > 0 && idx > 0) {
+        // Scroll DOWN on header → shrink (one step)
         e.preventDefault()
         setContainerSize(order[idx - 1])
         wheelLocked.current = true
@@ -755,7 +737,7 @@ export default function ObjectPanel({
       )}
         {/* Header: Desktop and Mobile layouts */}
         {isMobile ? (
-          <div className="sticky top-0 z-30 flex flex-col bg-white">
+          <div ref={headerRef} className="sticky top-0 z-30 flex flex-col bg-white">
             <div className="flex items-center justify-between text-sm min-w-0 px-4 pt-0">
               <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                 {breadcrumb.map((seg, i) => {
