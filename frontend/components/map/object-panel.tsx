@@ -142,8 +142,6 @@ export default function ObjectPanel({
   // "idle" → no gesture | "deciding" → figuring out scroll vs drag | "dragging" → sheet is being dragged
   const touchPhase = useRef<"idle" | "deciding" | "dragging">("idle")
   const touchStartScrollTop = useRef(0)
-  // Tracks whether the grid has items — used to decide shrink vs scroll intent
-  const objectsRef = useRef<number>(0)
   // Cooldown: timestamp after which new touch gestures are accepted (prevents double-snap on fast swipes)
   const snapCooldownUntil = useRef(0)
   // Wheel: separate debounce timer — extends as long as wheel events keep firing (momentum scroll)
@@ -159,9 +157,8 @@ export default function ObjectPanel({
     prefersReducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches
   }, [])
 
-  // Keep containerSizeRef and objectsRef in sync
+  // Keep containerSizeRef in sync
   useEffect(() => { containerSizeRef.current = containerSize }, [containerSize])
-  useEffect(() => { objectsRef.current = objects.length }, [objects.length])
 
   // Lock background body scroll when sheet is expanded on mobile (prevents page scroll behind)
   useEffect(() => {
@@ -247,9 +244,17 @@ export default function ObjectPanel({
         // Handle or header touch → always resize the sheet
         touchPhase.current = "dragging"
       } else if (scrollContainerRef.current?.contains(e.target as Node)) {
-        // Content area touch → always scroll, never resize
-        // (handles lazy-loaded grids, expanded state, etc.)
-        touchPhase.current = "idle"
+        if (containerSizeRef.current === "expanded") {
+          // Expanded: content always scrolls freely, sheet can only shrink via handle
+          touchPhase.current = "idle"
+        } else if (isInsideNestedScroll(e.target)) {
+          // Non-expanded + accordion/nested scroll: let nested content scroll freely
+          touchPhase.current = "idle"
+        } else {
+          // Non-expanded + main content area: "deciding" so upward scroll → expand sheet
+          // Downward scroll passes through naturally (handled in onTouchMove)
+          touchPhase.current = "deciding"
+        }
       } else {
         touchPhase.current = "deciding"
       }
@@ -262,19 +267,12 @@ export default function ObjectPanel({
       const deltaY = e.touches[0].clientY - dragStartY.current
 
       if (touchPhase.current === "deciding") {
-        if (Math.abs(deltaY) < 8) return // not committed yet, wait for clearer intent
-        // Upward drag (negative deltaY) → expand sheet, unless already expanded
+        if (Math.abs(deltaY) < 8) return // not committed yet
         if (deltaY < 0 && dragStartSize.current !== "expanded") {
+          // Upward → expand sheet
           touchPhase.current = "dragging"
-        }
-        // Downward drag → shrink ONLY when scroll is at top AND there are no items.
-        // If there are items (even unloaded images), treat downward as scroll intent.
-        // The handle is the correct affordance for shrinking when content exists.
-        else if (deltaY > 0 && touchStartScrollTop.current <= 4 && objectsRef.current === 0) {
-          touchPhase.current = "dragging"
-        }
-        else {
-          // Let the browser scroll — map won't move due to overscroll-behavior
+        } else {
+          // Downward in content area → scroll, never shrink
           touchPhase.current = "idle"
           return
         }
