@@ -258,7 +258,8 @@ export default function ObjectPanel({
           touchPhase.current = "deciding"
         }
       } else {
-        touchPhase.current = "deciding"
+        // Outside scroll container: only allow deciding in non-expanded states
+        touchPhase.current = containerSizeRef.current === "expanded" ? "idle" : "deciding"
       }
     }
 
@@ -394,6 +395,9 @@ export default function ObjectPanel({
         if (containerSizeRef.current !== "expanded") e.preventDefault()
         return
       }
+
+      // Expanded: only handle/header can resize — never trigger sheet change from grid scroll
+      if (containerSizeRef.current === "expanded") return
 
       const atTop = (scrollEl?.scrollTop ?? 0) <= 2
       const order: ContainerSize[] = ["minimized", "default", "expanded"]
