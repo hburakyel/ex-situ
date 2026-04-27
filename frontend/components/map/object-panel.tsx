@@ -135,10 +135,15 @@ export default function ObjectPanel({
   const [showCopied, setShowCopied] = useState(false)
 
   // ── Mobile bottom-sheet drag-to-resize ──
+  const containerSizeRef = useRef<ContainerSize>(containerSize)
   const dragStartY = useRef(0)
   const dragStartTime = useRef(0)
   const dragStartSize = useRef<ContainerSize>("default")
-  const touchOrigin = useRef<"handle" | null>(null)
+  // "idle" → no gesture | "deciding" → figuring out scroll vs drag | "dragging" → sheet is being dragged
+  const touchPhase = useRef<"idle" | "deciding" | "dragging">("idle")
+  const touchStartScrollTop = useRef(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const handleRef = useRef<HTMLDivElement>(null)
   const prefersReducedMotion = useRef(false)
   const [liveHeight, setLiveHeight] = useState<number | null>(null)
 
@@ -146,7 +151,29 @@ export default function ObjectPanel({
     prefersReducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches
   }, [])
 
-  // ── Mobile drag resize: window-level touch/mouse listeners ──
+  // Keep containerSizeRef in sync so window handlers always see the latest size
+  useEffect(() => { containerSizeRef.current = containerSize }, [containerSize])
+
+  // Lock background body scroll when sheet is expanded on mobile (prevents page scroll behind)
+  useEffect(() => {
+    if (!isMobile) return
+    if (containerSize === "expanded") {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = "hidden"
+      return () => { document.body.style.overflow = prev }
+    }
+  }, [isMobile, containerSize])
+
+  // ── Mobile drag resize: window-level gesture handler (Apple Maps-style) ──
+  //
+  // Gesture decision logic:
+  //   touch on handle        → immediately "dragging" (no deciding phase)
+  //   touch on content area:
+  //     finger moves UP   + sheet not expanded   → "dragging" (expand sheet)
+  //     finger moves DOWN + scroll is at top     → "dragging" (shrink sheet)
+  //     otherwise                                → "idle"    (let scroll happen)
+  //
+  // deltaY convention: positive = finger moved DOWN = sheet shrinks
   useEffect(() => {
     if (!isMobile) return
 
@@ -158,6 +185,9 @@ export default function ObjectPanel({
     }
 
     const resolveSnap = (deltaY: number, velocity: number): ContainerSize => {
+      // deltaY > 0: finger DOWN (shrink) | velocity > 0: moving DOWN
+      // Asymmetric thresholds: easier to grow than shrink (Apple Maps bias).
+      // Most user intent when dragging up from default = expand.
       const order: ContainerSize[] = ["minimized", "default", "expanded"]
       const snapH: Record<ContainerSize, number> = {
         expanded: window.innerHeight,
@@ -167,63 +197,157 @@ export default function ObjectPanel({
       const idx = order.indexOf(dragStartSize.current)
       const currentH = sizeToHeight(dragStartSize.current) - deltaY
       // High velocity → jump to extreme
-      if (velocity < -1.2) return "expanded"
       if (velocity > 1.2) return "minimized"
-      // Moderate velocity or large drag → adjacent
-      if (velocity < -0.4 || deltaY < -60) return order[Math.min(idx + 1, 2)]
-      if (velocity > 0.4 || deltaY > 60) return order[Math.max(idx - 1, 0)]
-      // Slow drag → nearest snap point by current height
+      if (velocity < -1.2) return "expanded"
+      // Bias toward expansion: any meaningful upward intent grows the sheet
+      if (velocity < -0.2 || deltaY < -30) return order[Math.min(idx + 1, 2)]
+      // Shrinking requires more deliberate gesture
+      if (velocity > 0.5 || deltaY > 70) return order[Math.max(idx - 1, 0)]
+      // Slow drag → nearest snap point by current live height
       return (Object.keys(snapH) as ContainerSize[]).reduce((best, k) =>
         Math.abs(currentH - snapH[k]) < Math.abs(currentH - snapH[best]) ? k : best
       )
     }
 
+    const onTouchStart = (e: TouchEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) return
+      dragStartY.current = e.touches[0].clientY
+      dragStartTime.current = Date.now()
+      dragStartSize.current = containerSizeRef.current
+      touchStartScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0
+      // Handle area: commit to dragging immediately (no ambiguity)
+      touchPhase.current = handleRef.current?.contains(e.target as Node) ? "dragging" : "deciding"
+    }
+
     const onTouchMove = (e: TouchEvent) => {
-      if (touchOrigin.current !== "handle") return
-      e.preventDefault()
-      const deltaY = dragStartY.current - e.touches[0].clientY
-      const baseH = sizeToHeight(dragStartSize.current)
-      setLiveHeight(Math.max(88, Math.min(window.innerHeight, baseH + deltaY)))
+      if (touchPhase.current === "idle") return
+
+      // deltaY: positive = finger moved DOWN
+      const deltaY = e.touches[0].clientY - dragStartY.current
+
+      if (touchPhase.current === "deciding") {
+        if (Math.abs(deltaY) < 8) return // not committed yet, wait for clearer intent
+        // Upward drag (negative deltaY) → expand sheet, unless already expanded
+        if (deltaY < 0 && dragStartSize.current !== "expanded") {
+          touchPhase.current = "dragging"
+        }
+        // Downward drag (positive deltaY) → shrink sheet, only when scroll is at top
+        // Allow tiny scrollTop tolerance — some browsers report 1-2px when "at top"
+        else if (deltaY > 0 && touchStartScrollTop.current <= 4) {
+          touchPhase.current = "dragging"
+        }
+        else {
+          // Scroll inside content — let browser handle it, map won't move due to overscroll-behavior
+          touchPhase.current = "idle"
+          return
+        }
+      }
+
+      if (touchPhase.current === "dragging") {
+        e.preventDefault()
+        const baseH = sizeToHeight(dragStartSize.current)
+        setLiveHeight(Math.max(88, Math.min(window.innerHeight, baseH - deltaY)))
+      }
     }
 
     const onTouchEnd = (e: TouchEvent) => {
-      if (touchOrigin.current !== "handle") return
+      // Tap-to-expand: phase still "deciding" (never moved enough) + short duration
+      // → cycle to next size up. Skip if tap target is interactive so buttons/links work.
+      if (touchPhase.current === "deciding") {
+        const deltaTime = Date.now() - dragStartTime.current
+        const target = e.target as HTMLElement | null
+        const isInteractive = !!target?.closest(
+          'button, a, input, textarea, select, [role="button"], [role="link"], [data-no-sheet-tap]'
+        )
+        if (!isInteractive && deltaTime < 250) {
+          const order: ContainerSize[] = ["minimized", "default", "expanded"]
+          const idx = order.indexOf(containerSizeRef.current)
+          if (idx < order.length - 1) setContainerSize(order[idx + 1])
+        }
+        touchPhase.current = "idle"
+        return
+      }
+      if (touchPhase.current !== "dragging") {
+        touchPhase.current = "idle"
+        return
+      }
       const deltaY = e.changedTouches[0].clientY - dragStartY.current
       const deltaTime = Date.now() - dragStartTime.current
-      const velocity = deltaY / (deltaTime || 1)
+      const velocity = deltaY / Math.max(deltaTime, 1)
       setContainerSize(resolveSnap(deltaY, velocity))
       setLiveHeight(null)
-      touchOrigin.current = null
+      touchPhase.current = "idle"
     }
 
+    // Mouse events for desktop drag testing (handle only, via onMouseDown on handle)
     const onMouseMove = (e: MouseEvent) => {
-      if (touchOrigin.current !== "handle") return
-      const deltaY = dragStartY.current - e.clientY
+      if (touchPhase.current !== "dragging") return
+      const deltaY = e.clientY - dragStartY.current
       const baseH = sizeToHeight(dragStartSize.current)
-      setLiveHeight(Math.max(88, Math.min(window.innerHeight, baseH + deltaY)))
+      setLiveHeight(Math.max(88, Math.min(window.innerHeight, baseH - deltaY)))
     }
 
     const onMouseUp = (e: MouseEvent) => {
-      if (touchOrigin.current !== "handle") return
+      if (touchPhase.current !== "dragging") return
       const deltaY = e.clientY - dragStartY.current
       const deltaTime = Date.now() - dragStartTime.current
-      const velocity = deltaY / (deltaTime || 1)
+      // Small movement = click on handle → cycle to next size up
+      if (Math.abs(deltaY) < 5 && deltaTime < 300) {
+        const order: ContainerSize[] = ["minimized", "default", "expanded"]
+        const idx = order.indexOf(containerSizeRef.current)
+        if (idx < order.length - 1) setContainerSize(order[idx + 1])
+        setLiveHeight(null)
+        touchPhase.current = "idle"
+        return
+      }
+      const velocity = deltaY / Math.max(deltaTime, 1)
       setContainerSize(resolveSnap(deltaY, velocity))
       setLiveHeight(null)
-      touchOrigin.current = null
+      touchPhase.current = "idle"
     }
 
+    window.addEventListener("touchstart", onTouchStart, { passive: true })
     window.addEventListener("touchmove", onTouchMove, { passive: false })
     window.addEventListener("touchend", onTouchEnd)
     window.addEventListener("mousemove", onMouseMove)
     window.addEventListener("mouseup", onMouseUp)
     return () => {
+      window.removeEventListener("touchstart", onTouchStart)
       window.removeEventListener("touchmove", onTouchMove)
       window.removeEventListener("touchend", onTouchEnd)
       window.removeEventListener("mousemove", onMouseMove)
       window.removeEventListener("mouseup", onMouseUp)
     }
   }, [isMobile, setContainerSize])
+
+  // ── Wheel-to-resize: scroll up at top → expand; scroll down at top → shrink ──
+  // Works for both mobile (mouse testing) and desktop panel.
+  // Attaches to containerRef so it's always available regardless of containerSize.
+  useEffect(() => {
+    const panel = containerRef.current
+    if (!panel) return
+    const onWheel = (e: WheelEvent) => {
+      const scrollEl = scrollContainerRef.current
+      // Only intercept when the scroll target is inside the scroll container
+      if (scrollEl && !scrollEl.contains(e.target as Node)) return
+      const atTop = (scrollEl?.scrollTop ?? 0) <= 2
+      const order: ContainerSize[] = ["minimized", "default", "expanded"]
+      const idx = order.indexOf(containerSizeRef.current)
+      if (e.deltaY < 0 && atTop && idx < order.length - 1) {
+        // Scroll up at top → expand
+        e.preventDefault()
+        setContainerSize(order[idx + 1])
+      } else if (e.deltaY > 0 && atTop && idx > 0) {
+        // Scroll down at top → shrink
+        e.preventDefault()
+        setContainerSize(order[idx - 1])
+      }
+    }
+    panel.addEventListener("wheel", onWheel, { passive: false })
+    return () => panel.removeEventListener("wheel", onWheel)
+  // containerRef is stable; setContainerSize is stable (from useState setter)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setContainerSize])
 
   // Share current URL to clipboard
   const handleShare = useCallback(async () => {
@@ -357,6 +481,35 @@ export default function ObjectPanel({
   // Once site objects load, switch gallery from single-artifact mode to full list.
   // Using galleryKey forces ImageGallery to remount with the correct initialIndex.
   const [galleryKey, setGalleryKey] = useState(0)
+
+  // Gallery fade-in: two-frame flush triggers CSS transition from opacity:0 → opacity:1
+  const [galleryVisible, setGalleryVisible] = useState(false)
+  useEffect(() => {
+    if (galleryOpen) {
+      const id = requestAnimationFrame(() =>
+        requestAnimationFrame(() => setGalleryVisible(true))
+      )
+      return () => cancelAnimationFrame(id)
+    } else {
+      setGalleryVisible(false)
+    }
+  }, [galleryOpen])
+
+  // ── Mobile: gallery should always be at expanded size (Apple Maps detail behavior) ──
+  // Remember the size before opening so we can restore it on close.
+  const sizeBeforeGallery = useRef<ContainerSize | null>(null)
+  useEffect(() => {
+    if (!isMobile) return
+    if (galleryOpen) {
+      if (sizeBeforeGallery.current === null) {
+        sizeBeforeGallery.current = containerSizeRef.current
+        if (containerSizeRef.current !== "expanded") setContainerSize("expanded")
+      }
+    } else if (sizeBeforeGallery.current !== null) {
+      setContainerSize(sizeBeforeGallery.current)
+      sizeBeforeGallery.current = null
+    }
+  }, [galleryOpen, isMobile, setContainerSize])
   useEffect(() => {
     if (!galleryArtifact || !galleryOpen || objects.length === 0) return
     const idx = objects.findIndex(o => String(o.id) === String(galleryArtifact.id))
@@ -369,8 +522,11 @@ export default function ObjectPanel({
 
   const getContainerStyle = (): React.CSSProperties => {
     if (isMobile) {
-      const shadow = "0 -2px 20px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08)"
-      const transition = prefersReducedMotion.current ? "none" : "height 0.42s cubic-bezier(0.25,0.46,0.45,0.94), border-radius 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease"
+      const shadow = "0 -2px 20px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07)"
+      // Snappy but subtle: 260ms is below perceptual threshold for "heavy"
+      const transition = prefersReducedMotion.current ? "none" : "height 0.26s cubic-bezier(0.4,0,0.2,1), border-radius 0.22s cubic-bezier(0.4,0,0.2,1), left 0.22s cubic-bezier(0.4,0,0.2,1), right 0.22s cubic-bezier(0.4,0,0.2,1), bottom 0.22s cubic-bezier(0.4,0,0.2,1)"
+      // Respect iPhone home indicator / notch
+      const safeBottom = "max(16px, env(safe-area-inset-bottom))"
 
       if (liveHeight !== null) {
         const isNearExpanded = liveHeight >= window.innerHeight * 0.9
@@ -378,7 +534,7 @@ export default function ObjectPanel({
           top: isNearExpanded ? 0 : "auto",
           transition: "none",
           height: isNearExpanded ? "100dvh" : liveHeight,
-          bottom: isNearExpanded ? 0 : 16,
+          bottom: isNearExpanded ? 0 : safeBottom,
           left: isNearExpanded ? 0 : 12,
           right: isNearExpanded ? 0 : 12,
           borderRadius: isNearExpanded ? 0 : 24,
@@ -390,22 +546,25 @@ export default function ObjectPanel({
         case "expanded":
           return { transition, top: 0, bottom: 0, left: 0, right: 0, height: "100dvh", borderRadius: 0, boxShadow: "none" }
         case "minimized":
-          return { transition, top: "auto", bottom: 16, left: 12, right: 12, height: 88, borderRadius: 24, boxShadow: shadow }
+          return { transition, top: "auto", bottom: safeBottom, left: 12, right: 12, height: 88, borderRadius: 24, boxShadow: shadow }
         case "default":
         default:
-          return { transition, top: "auto", bottom: 16, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: shadow }
+          return { transition, top: "auto", bottom: safeBottom, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: shadow }
       }
     }
 
+    const desktopTransition = prefersReducedMotion.current ? "none" : "width 0.26s cubic-bezier(0.4,0,0.2,1), height 0.26s cubic-bezier(0.4,0,0.2,1)"
     switch (containerSize) {
       case "expanded":
         return {
+          transition: desktopTransition,
           width: "calc(100% - 5rem)",
           height: "calc(100dvh - 5rem)",
         }
       case "default":
       default:
         return {
+          transition: desktopTransition,
           width: "40%",
           height: "auto",
         }
@@ -488,26 +647,18 @@ export default function ObjectPanel({
       {/* Mobile drag handle */}
       {isMobile && (
         <div
+          ref={handleRef}
           role="button"
           tabIndex={0}
           aria-label={`Panel is ${containerSize}. Use arrow keys to resize.`}
           aria-expanded={containerSize === "expanded"}
-          className="flex-shrink-0 flex items-center justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none"
+          className="flex-shrink-0 flex items-center justify-center pt-2 pb-1 select-none"
           style={{ touchAction: "none" }}
-          onTouchStart={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            touchOrigin.current = "handle"
-            dragStartY.current = e.touches[0].clientY
-            dragStartTime.current = Date.now()
-            dragStartSize.current = containerSize
-          }}
           onMouseDown={(e) => {
-            e.stopPropagation()
-            touchOrigin.current = "handle"
             dragStartY.current = e.clientY
             dragStartTime.current = Date.now()
-            dragStartSize.current = containerSize
+            dragStartSize.current = containerSizeRef.current
+            touchPhase.current = "dragging"
           }}
           onKeyDown={(e) => {
             const order: ContainerSize[] = ["minimized", "default", "expanded"]
@@ -666,7 +817,7 @@ export default function ObjectPanel({
 
         {/* Content — objects */}
         {containerSize !== "minimized" && (
-        <div className="flex-1 overflow-auto bg-white" style={{ touchAction: "pan-y" }}>
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto bg-white" style={{ touchAction: "pan-y", overscrollBehaviorY: "contain" }}>
           <ObjectGrid
             objects={objects}
             onLoadMore={onLoadMore}
@@ -792,21 +943,33 @@ export default function ObjectPanel({
       style={{
         ...containerStyle,
         ...(!isMobile ? { borderRadius: "1rem" } : {}),
-        ...(isMobile ? { willChange: "height" } : {}),
+        ...(isMobile && liveHeight !== null ? { willChange: "height" } : {}),
       }}
     >
       {sheetInner}
 
-      {/* Image Gallery */}
+      {/* Image Gallery — subtle fade + slide entrance */}
       {galleryOpen && (
-        <ImageGallery
-          key={galleryKey}
-          objects={galleryArtifact ? [galleryArtifact] : objects}
-          initialIndex={galleryArtifact ? 0 : selectedIndex}
-          onClose={() => { setGalleryArtifact(null); setGalleryOpen(false) }}
-          isFullscreen={containerSize === "expanded"}
-          isMobile={isMobile}
-        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 59,
+            opacity: galleryVisible ? 1 : 0,
+            transform: galleryVisible ? "translateY(0)" : "translateY(6px)",
+            transition: "opacity 0.18s ease, transform 0.18s ease",
+            pointerEvents: galleryVisible ? "auto" : "none",
+          }}
+        >
+          <ImageGallery
+            key={galleryKey}
+            objects={galleryArtifact ? [galleryArtifact] : objects}
+            initialIndex={galleryArtifact ? 0 : selectedIndex}
+            onClose={() => { setGalleryArtifact(null); setGalleryOpen(false) }}
+            isFullscreen={containerSize === "expanded"}
+            isMobile={isMobile}
+          />
+        </div>
       )}
     </div>
   )
