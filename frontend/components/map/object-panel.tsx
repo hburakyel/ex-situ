@@ -243,11 +243,12 @@ export default function ObjectPanel({
         // Handle touch → always resize the sheet
         touchPhase.current = "dragging"
       } else if (headerRef.current?.contains(e.target as Node)) {
-        // Header touch: accordion/nested scroll areas scroll freely; bare header decides
+        // Header touch: accordion/nested scroll areas scroll freely; bare header resizes
         if (isInsideNestedScroll(e.target)) {
           touchPhase.current = "idle"
         } else if (containerSizeRef.current === "expanded") {
-          touchPhase.current = "idle"
+          // Expanded: header drag can shrink the sheet (downward = shrink)
+          touchPhase.current = "dragging"
         } else {
           // Non-expanded: upward swipe → expand (deciding → snap), downward → idle
           touchPhase.current = "deciding"
