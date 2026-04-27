@@ -100,7 +100,7 @@ export async function generateMetadata({ params }: ObjectPageProps): Promise<Met
 
   const attrs = object.attributes
   const title = attrs.title || `Object ${id}`
-  const invPart = attrs.inventory_number ? ` (inv: ${attrs.inventory_number})` : ""
+  const invPart = attrs.inventory_number ? ` ${attrs.inventory_number}` : ""
   const description = buildDescription(attrs, invPart)
   const canonicalUrl = `${BASE_URL}/artifact/${id}`
   const images = attrs.img_url ? [{ url: attrs.img_url }] : []
