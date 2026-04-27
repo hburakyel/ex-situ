@@ -185,9 +185,8 @@ export default function ObjectPanel({
     }
 
     const resolveSnap = (deltaY: number, velocity: number): ContainerSize => {
-      // deltaY > 0: finger DOWN (shrink) | velocity > 0: moving DOWN
-      // Asymmetric thresholds: easier to grow than shrink (Apple Maps bias).
-      // Most user intent when dragging up from default = expand.
+      // Always move at most ONE step at a time: minimized ↔ default ↔ expanded.
+      // This prevents jumping directly from expanded to minimized or vice-versa.
       const order: ContainerSize[] = ["minimized", "default", "expanded"]
       const snapH: Record<ContainerSize, number> = {
         expanded: window.innerHeight,
@@ -196,17 +195,18 @@ export default function ObjectPanel({
       }
       const idx = order.indexOf(dragStartSize.current)
       const currentH = sizeToHeight(dragStartSize.current) - deltaY
-      // High velocity → jump to extreme
-      if (velocity > 1.2) return "minimized"
-      if (velocity < -1.2) return "expanded"
-      // Bias toward expansion: any meaningful upward intent grows the sheet
-      if (velocity < -0.2 || deltaY < -30) return order[Math.min(idx + 1, 2)]
-      // Shrinking requires more deliberate gesture
+      // Upward intent (negative deltaY / negative velocity) → one step up
+      if (velocity < -0.2 || deltaY < -30) return order[Math.min(idx + 1, order.length - 1)]
+      // Downward intent → one step down
       if (velocity > 0.5 || deltaY > 70) return order[Math.max(idx - 1, 0)]
-      // Slow drag → nearest snap point by current live height
-      return (Object.keys(snapH) as ContainerSize[]).reduce((best, k) =>
+      // Slow drag → nearest snap point (still capped to one step from start)
+      const nearest = (Object.keys(snapH) as ContainerSize[]).reduce((best, k) =>
         Math.abs(currentH - snapH[k]) < Math.abs(currentH - snapH[best]) ? k : best
       )
+      const nearestIdx = order.indexOf(nearest)
+      // Clamp to one step away from where we started
+      const clampedIdx = Math.max(idx - 1, Math.min(idx + 1, nearestIdx))
+      return order[clampedIdx]
     }
 
     // Returns true if `el` is inside a scrollable container that isn't the main scroll root.
