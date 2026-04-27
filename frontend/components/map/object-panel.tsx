@@ -238,13 +238,16 @@ export default function ObjectPanel({
       dragStartTime.current = Date.now()
       dragStartSize.current = containerSizeRef.current
       touchStartScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0
-      // Handle area: commit to dragging immediately (no ambiguity)
       if (handleRef.current?.contains(e.target as Node)) {
+        // Handle: always allow drag regardless of current size
         touchPhase.current = "dragging"
+      } else if (containerSizeRef.current === "expanded") {
+        // In expanded state, content area touches must never intercept the scroll.
+        // The handle is the only affordance to shrink the sheet.
+        touchPhase.current = "idle"
       } else if (isInsideNestedScroll(e.target)) {
-        // Touch started inside a nested scrollable (e.g. accordion list)
-        // Only allow downward (shrink) gestures when main scroll is at top;
-        // never intercept upward scrolls so nested content scrolls freely.
+        // Touch inside a nested scrollable (e.g. accordion list):
+        // only allow downward (shrink) gesture when main scroll is at top.
         touchPhase.current = "nested-scroll" as any
       } else {
         touchPhase.current = "deciding"
@@ -385,9 +388,11 @@ export default function ObjectPanel({
       if (wheelLockTimer.current) clearTimeout(wheelLockTimer.current)
       wheelLockTimer.current = setTimeout(unlock, 600)
 
-      // If already locked after a snap, suppress this event entirely
+      // If already locked after a snap:
+      // - In expanded state, let content scroll freely (don't block the grid).
+      // - In other states, suppress the event so momentum can't re-trigger a snap.
       if (wheelLocked.current) {
-        e.preventDefault()
+        if (containerSizeRef.current !== "expanded") e.preventDefault()
         return
       }
 
