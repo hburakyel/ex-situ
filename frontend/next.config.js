@@ -42,6 +42,15 @@ const nextConfig = {
       },
     ]
   },
+  async redirects() {
+    return [
+      {
+        source: "/research/:path*",
+        destination: "/map",
+        permanent: false,
+      },
+    ]
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

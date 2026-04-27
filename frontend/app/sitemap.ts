@@ -11,32 +11,7 @@ const ARTIFACTS_PER_PAGE = 1000
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function fetchArcAndCollectionSlugs(): Promise<{
-  arcs: string[]
-  collections: string[]
-}> {
-  try {
-    const res = await fetch(`${API_BASE}/museum-objects/geospatial?zoom=1`, {
-      next: { revalidate: 86400 },
-    })
-    if (!res.ok) return { arcs: [], collections: [] }
-
-    const json = await res.json()
-    const data: Array<{ place_name?: string; institution_name?: string }> =
-      Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
-
-    const arcs = [...new Set(
-      data.map((d) => d.place_name).filter((s): s is string => Boolean(s))
-    )]
-    const collections = [...new Set(
-      data.map((d) => d.institution_name).filter((s): s is string => Boolean(s))
-    )]
-
-    return { arcs, collections }
-  } catch {
-    return { arcs: [], collections: [] }
-  }
-}
+// Research pages intentionally excluded from sitemap (work in progress)
 
 async function fetchTotalArtifactCount(): Promise<number> {
   try {
@@ -83,28 +58,11 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
   const now = new Date()
   const numId = Number(id)
 
-  // id=0: static pages, arcs, collections
+  // id=0: static pages only (research excluded — work in progress)
   if (numId === 0) {
-    const { arcs, collections } = await fetchArcAndCollectionSlugs()
-
-    const staticRoutes: MetadataRoute.Sitemap = [
+    return [
       { url: `${BASE_URL}/map`, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
-      { url: `${BASE_URL}/research`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
     ]
-    const arcRoutes: MetadataRoute.Sitemap = arcs.map((slug) => ({
-      url: `${BASE_URL}/research/arc/${encodeURIComponent(slug)}`,
-      lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-    }))
-    const collectionRoutes: MetadataRoute.Sitemap = collections.map((slug) => ({
-      url: `${BASE_URL}/research/collection/${encodeURIComponent(slug)}`,
-      lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.6,
-    }))
-
-    return [...staticRoutes, ...arcRoutes, ...collectionRoutes]
   }
 
   // id≥1: artifact pages (page index = id - 1)
