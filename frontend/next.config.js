@@ -45,7 +45,17 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        source: "/research/:path*",
+        source: "/research/arc/:slug",
+        destination: "/map?place=:slug",
+        permanent: false,
+      },
+      {
+        source: "/research/collection/:slug",
+        destination: "/map?institution=:slug",
+        permanent: false,
+      },
+      {
+        source: "/research",
         destination: "/map",
         permanent: false,
       },
