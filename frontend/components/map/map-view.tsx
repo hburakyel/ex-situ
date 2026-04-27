@@ -304,7 +304,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // ── Animate helper ──
     const animateToZoomLevel = useCallback(
       (center: [number, number], targetZoom: number, options: { mode?: "level-shift" | "detail"; duration?: number; onComplete?: () => void } = {}) => {
-        if (!map.current) return
+        const mapRef = map.current
+        if (!mapRef) return
         isProgrammaticMove.current = true
         setViewportState({ longitude: center[0], latitude: center[1], zoom: targetZoom })
         lastViewRef.current = { lng: center[0], lat: center[1], zoom: targetZoom }
@@ -313,9 +314,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         const easingFn = mode === "detail"
           ? (t: number) => 1 - Math.pow(1 - t, 2.2)
           : (t: number) => 1 - Math.pow(1 - t, 3.2)
-        map.current.easeTo({ center, zoom: targetZoom, duration, easing: easingFn, essential: true })
+        mapRef.easeTo({ center, zoom: targetZoom, duration, easing: easingFn, essential: true })
       },
-      [],
+      [map],
     )
 
     // ── Bounds change ──
@@ -648,6 +649,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     }, [isMapReady, isWikipediaSelected, spatialDocData])
 
     // Arc layer construction
+
+    // ArcLayer: görsel ve etkileşim bir arada, mobilde hover/tıklama sırasında geçici olarak genişler
     const arcLayer = useMemo(() => {
       if (!isMapReady || processedArcs.arcLayerData.length === 0) return null
       const { arcLayerData, dataSource, layerStyle } = processedArcs
@@ -675,9 +678,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         getWidth: (d) => {
           const arcKey = `${d.fromName}-${d.toName}`
           const highlighted = selectedArcRef.current?.key === arcKey || (activeSite && d.fromName === activeSite)
+          const isHovered = hoveredArc && hoveredArc.fromName === d.fromName && hoveredArc.toName === d.toName
           const baseWidth = dataSource === 'geospatial-country' || dataSource === 'geospatial-city'
             ? Math.max(0.5, Math.min(3, 0.5 + Math.log(d.count + 1) * 0.45))
             : Math.max(2, Math.min(6, 2 + Math.log(d.count + 1) * 0.9))
+          // Mobilde ve hover/seçili ise geçici olarak genişlet
+          if (isMobile && (isHovered || highlighted)) return Math.max(baseWidth, 16)
           return highlighted ? baseWidth * 2.5 : baseWidth
         },
         widthMinPixels: isMobile ? 2.5 : 1.5,
@@ -686,7 +692,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         highlightColor: [59, 130, 246],
         transitions: { getSourceColor: { duration: 300 }, getTargetColor: { duration: 300 }, getWidth: { duration: 300 } },
         updateTriggers: {
-          getSourceColor: [selectedArc?.key, activeSite], getTargetColor: [selectedArc?.key, activeSite], getWidth: [selectedArc?.key, activeSite],
+          getSourceColor: [selectedArc?.key, activeSite], getTargetColor: [selectedArc?.key, activeSite], getWidth: [selectedArc?.key, activeSite, hoveredArc, isMobile],
         },
         onHover: (info: any) => {
           if (info.object) {
@@ -709,8 +715,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           isProgrammaticMove.current = true
           const mapRef = map.current
           if (!mapRef) return
-          // panelVisible: true — the panel is guaranteed to be shown
-          // after onSelectArc (even if the batched state hasn't committed yet)
           if (info.layer.id === 'arc-layer-geospatial') {
             const curZ = mapRef.getZoom()
             if (curZ < 4) animateToZoomLevel([lng, lat], 5, { mode: 'level-shift', duration: 950 })
@@ -722,7 +726,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           }
         },
       })
-    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite])
+    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredArc])
 
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({
@@ -741,8 +745,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // Push layers to MapboxOverlay
     useEffect(() => {
       if (!deckOverlay.current || !isMapReady) return
-      try { deckOverlay.current.setProps({ layers }) } catch (e) {}
-    }, [layers, isMapReady])
+      try { deckOverlay.current.setProps({ layers, pickingRadius: isMobile ? 10 : 3 }) } catch (e) {}
+    }, [layers, isMapReady, isMobile])
 
     // Notify parent when arcCards change
     useEffect(() => { onArcCardsChange?.(arcCards) }, [arcCards, onArcCardsChange])
@@ -771,7 +775,22 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             : (isObjectContainerVisible ? "desktop" : "desktop-hidden")
         }
       >
-        <div ref={mapContainer} className="h-full w-full" suppressHydrationWarning />
+        {/* iOS Safari'de harita arkasında beyaz background sorununu önlemek için özel bir kapsayıcı */}
+        <div
+          ref={mapContainer}
+          className="h-full w-full"
+          suppressHydrationWarning
+          style={{
+            backgroundColor: "#111", // Protomaps dark bg ile uyumlu
+            WebkitBackdropFilter: "none",
+            backdropFilter: "none",
+            // iOS Safari'de background-attachment: fixed bug'ını önle
+            backgroundAttachment: 'fixed',
+            // iOS Safari tespiti için user agent kontrolü
+            ...(typeof window !== 'undefined' && /iP(ad|hone|od)/.test(navigator.userAgent)
+              ? { backgroundColor: '#111', backgroundImage: 'none' } : {})
+          }}
+        />
 
         {/* Map attribution */}
         <div className="absolute bottom-1 right-1 z-10 text-[9px] text-gray-600/40 px-1.5 py-0.5 rounded">

@@ -4,6 +4,8 @@ export const revalidate = 86400 // regenerate once per day
 
 const BASE_URL = 'https://exsitu.app'
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:1337/api'
+// Google hard limit is 50,000 URLs per sitemap file
+const ARTIFACTS_PER_PAGE = 1000
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,87 +38,81 @@ async function fetchArcAndCollectionSlugs(): Promise<{
   }
 }
 
-async function fetchArtifactIds(cap = 500): Promise<number[]> {
-  const ids: number[] = []
-  const pageSize = 100
-  let page = 1
-  let totalPages = 1
-
+async function fetchTotalArtifactCount(): Promise<number> {
   try {
-    while (page <= totalPages && ids.length < cap) {
-      const res = await fetch(
-        `${API_BASE}/museum-objects?pagination[page]=${page}&pagination[pageSize]=${pageSize}&fields[0]=id`,
-        { next: { revalidate: 86400 } }
-      )
-      if (!res.ok) break
-
-      const json = await res.json()
-      const records: Array<{ id: number }> = Array.isArray(json?.data)
-        ? json.data
-        : []
-
-      for (const r of records) {
-        if (ids.length >= cap) break
-        if (typeof r.id === 'number') ids.push(r.id)
-      }
-
-      totalPages = json?.meta?.pagination?.pageCount ?? 1
-      page++
-    }
+    const res = await fetch(
+      `${API_BASE}/museum-objects?pagination[pageSize]=1`,
+      { next: { revalidate: 86400 } }
+    )
+    if (!res.ok) return 0
+    const json = await res.json()
+    return json?.meta?.pagination?.total ?? 0
   } catch {
-    // Gracefully degrade — sitemap will omit artifact entries
+    return 0
   }
+}
 
-  return ids
+async function fetchArtifactPage(pageIndex: number, pageSize: number): Promise<number[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/museum-objects?pagination[page]=${pageIndex + 1}&pagination[pageSize]=${pageSize}&fields[0]=id`,
+      { next: { revalidate: 86400 } }
+    )
+    if (!res.ok) return []
+    const json = await res.json()
+    return (Array.isArray(json?.data) ? json.data : [])
+      .map((r: { id: number }) => r.id)
+      .filter((id: unknown): id is number => typeof id === 'number')
+  } catch {
+    return []
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Sitemap
+// Paginated sitemap — id=0: static+arcs+collections, id≥1: artifacts
 // ---------------------------------------------------------------------------
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [{ arcs, collections }, artifactIds] = await Promise.all([
-    fetchArcAndCollectionSlugs(),
-    fetchArtifactIds(500),
-  ])
+export async function generateSitemaps() {
+  const total = await fetchTotalArtifactCount()
+  const artifactPageCount = Math.max(1, Math.ceil(total / ARTIFACTS_PER_PAGE))
+  // id=0 reserved for static routes, id=1..N for artifacts
+  return Array.from({ length: artifactPageCount + 1 }, (_, i) => ({ id: i }))
+}
 
+export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
+  const numId = Number(id)
 
-  const staticRoutes: MetadataRoute.Sitemap = [
-    {
-      url: `${BASE_URL}/map`,
+  // id=0: static pages, arcs, collections
+  if (numId === 0) {
+    const { arcs, collections } = await fetchArcAndCollectionSlugs()
+
+    const staticRoutes: MetadataRoute.Sitemap = [
+      { url: `${BASE_URL}/map`, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
+      { url: `${BASE_URL}/research`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
+    ]
+    const arcRoutes: MetadataRoute.Sitemap = arcs.map((slug) => ({
+      url: `${BASE_URL}/research/arc/${encodeURIComponent(slug)}`,
       lastModified: now,
-      changeFrequency: 'daily',
-      priority: 1.0,
-    },
-    {
-      url: `${BASE_URL}/research`,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    }))
+    const collectionRoutes: MetadataRoute.Sitemap = collections.map((slug) => ({
+      url: `${BASE_URL}/research/collection/${encodeURIComponent(slug)}`,
       lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-  ]
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
+    }))
 
-  const arcRoutes: MetadataRoute.Sitemap = arcs.map((slug) => ({
-    url: `${BASE_URL}/research/arc/${encodeURIComponent(slug)}`,
-    lastModified: now,
-    changeFrequency: 'weekly' as const,
-    priority: 0.7,
-  }))
+    return [...staticRoutes, ...arcRoutes, ...collectionRoutes]
+  }
 
-  const collectionRoutes: MetadataRoute.Sitemap = collections.map((slug) => ({
-    url: `${BASE_URL}/research/collection/${encodeURIComponent(slug)}`,
-    lastModified: now,
-    changeFrequency: 'weekly' as const,
-    priority: 0.6,
-  }))
-
-  const artifactRoutes: MetadataRoute.Sitemap = artifactIds.map((id) => ({
-    url: `${BASE_URL}/artifact/${id}`,
+  // id≥1: artifact pages (page index = id - 1)
+  const artifactIds = await fetchArtifactPage(numId - 1, ARTIFACTS_PER_PAGE)
+  return artifactIds.map((artId) => ({
+    url: `${BASE_URL}/artifact/${artId}`,
     lastModified: now,
     changeFrequency: 'monthly' as const,
     priority: 0.5,
   }))
-
-  return [...staticRoutes, ...arcRoutes, ...collectionRoutes, ...artifactRoutes]
 }

@@ -75,13 +75,17 @@ export async function generateMetadata({
       ? `${totalObjects.toLocaleString()} cultural heritage objects from ${displayName}, held at ${institutions.join(", ")}${institutions.length > 0 ? " and others" : ""}. Explore provenance on Ex Situ.`
       : `Explore cultural heritage objects from ${displayName} and their institutional provenance on Ex Situ.`
 
+  const canonicalUrl = `https://exsitu.app/research/arc/${encodeURIComponent(country.toLowerCase())}`
+
   return {
     title: `${displayName} — Cultural Heritage Provenance | Ex Situ`,
     description,
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title: `${displayName} — Cultural Heritage Provenance | Ex Situ`,
       description,
-      url: `https://exsitu.app/research/arc/${encodeURIComponent(country.toLowerCase())}`,
+      url: canonicalUrl,
+      type: 'website',
     },
   }
 }

@@ -373,6 +373,8 @@ export interface ApiGeocodeGeocode extends Schema.CollectionType {
     draftAndPublish: false;
   };
   attributes: {
+    city: Attribute.String;
+    country: Attribute.String;
     createdAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
       'api::geocode.geocode',
@@ -380,6 +382,9 @@ export interface ApiGeocodeGeocode extends Schema.CollectionType {
       'admin::user'
     > &
       Attribute.Private;
+    latitude: Attribute.Decimal;
+    longitude: Attribute.Decimal;
+    place_name: Attribute.String;
     updatedAt: Attribute.DateTime;
     updatedBy: Attribute.Relation<
       'api::geocode.geocode',
@@ -422,8 +427,15 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
     inventory_number: Attribute.String;
     latitude: Attribute.Float;
     longitude: Attribute.Float;
+    manual_latitude: Attribute.Float;
+    manual_longitude: Attribute.Float;
     object_id: Attribute.BigInteger;
     object_links: Attribute.Component<'object-links.object-link-info', true>;
+    place: Attribute.Relation<
+      'api::museum-object.museum-object',
+      'manyToOne',
+      'api::place.place'
+    >;
     place_name: Attribute.Text;
     publishedAt: Attribute.DateTime;
     source_link: Attribute.Text;
@@ -432,6 +444,53 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
     updatedAt: Attribute.DateTime;
     updatedBy: Attribute.Relation<
       'api::museum-object.museum-object',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+  };
+}
+
+export interface ApiPlacePlace extends Schema.CollectionType {
+  collectionName: 'places';
+  info: {
+    description: 'Canonical geographic place or archaeological site linked to museum objects';
+    displayName: 'Place';
+    pluralName: 'places';
+    singularName: 'place';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    city_en: Attribute.String;
+    city_native: Attribute.String;
+    country_en: Attribute.String;
+    country_native: Attribute.String;
+    createdAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::place.place',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    description: Attribute.Text;
+    latitude: Attribute.Decimal;
+    longitude: Attribute.Decimal;
+    museum_objects: Attribute.Relation<
+      'api::place.place',
+      'oneToMany',
+      'api::museum-object.museum-object'
+    >;
+    name: Attribute.String & Attribute.Required;
+    name_native: Attribute.String;
+    site_type: Attribute.Enumeration<
+      ['archaeological_site', 'region', 'city', 'country', 'museum', 'other']
+    >;
+    source: Attribute.String;
+    updatedAt: Attribute.DateTime;
+    updatedBy: Attribute.Relation<
+      'api::place.place',
       'oneToOne',
       'admin::user'
     > &
@@ -911,6 +970,7 @@ declare module '@strapi/types' {
       'admin::user': AdminUser;
       'api::geocode.geocode': ApiGeocodeGeocode;
       'api::museum-object.museum-object': ApiMuseumObjectMuseumObject;
+      'api::place.place': ApiPlacePlace;
       'api::stats.stats': ApiStatsStats;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

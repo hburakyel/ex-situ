@@ -225,9 +225,9 @@ export default function CollectionDetailClient({ params }: { params: Promise<{ s
               <button
                 key={arc.cluster_id}
                 onClick={() => toggleOrigin(arc.place_name)}
-                className={`px-2 py-0.5 text-sm border transition-colors ${
+                className={`px-2 py-0.5 rounded-md text-sm border transition-colors ${
                   activeOrigin?.toLowerCase() === arc.place_name.toLowerCase()
-                    ? "border-blue-400 text-blue-600 bg-blue-50"
+                    ? "border-blue-400 bg-blue-100 text-blue-700"
                     : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
                 }`}
               >
@@ -295,7 +295,7 @@ export default function CollectionDetailClient({ params }: { params: Promise<{ s
               <div className="space-y-0.5">
                 <div className="truncate">
                   <span className="text-gray-400">title: </span>
-                  <span className="text-gray-800 group-hover:text-black">
+                  <span className="text-black/60 group-hover:text-black">
                     {obj.attributes.title || "untitled"}
                   </span>
                 </div>

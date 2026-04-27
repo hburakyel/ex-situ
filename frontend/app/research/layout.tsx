@@ -91,7 +91,7 @@ export default function ResearchLayout({ children }: { children: React.ReactNode
         <div className="px-5 py-3 max-w-5xl mx-auto">
           {/* Breadcrumb prompt line */}
           <div className="flex items-center gap-0 flex-wrap">
-            <Link href="/" className="text-green-600 hover:text-green-500">
+            <Link href="/" className="text-black/60 hover:text-black">
               exsitu
             </Link>
             <span className="text-gray-400 mx-0.5">/</span>
@@ -100,7 +100,7 @@ export default function ResearchLayout({ children }: { children: React.ReactNode
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="text-green-600 hover:text-green-500 cursor-pointer"
+                className="text-black/60 hover:text-black cursor-pointer"
               >
                 {segments[0] || "research"}
                 <span className="text-gray-400 ml-1">▾</span>
@@ -112,10 +112,10 @@ export default function ResearchLayout({ children }: { children: React.ReactNode
                     <button
                       key={item.label}
                       onClick={() => handleNavigate(item.href)}
-                      className={`block w-full text-left px-3 py-1.5 hover:bg-gray-100 ${
+                      className={`block w-full text-left px-3 py-1.5 hover:bg-gray-50 ${
                         pathname.startsWith(item.href)
-                          ? "text-green-600"
-                          : "text-gray-600"
+                          ? "text-black"
+                          : "text-gray-500"
                       }`}
                     >
                       {item.label}
@@ -159,7 +159,7 @@ export default function ResearchLayout({ children }: { children: React.ReactNode
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               placeholder="search objects, arcs, collections..."
-              className="flex-1 bg-transparent border-none outline-none text-gray-800 placeholder:text-gray-300 caret-green-500"
+              className="flex-1 bg-transparent border-none outline-none text-black placeholder:text-gray-300"
             />
             {isSearching && (
               <span className="text-gray-400 text-xs">searching...</span>

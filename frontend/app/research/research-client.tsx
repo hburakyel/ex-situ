@@ -96,13 +96,13 @@ export default function ResearchClient() {
       <div className="flex items-center gap-4 mb-4">
         <button
           onClick={() => setActiveTab("arcs")}
-          className={activeTab === "arcs" ? "text-gray-900 underline underline-offset-4" : "text-gray-400 hover:text-gray-600"}
+          className={activeTab === "arcs" ? "text-black underline underline-offset-4" : "text-gray-400 hover:text-gray-600"}
         >
           arcs
         </button>
         <button
           onClick={() => setActiveTab("collections")}
-          className={activeTab === "collections" ? "text-gray-900 underline underline-offset-4" : "text-gray-400 hover:text-gray-600"}
+          className={activeTab === "collections" ? "text-black underline underline-offset-4" : "text-gray-400 hover:text-gray-600"}
         >
           collections
         </button>
@@ -114,7 +114,7 @@ export default function ResearchClient() {
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             placeholder="..."
-            className="bg-transparent border-none outline-none text-gray-700 placeholder:text-gray-300 w-40 caret-green-500"
+            className="bg-transparent border-none outline-none text-black placeholder:text-gray-300 w-40"
           />
         </div>
       </div>

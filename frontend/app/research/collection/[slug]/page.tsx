@@ -78,13 +78,17 @@ export async function generateMetadata({
       ? `${displayName} holds ${totalObjects.toLocaleString()} cultural heritage objects from ${origins.join(", ")}${origins.length > 0 ? " and other origins" : ""}. Explore the collection on Ex Situ.`
       : `Explore the ${displayName} collection and its provenance data on Ex Situ.`
 
+  const canonicalUrl = `https://exsitu.app/research/collection/${encodeURIComponent(decodedSlug.toLowerCase())}`
+
   return {
     title: `${displayName} Collection | Ex Situ`,
     description,
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title: `${displayName} Collection | Ex Situ`,
       description,
-      url: `https://exsitu.app/research/collection/${encodeURIComponent(decodedSlug.toLowerCase())}`,
+      url: canonicalUrl,
+      type: 'website',
     },
   }
 }

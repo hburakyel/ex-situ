@@ -59,6 +59,9 @@ function MapContent() {
   const urlLat = searchParams.get("lat")
   const urlLng = searchParams.get("lng")
   const urlZoom = searchParams.get("zoom")
+  const urlArtifactId = searchParams.get("artifactId")
+  // Capture on mount in a ref — router.replace will strip it from the URL but we still need it
+  const artifactIdRef = useRef(urlArtifactId)
 
   // Clamp and validate URL parameters to prevent NaN / extreme values
   const clamp = (val: number, min: number, max: number, fallback: number) =>
@@ -91,6 +94,7 @@ function MapContent() {
   const [selectedArc, setSelectedArc] = useState<SelectedArc | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [wikiDocs, setWikiDocs] = useState<any[]>([])
+  const [initialGalleryArtifact, setInitialGalleryArtifact] = useState<MuseumObject | null>(null)
   const initialZoom = clamp(urlZoom ? parseFloat(urlZoom) : 2, 0, 22, 2)
   const [currentZoom, setCurrentZoom] = useState(initialZoom)
   const currentZoomRef = useRef(initialZoom)
@@ -109,6 +113,17 @@ function MapContent() {
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
   }, [])
+
+  // ── Deep-link: fetch single artifact from URL param to auto-open gallery ──
+  // Use ref value so the URL being rewritten (stripping artifactId) doesn't cancel the fetch
+  useEffect(() => {
+    const artifactId = artifactIdRef.current
+    if (!artifactId) return
+    fetch(`/api/proxy/object/${encodeURIComponent(artifactId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.data) setInitialGalleryArtifact(data.data as MuseumObject) })
+      .catch(() => {})
+  }, []) // run once on mount — artifactIdRef is stable
 
   // ── Drill-down state (research page pattern) ──
   const [drillLevel, setDrillLevel] = useState<DrillLevel>(urlCountry ? (urlSite || urlInstitution ? "objects" : "country") : "global")
@@ -906,6 +921,7 @@ function MapContent() {
             onFacetedFiltersChange={setFacetedFilters}
             onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
             linkObjects={[]}
+            initialGalleryArtifact={initialGalleryArtifact}
           />
         )}
 

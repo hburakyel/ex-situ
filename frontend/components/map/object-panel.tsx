@@ -85,6 +85,7 @@ interface ObjectPanelProps {
   onFacetedFiltersChange?: (filters: FacetedFilters) => void
   onCommandPaletteOpen?: () => void
   linkObjects?: MuseumObject[]
+  initialGalleryArtifact?: MuseumObject | null
 }
 
 export default function ObjectPanel({
@@ -122,10 +123,12 @@ export default function ObjectPanel({
   onFacetedFiltersChange,
   onCommandPaletteOpen,
   linkObjects = [],
+  initialGalleryArtifact,
 }: ObjectPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [galleryArtifact, setGalleryArtifact] = useState<MuseumObject | null>(null)
   const [showOrigins, setShowOrigins] = useState(false)
   const [showSites, setShowSites] = useState(false)
   const [showCollections, setShowCollections] = useState(false)
@@ -136,9 +139,14 @@ export default function ObjectPanel({
   const dragStartTime = useRef(0)
   const dragStartSize = useRef<ContainerSize>("default")
   const touchOrigin = useRef<"handle" | null>(null)
+  const prefersReducedMotion = useRef(false)
   const [liveHeight, setLiveHeight] = useState<number | null>(null)
 
-  // ── Mobile drag resize: window-level touch listeners ──
+  useEffect(() => {
+    prefersReducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  }, [])
+
+  // ── Mobile drag resize: window-level touch/mouse listeners ──
   useEffect(() => {
     if (!isMobile) return
 
@@ -149,86 +157,64 @@ export default function ObjectPanel({
       return Math.round(vh * 0.44)
     }
 
+    const resolveSnap = (deltaY: number, velocity: number): ContainerSize => {
+      const order: ContainerSize[] = ["minimized", "default", "expanded"]
+      const snapH: Record<ContainerSize, number> = {
+        expanded: window.innerHeight,
+        default: Math.round(window.innerHeight * 0.44),
+        minimized: 88,
+      }
+      const idx = order.indexOf(dragStartSize.current)
+      const currentH = sizeToHeight(dragStartSize.current) - deltaY
+      // High velocity → jump to extreme
+      if (velocity < -1.2) return "expanded"
+      if (velocity > 1.2) return "minimized"
+      // Moderate velocity or large drag → adjacent
+      if (velocity < -0.4 || deltaY < -60) return order[Math.min(idx + 1, 2)]
+      if (velocity > 0.4 || deltaY > 60) return order[Math.max(idx - 1, 0)]
+      // Slow drag → nearest snap point by current height
+      return (Object.keys(snapH) as ContainerSize[]).reduce((best, k) =>
+        Math.abs(currentH - snapH[k]) < Math.abs(currentH - snapH[best]) ? k : best
+      )
+    }
+
     const onTouchMove = (e: TouchEvent) => {
       if (touchOrigin.current !== "handle") return
       e.preventDefault()
       const deltaY = dragStartY.current - e.touches[0].clientY
       const baseH = sizeToHeight(dragStartSize.current)
-      const newH = Math.max(88, Math.min(window.innerHeight, baseH + deltaY))
-      setLiveHeight(newH)
+      setLiveHeight(Math.max(88, Math.min(window.innerHeight, baseH + deltaY)))
     }
 
     const onTouchEnd = (e: TouchEvent) => {
       if (touchOrigin.current !== "handle") return
-      const endY = e.changedTouches[0].clientY
-      const endTime = Date.now()
-      const deltaY = endY - dragStartY.current
-      const deltaTime = endTime - dragStartTime.current
+      const deltaY = e.changedTouches[0].clientY - dragStartY.current
+      const deltaTime = Date.now() - dragStartTime.current
       const velocity = deltaY / (deltaTime || 1)
+      setContainerSize(resolveSnap(deltaY, velocity))
+      setLiveHeight(null)
+      touchOrigin.current = null
+    }
 
-      const order: ContainerSize[] = ["minimized", "default", "expanded"]
-      const currentIdx = order.indexOf(dragStartSize.current)
+    const onMouseMove = (e: MouseEvent) => {
+      if (touchOrigin.current !== "handle") return
+      const deltaY = dragStartY.current - e.clientY
+      const baseH = sizeToHeight(dragStartSize.current)
+      setLiveHeight(Math.max(88, Math.min(window.innerHeight, baseH + deltaY)))
+    }
 
-      if (Math.abs(deltaY) < 10 && deltaTime < 300) {
-        // Tap on handle — cycle: minimized → default → expanded → minimized
-        if (dragStartSize.current === "minimized") setContainerSize("default")
-        else if (dragStartSize.current === "default") setContainerSize("expanded")
-        else setContainerSize("minimized")
-      } else if (deltaY < -60 || velocity < -0.3) {
-        // Dragged up — expand one level
-        setContainerSize(order[Math.min(currentIdx + 1, 2)])
-      } else if (deltaY > 60 || velocity > 0.3) {
-        // Dragged down — collapse one level
-        setContainerSize(order[Math.max(currentIdx - 1, 0)])
-      } else {
-        // Small move — snap back to current level
-        setContainerSize(dragStartSize.current)
-      }
-
+    const onMouseUp = (e: MouseEvent) => {
+      if (touchOrigin.current !== "handle") return
+      const deltaY = e.clientY - dragStartY.current
+      const deltaTime = Date.now() - dragStartTime.current
+      const velocity = deltaY / (deltaTime || 1)
+      setContainerSize(resolveSnap(deltaY, velocity))
       setLiveHeight(null)
       touchOrigin.current = null
     }
 
     window.addEventListener("touchmove", onTouchMove, { passive: false })
     window.addEventListener("touchend", onTouchEnd)
-
-    // Mouse equivalents for desktop devtools mobile emulation
-    const onMouseMove = (e: MouseEvent) => {
-      if (touchOrigin.current !== "handle") return
-      e.preventDefault()
-      const deltaY = dragStartY.current - e.clientY
-      const baseH = sizeToHeight(dragStartSize.current)
-      const newH = Math.max(88, Math.min(window.innerHeight, baseH + deltaY))
-      setLiveHeight(newH)
-    }
-
-    const onMouseUp = (e: MouseEvent) => {
-      if (touchOrigin.current !== "handle") return
-      const endY = e.clientY
-      const endTime = Date.now()
-      const deltaY = endY - dragStartY.current
-      const deltaTime = endTime - dragStartTime.current
-      const velocity = deltaY / (deltaTime || 1)
-
-      const order: ContainerSize[] = ["minimized", "default", "expanded"]
-      const currentIdx = order.indexOf(dragStartSize.current)
-
-      if (Math.abs(deltaY) < 10 && deltaTime < 300) {
-        if (dragStartSize.current === "minimized") setContainerSize("default")
-        else if (dragStartSize.current === "default") setContainerSize("expanded")
-        else setContainerSize("minimized")
-      } else if (deltaY < -60 || velocity < -0.3) {
-        setContainerSize(order[Math.min(currentIdx + 1, 2)])
-      } else if (deltaY > 60 || velocity > 0.3) {
-        setContainerSize(order[Math.max(currentIdx - 1, 0)])
-      } else {
-        setContainerSize(dragStartSize.current)
-      }
-
-      setLiveHeight(null)
-      touchOrigin.current = null
-    }
-
     window.addEventListener("mousemove", onMouseMove)
     window.addEventListener("mouseup", onMouseUp)
     return () => {
@@ -348,26 +334,46 @@ export default function ObjectPanel({
   }, [objects, linkObjects])
 
   // Close gallery when objects become empty or selectedIndex goes out of bounds
+  // Skip when showing a deep-linked artifact (galleryArtifact overrides objects[])
   useEffect(() => {
+    if (galleryArtifact) return
     if (galleryOpen && (!objects || objects.length === 0)) {
       setGalleryOpen(false)
       setSelectedIndex(0)
     } else if (galleryOpen && selectedIndex >= objects.length) {
       setSelectedIndex(Math.max(0, objects.length - 1))
     }
-  }, [objects, galleryOpen, selectedIndex])
+  }, [objects, galleryOpen, selectedIndex, galleryArtifact])
+
+  // Deep-link: auto-open gallery when a specific artifact is passed via prop
+  useEffect(() => {
+    if (!initialGalleryArtifact || galleryOpen) return
+    setGalleryArtifact(initialGalleryArtifact)
+    setSelectedIndex(0)
+    setGalleryOpen(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialGalleryArtifact])
+
+  // Once site objects load, switch gallery from single-artifact mode to full list.
+  // Using galleryKey forces ImageGallery to remount with the correct initialIndex.
+  const [galleryKey, setGalleryKey] = useState(0)
+  useEffect(() => {
+    if (!galleryArtifact || !galleryOpen || objects.length === 0) return
+    const idx = objects.findIndex(o => String(o.id) === String(galleryArtifact.id))
+    if (idx !== -1) {
+      setSelectedIndex(idx)
+      setGalleryArtifact(null)
+      setGalleryKey(k => k + 1) // force remount so initialIndex is picked up
+    }
+  }, [objects, galleryArtifact, galleryOpen])
 
   const getContainerStyle = (): React.CSSProperties => {
     if (isMobile) {
-      const shadow = "0 -4px 32px rgba(0,0,0,0.5)"
-      const animated: React.CSSProperties = {
-        transition: "height 0.3s cubic-bezier(.32,.72,0,1), border-radius 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease, top 0.3s ease",
-      }
+      const shadow = "0 -2px 20px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08)"
+      const transition = prefersReducedMotion.current ? "none" : "height 0.42s cubic-bezier(0.25,0.46,0.45,0.94), border-radius 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease"
 
-      // Live drag — update height in real time, no animated transition
       if (liveHeight !== null) {
-        const vh = window.innerHeight
-        const isNearExpanded = liveHeight >= vh * 0.9
+        const isNearExpanded = liveHeight >= window.innerHeight * 0.9
         return {
           top: isNearExpanded ? 0 : "auto",
           transition: "none",
@@ -382,54 +388,27 @@ export default function ObjectPanel({
 
       switch (containerSize) {
         case "expanded":
-          return {
-            ...animated,
-            top: 0,
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: "100dvh",
-            borderRadius: 0,
-            boxShadow: "none",
-          }
+          return { transition, top: 0, bottom: 0, left: 0, right: 0, height: "100dvh", borderRadius: 0, boxShadow: "none" }
         case "minimized":
-          return {
-            ...animated,
-            top: "auto",
-            bottom: 16,
-            left: 12,
-            right: 12,
-            height: 88,
-            borderRadius: 24,
-            boxShadow: shadow,
-          }
+          return { transition, top: "auto", bottom: 16, left: 12, right: 12, height: 88, borderRadius: 24, boxShadow: shadow }
         case "default":
         default:
-          return {
-            ...animated,
-            top: "auto",
-            bottom: 16,
-            left: 12,
-            right: 12,
-            height: "44vh",
-            borderRadius: 24,
-            boxShadow: shadow,
-          }
+          return { transition, top: "auto", bottom: 16, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: shadow }
       }
-    } else {
-      switch (containerSize) {
-        case "expanded":
-          return {
-            width: "calc(100% - 5rem)",
-            height: "calc(100vh - 5rem)",
-          }
-        case "default":
-        default:
-          return {
-            width: "40%",
-            height: "auto",
-          }
-      }
+    }
+
+    switch (containerSize) {
+      case "expanded":
+        return {
+          width: "calc(100% - 5rem)",
+          height: "calc(100dvh - 5rem)",
+        }
+      case "default":
+      default:
+        return {
+          width: "40%",
+          height: "auto",
+        }
     }
   }
 
@@ -504,53 +483,43 @@ export default function ObjectPanel({
 
   const containerStyle = getContainerStyle()
 
-
-  return (
-    <div
-      ref={containerRef}
-      className={`fixed ${
-        isMobile
-          ? "" // all positioning/sizing/appearance handled by inline style
-          : "top-10 right-10 bottom-10 shadow-lg"
-      } bg-white z-20 overflow-hidden`}
-      style={{
-        ...containerStyle,
-        ...(!isMobile ? { borderRadius: "1rem" } : {}),
-        ...(isMobile ? { willChange: "height" } : {}),
-      }}
-    >
-      <div className="h-full flex flex-col">
-        {/* Mobile drag handle — touch starts here to resize the sheet */}
-        {isMobile && (
-          <div
-            className="flex-shrink-0 flex items-center justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none"
-            style={{ touchAction: "none" }}
-            onTouchStart={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              touchOrigin.current = "handle"
-              dragStartY.current = e.touches[0].clientY
-              dragStartTime.current = Date.now()
-              dragStartSize.current = containerSize
-              if (containerRef.current) {
-                setLiveHeight(containerRef.current.getBoundingClientRect().height)
-              }
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              touchOrigin.current = "handle"
-              dragStartY.current = e.clientY
-              dragStartTime.current = Date.now()
-              dragStartSize.current = containerSize
-              if (containerRef.current) {
-                setLiveHeight(containerRef.current.getBoundingClientRect().height)
-              }
-            }}
-          >
-            <div className="w-9 h-1 rounded-full bg-gray-300" />
-          </div>
-        )}
+  const sheetInner = (
+    <div className="h-full flex flex-col">
+      {/* Mobile drag handle */}
+      {isMobile && (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={`Panel is ${containerSize}. Use arrow keys to resize.`}
+          aria-expanded={containerSize === "expanded"}
+          className="flex-shrink-0 flex items-center justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none"
+          style={{ touchAction: "none" }}
+          onTouchStart={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            touchOrigin.current = "handle"
+            dragStartY.current = e.touches[0].clientY
+            dragStartTime.current = Date.now()
+            dragStartSize.current = containerSize
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation()
+            touchOrigin.current = "handle"
+            dragStartY.current = e.clientY
+            dragStartTime.current = Date.now()
+            dragStartSize.current = containerSize
+          }}
+          onKeyDown={(e) => {
+            const order: ContainerSize[] = ["minimized", "default", "expanded"]
+            const idx = order.indexOf(containerSize)
+            if (e.key === "ArrowUp") { e.preventDefault(); setContainerSize(order[Math.min(idx + 1, 2)]) }
+            else if (e.key === "ArrowDown") { e.preventDefault(); setContainerSize(order[Math.max(idx - 1, 0)]) }
+            else if (e.key === "Escape") { e.preventDefault(); setContainerSize("minimized") }
+          }}
+        >
+          <div className="w-14 h-1 rounded-full bg-gray-300" />
+        </div>
+      )}
         {/* Header: Desktop and Mobile layouts */}
         {isMobile ? (
           <div className="sticky top-0 z-30 flex flex-col bg-white">
@@ -697,7 +666,7 @@ export default function ObjectPanel({
 
         {/* Content — objects */}
         {containerSize !== "minimized" && (
-        <div className="flex-1 overflow-auto bg-white">
+        <div className="flex-1 overflow-auto bg-white" style={{ touchAction: "pan-y" }}>
           <ObjectGrid
             objects={objects}
             onLoadMore={onLoadMore}
@@ -808,13 +777,33 @@ export default function ObjectPanel({
         </div>
         )}
       </div>
+  )
+
+  return (
+    <div
+      ref={containerRef}
+      role={isMobile ? "complementary" : undefined}
+      aria-label={isMobile ? "Object panel" : undefined}
+      className={`fixed ${
+        isMobile
+          ? "" // all positioning/sizing handled by inline style
+          : "top-10 right-10 bottom-10 shadow-lg"
+      } bg-white z-20 overflow-hidden`}
+      style={{
+        ...containerStyle,
+        ...(!isMobile ? { borderRadius: "1rem" } : {}),
+        ...(isMobile ? { willChange: "height" } : {}),
+      }}
+    >
+      {sheetInner}
 
       {/* Image Gallery */}
       {galleryOpen && (
         <ImageGallery
-          objects={objects}
-          initialIndex={selectedIndex}
-          onClose={() => setGalleryOpen(false)}
+          key={galleryKey}
+          objects={galleryArtifact ? [galleryArtifact] : objects}
+          initialIndex={galleryArtifact ? 0 : selectedIndex}
+          onClose={() => { setGalleryArtifact(null); setGalleryOpen(false) }}
           isFullscreen={containerSize === "expanded"}
           isMobile={isMobile}
         />

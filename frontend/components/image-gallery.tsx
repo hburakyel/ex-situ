@@ -7,8 +7,7 @@ import { Spinner } from "@radix-ui/themes"
 import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
 import BlurhashImage from "@/components/blurhash-image"
-import Link from "next/link"
-import { Info } from "lucide-react"
+import { Check, Link2 } from "lucide-react"
 
 interface ImageGalleryProps {
   objects: MuseumObject[]
@@ -28,6 +27,7 @@ export default function ImageGallery({
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageError, setImageError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [linkCopied, setLinkCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Clamp currentIndex when objects array changes (e.g. filters, navigation)
@@ -180,10 +180,10 @@ export default function ImageGallery({
             )}
           </div>
           <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-8 w-8" disabled={objects.length <= 1}>
               <ChevronLeftIcon className="h-5 w-5 text-gray-500" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8" disabled={objects.length <= 1}>
               <ChevronRightIcon className="h-5 w-5 text-gray-500" />
             </Button>
             {(() => {
@@ -191,16 +191,23 @@ export default function ImageGallery({
               const numId = Number(rawId)
               const hasValidId = rawId && !String(rawId).startsWith('wiki-') && !isNaN(numId) && numId > 0
               return hasValidId ? (
-                <Link href={`/artifact/${rawId}`} onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    title="Object Details"
-                  >
-                    <Info className="h-5 w-5 text-gray-500" />
-                  </Button>
-                </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title={linkCopied ? "Copied!" : "Copy link"}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const url = `${window.location.origin}/artifact/${rawId}`
+                    navigator.clipboard.writeText(url).catch(() => {})
+                    setLinkCopied(true)
+                    setTimeout(() => setLinkCopied(false), 2000)
+                  }}
+                >
+                  {linkCopied
+                    ? <Check className="h-5 w-5 text-green-500" />
+                    : <Link2 className="h-5 w-5 text-gray-500" />}
+                </Button>
               ) : null
             })()}
             {getLinkUrl() && (

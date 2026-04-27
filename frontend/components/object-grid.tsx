@@ -5,7 +5,6 @@ import type { MuseumObject } from "../types"
 import BlurhashImage from "@/components/blurhash-image"
 import { useInView } from "react-intersection-observer"
 import { Spinner } from "@radix-ui/themes"
-import { Badge } from "@/components/ui/badge"
 
 interface ObjectGridProps {
   objects: MuseumObject[]
@@ -30,30 +29,6 @@ export default function ObjectGrid({
   panelSize = 50,
   mobileColumns = 2,
 }: ObjectGridProps) {
-    const getGeocodeStatusVariant = (status?: string) => {
-      switch (status) {
-        case "disputed":
-          return "destructive"
-        case "ok":
-          return "secondary"
-        case "ambiguous":
-        default:
-          return "default"
-      }
-    }
-
-    const getReviewStatusVariant = (status?: string) => {
-      switch (status) {
-        case "verified":
-          return "secondary"
-        case "rejected":
-          return "destructive"
-        case "pending":
-        default:
-          return "outline"
-      }
-    }
-
   const { ref: observerRef, inView } = useInView({
     threshold: 0.1,
     triggerOnce: false,
@@ -232,21 +207,27 @@ return (
       }
     >
       {(object.attributes.geocoding_status && object.attributes.geocoding_status !== "ok") && (
-        <Badge
-          variant={getGeocodeStatusVariant(object.attributes.geocoding_status)}
-          className="absolute top-2 left-2 z-10 capitalize"
+        <span
+          className={`absolute top-2 left-2 z-10 capitalize inline-flex items-center px-2 py-0.5 rounded-md text-xs ${
+            object.attributes.geocoding_status === "disputed"
+              ? "bg-orange-50 text-orange-700"
+              : "border border-gray-200 text-gray-500"
+          }`}
           title={object.attributes.geocoding_notes || undefined}
         >
           {object.attributes.geocoding_status}
-        </Badge>
+        </span>
       )}
       {(object.attributes.review_status && object.attributes.review_status !== "verified") && (
-        <Badge
-          variant={getReviewStatusVariant(object.attributes.review_status)}
-          className="absolute top-2 right-2 z-10 capitalize"
+        <span
+          className={`absolute top-2 right-2 z-10 capitalize inline-flex items-center px-2 py-0.5 rounded-md text-xs ${
+            object.attributes.review_status === "rejected"
+              ? "bg-orange-50 text-orange-700"
+              : "border border-gray-200 text-gray-500"
+          }`}
         >
           {object.attributes.review_status}
-        </Badge>
+        </span>
       )}
       <BlurhashImage
             src={object.attributes.img_url!}

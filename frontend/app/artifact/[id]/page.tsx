@@ -1,12 +1,9 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
-import Image from "next/image"
-import Link from "next/link"
-import { ArrowLeft, ExternalLink, MapPin, Building2, Globe2, BookOpen, Route, History, Shield } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import type { MuseumObject } from "@/types"
-import BackButton from "@/components/back-button"
+import ArtifactRedirect from "./artifact-redirect"
+
+const BASE_URL = "https://exsitu.app"
 
 interface ObjectPageProps {
   params: Promise<{ id: string }>
@@ -19,7 +16,7 @@ async function getObject(id: string): Promise<MuseumObject | null> {
   try {
     const fixedApiBaseUrl = apiBaseUrl.replace("localhost", "127.0.0.1")
     const response = await fetch(`${fixedApiBaseUrl}/museum-objects/${id}?populate=*`, {
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      next: { revalidate: 3600 },
     })
 
     if (!response.ok) return null
@@ -32,27 +29,98 @@ async function getObject(id: string): Promise<MuseumObject | null> {
   }
 }
 
+function buildDescription(attrs: MuseumObject["attributes"], invPart: string): string {
+  const parts: string[] = []
+  const title = attrs.title
+  if (title) parts.push(`${title}${invPart}.`)
+  const origin = attrs.place_name || attrs.country_en
+  if (origin) parts.push(`Origin: ${origin}.`)
+  if (attrs.institution_name) parts.push(`Now at ${attrs.institution_name}.`)
+  if (attrs.cultural_context) {
+    const snippet = attrs.cultural_context.slice(0, 120)
+    parts.push(snippet.length < attrs.cultural_context.length ? `${snippet}…` : snippet)
+  }
+  return parts.join(" ") || `Museum object at Ex Situ — relational spatial index of cultural heritage.`
+}
+
+function buildJsonLd(id: string, attrs: MuseumObject["attributes"]) {
+  const sameAs: string[] = []
+  if (attrs.source_link) sameAs.push(attrs.source_link)
+  if (attrs.object_links?.length) {
+    for (const l of attrs.object_links) {
+      if (l.url) sameAs.push(l.url)
+    }
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "VisualArtwork",
+    "@id": `${BASE_URL}/artifact/${id}`,
+    url: `${BASE_URL}/artifact/${id}`,
+    name: attrs.title || `Object ${id}`,
+    ...(attrs.inventory_number && { identifier: attrs.inventory_number }),
+    ...(attrs.img_url && { image: attrs.img_url }),
+    ...(attrs.cultural_context && { description: attrs.cultural_context }),
+    ...((attrs.place_name || attrs.country_en) && {
+      locationCreated: {
+        "@type": "Place",
+        name: attrs.place_name || attrs.country_en,
+        ...(attrs.country_en && { addressCountry: attrs.country_en }),
+      },
+    }),
+    ...(attrs.institution_name && {
+      contentLocation: {
+        "@type": "Museum",
+        name: attrs.institution_name,
+        ...((attrs.institution_city_en || attrs.institution_country_en) && {
+          address: {
+            "@type": "PostalAddress",
+            ...(attrs.institution_city_en && { addressLocality: attrs.institution_city_en }),
+            ...(attrs.institution_country_en && { addressCountry: attrs.institution_country_en }),
+          },
+        }),
+      },
+    }),
+    ...(sameAs.length > 0 && { sameAs }),
+    provider: {
+      "@type": "Organization",
+      name: "Ex Situ",
+      url: BASE_URL,
+    },
+  }
+}
+
 export async function generateMetadata({ params }: ObjectPageProps): Promise<Metadata> {
   const { id } = await params
   const object = await getObject(id)
 
   if (!object) {
-    return {
-      title: "Object Not Found | Ex Situ",
-    }
+    return { title: "Object Not Found | Ex Situ" }
   }
 
   const attrs = object.attributes
   const title = attrs.title || `Object ${id}`
-  const description = `${title} from ${attrs.place_name || attrs.country_en || "Unknown origin"}, now at ${attrs.institution_name || "Unknown institution"}`
+  const invPart = attrs.inventory_number ? ` (inv: ${attrs.inventory_number})` : ""
+  const description = buildDescription(attrs, invPart)
+  const canonicalUrl = `${BASE_URL}/artifact/${id}`
+  const images = attrs.img_url ? [{ url: attrs.img_url }] : []
 
   return {
-    title: `${title} | Ex Situ`,
+    title: `${title}${invPart} | Ex Situ`,
     description,
+    alternates: { canonical: canonicalUrl },
     openGraph: {
-      title: `${title} | Ex Situ`,
+      title: `${title}${invPart} | Ex Situ`,
       description,
-      images: attrs.img_url ? [{ url: attrs.img_url }] : [],
+      url: canonicalUrl,
+      type: "article",
+      images,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${title}${invPart} | Ex Situ`,
+      description,
+      images: attrs.img_url ? [attrs.img_url] : [],
     },
   }
 }
@@ -61,318 +129,42 @@ export default async function ObjectPage({ params }: ObjectPageProps) {
   const { id } = await params
   const object = await getObject(id)
 
-  if (!object) {
-    notFound()
-  }
+  if (!object) notFound()
 
   const attrs = object.attributes
 
-  // Build map URL with coordinates
-  const mapUrl = attrs.latitude && attrs.longitude
-    ? `/map?zoom=12&lat=${attrs.latitude.toFixed(4)}&lng=${attrs.longitude.toFixed(4)}`
-    : "/map"
-
-  // Get external link
-  const getExternalLink = () => {
-    if (attrs.object_links?.length) {
-      return attrs.object_links[0].url || attrs.object_links[0].link_text
-    }
-    return attrs.source_link
+  const redirectParams = new URLSearchParams()
+  redirectParams.set("artifactId", id)
+  if (attrs.latitude && attrs.longitude) {
+    redirectParams.set("lat", attrs.latitude.toFixed(4))
+    redirectParams.set("lng", attrs.longitude.toFixed(4))
+    redirectParams.set("zoom", "12")
   }
+  if (attrs.country_en) redirectParams.set("place", attrs.country_en)
+  if (attrs.place_name) redirectParams.set("site", attrs.place_name)
 
-  const externalLink = getExternalLink()
+  const mapUrl = `/map?${redirectParams.toString()}`
+  const jsonLd = buildJsonLd(id, attrs)
 
   return (
-    <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center gap-4 px-4">
-          <BackButton />
-          <div className="flex-1" />
-          {externalLink && (
-            <a href={externalLink} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="gap-2">
-                <ExternalLink className="h-4 w-4" />
-                View Source
-              </Button>
-            </a>
-          )}
-        </div>
-      </header>
-
-      {/* Content */}
-      <div className="container px-4 py-8">
-        <div className="grid gap-8 lg:grid-cols-2">
-          {/* Image Section */}
-          <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
-            {attrs.img_url ? (
-              <Image
-                src={attrs.img_url}
-                alt={attrs.title || "Museum object"}
-                fill
-                className="object-contain"
-                priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                No Image
-              </div>
-            )}
-          </div>
-
-          {/* Details Section */}
-          <div className="space-y-6">
-            {/* Title & Inventory */}
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-                {attrs.title || "Başlık Yok"}
-              </h1>
-              {attrs.inventory_number && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Envanter No: {attrs.inventory_number}
-                </p>
-              )}
-            </div>
-
-            {/* Origin Location */}
-            <div className="rounded-lg border p-4">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <MapPin className="h-4 w-4 text-red-500" />
-                Origin
-              </div>
-              <div className="space-y-1 text-sm">
-                {attrs.place_name && (
-                  <p className="font-medium">{attrs.place_name}</p>
-                )}
-                {(attrs.city_en || attrs.city_native) && (
-                  <p>
-                    {attrs.city_en}
-                    {attrs.city_native && attrs.city_native !== attrs.city_en && (
-                      <span className="text-muted-foreground"> ({attrs.city_native})</span>
-                    )}
-                  </p>
-                )}
-                {(attrs.country_en || attrs.country_native) && (
-                  <p>
-                    {attrs.country_en}
-                    {attrs.country_native && attrs.country_native !== attrs.country_en && (
-                      <span className="text-muted-foreground"> ({attrs.country_native})</span>
-                    )}
-                  </p>
-                )}
-                {attrs.latitude && attrs.longitude && (
-                  <p className="text-xs text-muted-foreground">
-                    {attrs.latitude.toFixed(4)}, {attrs.longitude.toFixed(4)}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Institution */}
-            <div className="rounded-lg border p-4">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Building2 className="h-4 w-4 text-blue-500" />
-                Current Location
-              </div>
-              <div className="space-y-1 text-sm">
-                {attrs.institution_name && (
-                  <p className="font-medium">{attrs.institution_name}</p>
-                )}
-                {(attrs.institution_city_en || attrs.institution_city_native) && (
-                  <p>
-                    {attrs.institution_city_en}
-                    {attrs.institution_city_native && attrs.institution_city_native !== attrs.institution_city_en && (
-                      <span className="text-muted-foreground"> ({attrs.institution_city_native})</span>
-                    )}
-                  </p>
-                )}
-                {attrs.institution_country_en && (
-                  <p>{attrs.institution_country_en}</p>
-                )}
-                {attrs.institution_latitude && attrs.institution_longitude && (
-                  <p className="text-xs text-muted-foreground">
-                    {attrs.institution_latitude.toFixed(4)}, {attrs.institution_longitude.toFixed(4)}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Cultural Context (LLM Enrichment) */}
-            {attrs.cultural_context && (
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <BookOpen className="h-4 w-4 text-amber-500" />
-                  Cultural Context
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {attrs.cultural_context}
-                </p>
-                {attrs.enrichment_confidence && (
-                  <Badge
-                    variant={
-                      attrs.enrichment_confidence === "high"
-                        ? "secondary"
-                        : attrs.enrichment_confidence === "medium"
-                        ? "outline"
-                        : "destructive"
-                    }
-                    className="mt-2"
-                  >
-                    {attrs.enrichment_confidence} confidence
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            {/* Transfer Method (LLM Enrichment) */}
-            {attrs.transfer_method && (
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <Route className="h-4 w-4 text-orange-500" />
-                  Transfer Method
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {attrs.transfer_method}
-                </p>
-              </div>
-            )}
-
-            {/* Historical Relation (LLM Enrichment) */}
-            {attrs.historical_relation && (
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <History className="h-4 w-4 text-purple-500" />
-                  Historical Relation
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {attrs.historical_relation}
-                </p>
-              </div>
-            )}
-
-            {/* Origin Type & Normalized Origin */}
-            {(attrs.origin_type || attrs.normalized_origin) && (
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <Shield className="h-4 w-4 text-teal-500" />
-                  Origin Classification
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {attrs.origin_type && (
-                    <Badge
-                      variant={
-                        attrs.origin_type === "valid_location"
-                          ? "secondary"
-                          : attrs.origin_type === "cultural_area"
-                          ? "outline"
-                          : attrs.origin_type === "historical_toponym"
-                          ? "outline"
-                          : "destructive"
-                      }
-                    >
-                      {attrs.origin_type.replace(/_/g, " ")}
-                    </Badge>
-                  )}
-                  {attrs.normalized_origin && attrs.normalized_origin !== attrs.city_en && (
-                    <Badge variant="outline">
-                      Normalized: {attrs.normalized_origin}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Geocoding Info */}
-            {(attrs.geocoded_country || attrs.geocoder_source || attrs.geocoding_confidence) && (
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <Globe2 className="h-4 w-4 text-green-500" />
-                  Geocoding Info
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {attrs.geocoded_country && (
-                    <Badge variant="secondary">{attrs.geocoded_country}</Badge>
-                  )}
-                  {attrs.geocoded_region && (
-                    <Badge variant="secondary">{attrs.geocoded_region}</Badge>
-                  )}
-                  {attrs.geocoder_source && (
-                    <Badge variant="outline">{attrs.geocoder_source}</Badge>
-                  )}
-                  {attrs.geocoding_confidence && (
-                    <Badge variant="outline">
-                      Confidence: {(attrs.geocoding_confidence * 100).toFixed(0)}%
-                    </Badge>
-                  )}
-                  {attrs.geocoding_status && (
-                    <Badge
-                      variant={
-                        attrs.geocoding_status === "ok"
-                          ? "secondary"
-                          : attrs.geocoding_status === "disputed"
-                          ? "destructive"
-                          : "outline"
-                      }
-                    >
-                      {attrs.geocoding_status}
-                    </Badge>
-                  )}
-                </div>
-                {attrs.geocoding_notes && (
-                  <p className="mt-2 text-xs text-muted-foreground">{attrs.geocoding_notes}</p>
-                )}
-              </div>
-            )}
-
-            {/* Original Place Variants */}
-            {attrs.original_place_variants && attrs.original_place_variants.length > 0 && (
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 text-sm font-medium">Alternative Place Names</div>
-                <div className="flex flex-wrap gap-2">
-                  {attrs.original_place_variants.map((variant, index) => (
-                    <Badge key={index} variant="outline">
-                      {variant.label}
-                      {variant.language && (
-                        <span className="ml-1 text-xs opacity-60">({variant.language})</span>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Object Links */}
-            {attrs.object_links && attrs.object_links.length > 0 && (
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 text-sm font-medium">Links</div>
-                <div className="flex flex-col gap-2">
-                  {attrs.object_links.map((link, index) => (
-                    <a
-                      key={index}
-                      href={link.url || link.link_text}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      {link.link_display || link.link_text || "Bağlantı"}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* View on Map Button */}
-            <Link href={mapUrl} className="block">
-              <Button className="w-full gap-2" size="lg">
-                <MapPin className="h-4 w-4" />
-                View on Map
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </main>
+    <>
+      {/* Structured data for Google */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      {/* Client-side redirect to map — preserves SSR HTML for crawlers */}
+      <ArtifactRedirect url={mapUrl} />
+      {/* Crawler-visible content — hidden from real users via sr-only */}
+      <main style={{ position: "absolute", width: "1px", height: "1px", padding: 0, margin: "-1px", overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 }}>
+        <h1>{attrs.title || `Object ${id}`}</h1>
+        {attrs.inventory_number && <p>inv: {attrs.inventory_number}</p>}
+        {attrs.institution_name && <p>{attrs.institution_name}</p>}
+        {attrs.place_name && <p>{attrs.place_name}</p>}
+        {attrs.country_en && <p>{attrs.country_en}</p>}
+        {attrs.cultural_context && <p>{attrs.cultural_context}</p>}
+        <a href={mapUrl}>View on map</a>
+      </main>
+    </>
   )
 }
