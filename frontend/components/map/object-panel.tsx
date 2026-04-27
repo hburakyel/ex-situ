@@ -239,20 +239,22 @@ export default function ObjectPanel({
       dragStartTime.current = Date.now()
       dragStartSize.current = containerSizeRef.current
       touchStartScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0
-      if (handleRef.current?.contains(e.target as Node) ||
-          headerRef.current?.contains(e.target as Node)) {
-        // Handle or header touch → always resize the sheet
+      if (handleRef.current?.contains(e.target as Node)) {
+        // Handle touch → always resize the sheet
         touchPhase.current = "dragging"
+      } else if (headerRef.current?.contains(e.target as Node)) {
+        // Header touch: accordion/nested scroll areas scroll freely; bare header drags sheet
+        if (isInsideNestedScroll(e.target)) {
+          touchPhase.current = "idle"
+        } else {
+          touchPhase.current = "dragging"
+        }
       } else if (scrollContainerRef.current?.contains(e.target as Node)) {
         if (containerSizeRef.current === "expanded") {
           // Expanded: content always scrolls freely, sheet can only shrink via handle
           touchPhase.current = "idle"
-        } else if (isInsideNestedScroll(e.target)) {
-          // Non-expanded + accordion/nested scroll: let nested content scroll freely
-          touchPhase.current = "idle"
         } else {
-          // Non-expanded + main content area: "deciding" so upward scroll → expand sheet
-          // Downward scroll passes through naturally (handled in onTouchMove)
+          // Default/minimized: upward swipe on grid → expand sheet; downward → scroll
           touchPhase.current = "deciding"
         }
       } else {
