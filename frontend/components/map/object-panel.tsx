@@ -370,6 +370,9 @@ export default function ObjectPanel({
     const panel = containerRef.current
     if (!panel) return
     const onWheel = (e: WheelEvent) => {
+      // Guard: one snap per scroll gesture — a single finger swipe fires many wheel events,
+      // without this they cascade (expanded → default → minimized in one motion).
+      if (Date.now() < snapCooldownUntil.current) return
       const scrollEl = scrollContainerRef.current
       if (scrollEl && !scrollEl.contains(e.target as Node)) return
       const atTop = (scrollEl?.scrollTop ?? 0) <= 2
@@ -378,14 +381,15 @@ export default function ObjectPanel({
       const hasScrollableContent = !!(scrollEl && scrollEl.scrollHeight > scrollEl.clientHeight + 4)
 
       if (e.deltaY > 0 && atTop && idx < order.length - 1) {
-        // Scroll DOWN → expand sheet
+        // Scroll DOWN → expand sheet (one step)
         e.preventDefault()
         setContainerSize(order[idx + 1])
+        snapCooldownUntil.current = Date.now() + 450
       } else if (e.deltaY < 0 && idx > 0 && !hasScrollableContent) {
-        // Scroll UP → shrink sheet, but only if there's no scrollable content
-        // (prevents stealing scroll from the object grid)
+        // Scroll UP → shrink sheet (one step, only when no scrollable content)
         e.preventDefault()
         setContainerSize(order[idx - 1])
+        snapCooldownUntil.current = Date.now() + 450
       }
     }
     panel.addEventListener("wheel", onWheel, { passive: false })
