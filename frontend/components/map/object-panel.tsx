@@ -338,11 +338,8 @@ export default function ObjectPanel({
       if (touchPhase.current !== "dragging") return
       const deltaY = e.clientY - dragStartY.current
       const deltaTime = Date.now() - dragStartTime.current
-      // Small movement = click on handle → cycle to next size up
+      // Small movement: let onClick handle the cycle (avoid double-firing)
       if (Math.abs(deltaY) < 5 && deltaTime < 300) {
-        const order: ContainerSize[] = ["minimized", "default", "expanded"]
-        const idx = order.indexOf(containerSizeRef.current)
-        if (idx < order.length - 1) setContainerSize(order[idx + 1])
         setLiveHeight(null)
         touchPhase.current = "idle"
         return
@@ -738,12 +735,22 @@ export default function ObjectPanel({
             dragStartSize.current = containerSizeRef.current
             touchPhase.current = "dragging"
           }}
+          onClick={() => {
+            // Cycle on click/tap: minimized → default → expanded → default
+            const order: ContainerSize[] = ["minimized", "default", "expanded"]
+            const idx = order.indexOf(containerSizeRef.current)
+            setContainerSize(idx < order.length - 1 ? order[idx + 1] : order[idx - 1])
+          }}
           onKeyDown={(e) => {
             const order: ContainerSize[] = ["minimized", "default", "expanded"]
             const idx = order.indexOf(containerSize)
             if (e.key === "ArrowUp") { e.preventDefault(); setContainerSize(order[Math.min(idx + 1, 2)]) }
             else if (e.key === "ArrowDown") { e.preventDefault(); setContainerSize(order[Math.max(idx - 1, 0)]) }
             else if (e.key === "Escape") { e.preventDefault(); setContainerSize("minimized") }
+            else if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              setContainerSize(idx < order.length - 1 ? order[idx + 1] : order[idx - 1])
+            }
           }}
         >
           <div className="w-14 h-1 rounded-full bg-gray-300" />
