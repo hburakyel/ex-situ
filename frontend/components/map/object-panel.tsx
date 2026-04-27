@@ -142,6 +142,8 @@ export default function ObjectPanel({
   // "idle" → no gesture | "deciding" → figuring out scroll vs drag | "dragging" → sheet is being dragged
   const touchPhase = useRef<"idle" | "deciding" | "dragging">("idle")
   const touchStartScrollTop = useRef(0)
+  // Cooldown: timestamp after which new gestures are accepted (prevents double-snap on fast swipes)
+  const snapCooldownUntil = useRef(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
   const prefersReducedMotion = useRef(false)
@@ -227,6 +229,8 @@ export default function ObjectPanel({
 
     const onTouchStart = (e: TouchEvent) => {
       if (!containerRef.current?.contains(e.target as Node)) return
+      // Ignore new gesture while snap animation is playing
+      if (Date.now() < snapCooldownUntil.current) return
       dragStartY.current = e.touches[0].clientY
       dragStartTime.current = Date.now()
       dragStartSize.current = containerSizeRef.current
@@ -312,6 +316,8 @@ export default function ObjectPanel({
       setContainerSize(resolveSnap(deltaY, velocity))
       setLiveHeight(null)
       touchPhase.current = "idle"
+      // Block new gestures for 350ms (= animation duration) so a fast swipe can't chain two snaps
+      snapCooldownUntil.current = Date.now() + 350
     }
 
     // Mouse events for desktop drag testing (handle only, via onMouseDown on handle)
