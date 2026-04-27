@@ -355,14 +355,16 @@ export default function ObjectPanel({
     }
   }, [isMobile, setContainerSize])
 
-  // ── Wheel-to-resize (mobile only): scroll up at top → expand; scroll down at top → shrink ──
+  // ── Wheel-to-resize: scroll up at top → expand; scroll down at top (no content) → shrink ──
+  // Active on both mobile and desktop.
+  // For scroll-down: only intercept when there is no scrollable content in the panel;
+  // if the grid has items, let the browser scroll naturally so the grid is usable.
   useEffect(() => {
-    if (!isMobile) return
     const panel = containerRef.current
     if (!panel) return
     const onWheel = (e: WheelEvent) => {
       const scrollEl = scrollContainerRef.current
-      // Only intercept when the scroll target is inside the scroll container
+      // Only intercept when the scroll target is inside (or is) the panel
       if (scrollEl && !scrollEl.contains(e.target as Node)) return
       const atTop = (scrollEl?.scrollTop ?? 0) <= 2
       const order: ContainerSize[] = ["minimized", "default", "expanded"]
@@ -372,16 +374,20 @@ export default function ObjectPanel({
         e.preventDefault()
         setContainerSize(order[idx + 1])
       } else if (e.deltaY > 0 && atTop && idx > 0) {
-        // Scroll down at top → shrink
-        e.preventDefault()
-        setContainerSize(order[idx - 1])
+        // Scroll down at top → shrink ONLY when there is no scrollable content
+        // (prevents blocking grid scroll when items are loaded)
+        const hasScrollableContent = scrollEl && scrollEl.scrollHeight > scrollEl.clientHeight + 4
+        if (!hasScrollableContent) {
+          e.preventDefault()
+          setContainerSize(order[idx - 1])
+        }
       }
     }
     panel.addEventListener("wheel", onWheel, { passive: false })
     return () => panel.removeEventListener("wheel", onWheel)
   // containerRef is stable; setContainerSize is stable (from useState setter)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile, setContainerSize])
+  }, [setContainerSize])
 
   // Share current URL to clipboard
   const handleShare = useCallback(async () => {
