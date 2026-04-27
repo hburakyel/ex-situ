@@ -139,8 +139,8 @@ export default function ObjectPanel({
   const dragStartY = useRef(0)
   const dragStartTime = useRef(0)
   const dragStartSize = useRef<ContainerSize>("default")
-  // "idle" → no gesture | "deciding" → figuring out scroll vs drag | "dragging" → sheet is being dragged
-  const touchPhase = useRef<"idle" | "deciding" | "dragging">("idle")
+  // "idle" → no gesture | "deciding" → content area (up=expand, down=scroll) | "deciding-header" → header area (both directions → drag) | "dragging" → sheet is being dragged
+  const touchPhase = useRef<"idle" | "deciding" | "deciding-header" | "dragging">("idle")
   const touchStartScrollTop = useRef(0)
   // Cooldown: timestamp after which new touch gestures are accepted (prevents double-snap on fast swipes)
   const snapCooldownUntil = useRef(0)
@@ -250,8 +250,8 @@ export default function ObjectPanel({
           // Expanded: header drag can shrink the sheet (downward = shrink)
           touchPhase.current = "dragging"
         } else {
-          // Non-expanded: upward swipe → expand (deciding → snap), downward → idle
-          touchPhase.current = "deciding"
+          // Non-expanded: both directions can resize — use deciding-header
+          touchPhase.current = "deciding-header"
         }
       } else if (scrollContainerRef.current?.contains(e.target as Node)) {
         if (containerSizeRef.current === "expanded") {
@@ -285,6 +285,12 @@ export default function ObjectPanel({
         }
       }
 
+      if ((touchPhase.current as string) === "deciding-header") {
+        if (Math.abs(deltaY) < 8) return // not committed yet
+        // Header: both up (expand) and down (shrink) become dragging
+        touchPhase.current = "dragging"
+      }
+
       // nested-scroll: only allow sheet shrink on downward drag when main scroll is at top
       if ((touchPhase.current as string) === "nested-scroll") {
         if (deltaY > 8 && touchStartScrollTop.current <= 4) {
@@ -305,7 +311,7 @@ export default function ObjectPanel({
     const onTouchEnd = (e: TouchEvent) => {
       // Tap-to-expand: phase still "deciding" (never moved enough) + short duration
       // → cycle to next size up. Skip if tap target is interactive so buttons/links work.
-      if (touchPhase.current === "deciding") {
+      if (touchPhase.current === "deciding" || (touchPhase.current as string) === "deciding-header") {
         const deltaTime = Date.now() - dragStartTime.current
         const target = e.target as HTMLElement | null
         const isInteractive = !!target?.closest(
