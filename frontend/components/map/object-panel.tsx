@@ -142,6 +142,8 @@ export default function ObjectPanel({
   // "idle" → no gesture | "deciding" → figuring out scroll vs drag | "dragging" → sheet is being dragged
   const touchPhase = useRef<"idle" | "deciding" | "dragging">("idle")
   const touchStartScrollTop = useRef(0)
+  // Tracks whether the grid has items — used to decide shrink vs scroll intent
+  const objectsRef = useRef<number>(0)
   // Cooldown: timestamp after which new touch gestures are accepted (prevents double-snap on fast swipes)
   const snapCooldownUntil = useRef(0)
   // Wheel: separate debounce timer — extends as long as wheel events keep firing (momentum scroll)
@@ -156,8 +158,9 @@ export default function ObjectPanel({
     prefersReducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches
   }, [])
 
-  // Keep containerSizeRef in sync so window handlers always see the latest size
+  // Keep containerSizeRef and objectsRef in sync
   useEffect(() => { containerSizeRef.current = containerSize }, [containerSize])
+  useEffect(() => { objectsRef.current = objects.length }, [objects.length])
 
   // Lock background body scroll when sheet is expanded on mobile (prevents page scroll behind)
   useEffect(() => {
@@ -266,13 +269,14 @@ export default function ObjectPanel({
         if (deltaY < 0 && dragStartSize.current !== "expanded") {
           touchPhase.current = "dragging"
         }
-        // Downward drag (positive deltaY) → shrink sheet, only when scroll is at top
-        // Allow tiny scrollTop tolerance — some browsers report 1-2px when "at top"
-        else if (deltaY > 0 && touchStartScrollTop.current <= 4) {
+        // Downward drag → shrink ONLY when scroll is at top AND there are no items.
+        // If there are items (even unloaded images), treat downward as scroll intent.
+        // The handle is the correct affordance for shrinking when content exists.
+        else if (deltaY > 0 && touchStartScrollTop.current <= 4 && objectsRef.current === 0) {
           touchPhase.current = "dragging"
         }
         else {
-          // Scroll inside content — let browser handle it, map won't move due to overscroll-behavior
+          // Let the browser scroll — map won't move due to overscroll-behavior
           touchPhase.current = "idle"
           return
         }
