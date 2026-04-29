@@ -1,15 +1,21 @@
 # Ex Situ — Relational Spatial Index
 
+
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
 [![Strapi](https://img.shields.io/badge/Strapi-4-2E7EEA)](https://strapi.io)
 [![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-336791)](https://postgis.net)
 
+![Ex Situ — provenance arc visualization](docs/screenshot.png)
+
 **[https://exsitu.app](https://exsitu.app)**
+
 
 Ex Situ is an open-source spatial digital commons platform and geospatial infrastructure that turns institutional hyperlinks into standardized geospatial data. While archives are increasingly digital, their data remains siloed and lacks the standardized coordinates necessary for spatial analysis. Ex Situ resolves fragmented cultural heritage metadata into a unified, machine-readable index — enabling the visualization and analysis of artifact provenance and movement across global museum collections.
 
-> 132,854+ museum objects resolved and geolocated across international institutions in 177 countries.
+Museums across Europe and North America hold hundreds of thousands of objects whose provenance — where they came from, under what circumstances — remains buried in institutional databases, invisible to researchers and the public. Ex Situ makes this visible: not by duplicating institutional data, but by indexing the relationships between origin sites and destination collections as a spatial commons  — connective tissue between archives that were never designed to speak to each other.
+
+> 132,854+ museum objects resolved and geolocated across international institutions in 177 territories.
 
 ---
 
@@ -211,9 +217,14 @@ Please open an issue before submitting a pull request.
 
 ---
 
+
 ## Funding
 
-This project has received support from [HAB Hessen-Abschlussförderung](https://hab-hessen.de) (2022).
+This project has received support from 
+[HAB Hessen-Abschlussförderung](https://hab-hessen.de) (2022).  
+
+Support ongoing development via 
+[Open Collective](https://opencollective.com/ex-situ).
 
 ---
 
