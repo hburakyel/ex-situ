@@ -6,7 +6,7 @@
 [![Strapi](https://img.shields.io/badge/Strapi-4-2E7EEA)](https://strapi.io)
 [![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-336791)](https://postgis.net)
 
-![Ex Situ — provenance arc visualization](docs/Screenshot%202026-04-29%20at%2010.20.57.png)
+![Ex Situ — provenance arc visualization](docs/screenshot.png)
 
 **[https://exsitu.app](https://exsitu.app)**
 
