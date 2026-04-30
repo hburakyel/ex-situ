@@ -223,9 +223,6 @@ Please open an issue before submitting a pull request.
 This project has received support from 
 [HAB Hessen-Abschlussförderung](https://hab-hessen.de) (2022).  
 
-Support ongoing development via 
-[Open Collective](https://opencollective.com/ex-situ).
-
 ---
 
 ## License
