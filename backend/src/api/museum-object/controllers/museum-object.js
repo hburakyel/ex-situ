@@ -222,8 +222,23 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
     }
   },
 
-  async applyCorrection(ctx) {
+  /**
+   * Phase 7: Data quality statistics per institution
+   * GET /api/museum-objects/quality-stats
+   */
+  async qualityStats(ctx) {
     try {
+      const data = await strapi
+        .service('api::museum-object.museum-object')
+        .getQualityStats();
+      ctx.send(data);
+    } catch (error) {
+      strapi.log.error('qualityStats endpoint error:', error.message);
+      ctx.internalServerError('Quality stats query failed');
+    }
+  },
+
+  async applyCorrection(ctx) {    try {
       const id = parseInt(ctx.params.id);
       if (!id || id <= 0) {
         return ctx.badRequest('Invalid object id');
@@ -266,5 +281,41 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
       strapi.log.error('applyCorrection endpoint error:', error.message);
       ctx.internalServerError('Correction failed');
     }
-  }
+  },
+
+  /**
+   * Autocomplete suggest endpoint
+   * GET /api/museum-objects/suggest?q=benin&limit=8
+   */
+  async suggest(ctx) {
+    try {
+      const { q, limit } = ctx.query;
+      if (!q || String(q).trim().length < 2) {
+        return ctx.send({ data: [] });
+      }
+      const results = await strapi
+        .service('api::museum-object.museum-object')
+        .getSuggestions(q, limit);
+      ctx.send({ data: results });
+    } catch (error) {
+      strapi.log.error('suggest endpoint error:', error.message);
+      ctx.internalServerError('Suggest query failed');
+    }
+  },
+
+  /**
+   * Synonyms table endpoint — returns all alias→canonical mappings
+   * GET /api/museum-objects/synonyms
+   */
+  async synonyms(ctx) {
+    try {
+      const results = await strapi
+        .service('api::museum-object.museum-object')
+        .getSynonyms();
+      ctx.send({ data: results });
+    } catch (error) {
+      strapi.log.error('synonyms endpoint error:', error.message);
+      ctx.internalServerError('Synonyms query failed');
+    }
+  },
 }));

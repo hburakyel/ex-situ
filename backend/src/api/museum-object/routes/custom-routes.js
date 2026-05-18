@@ -58,6 +58,36 @@ module.exports = {
     },
     {
       method: 'GET',
+      path: '/museum-objects/quality-stats',
+      handler: 'museum-object.qualityStats',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
+      path: '/museum-objects/suggest',
+      handler: 'museum-object.suggest',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
+      path: '/museum-objects/synonyms',
+      handler: 'museum-object.synonyms',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
       path: '/museum-objects/pending-corrections',
       handler: 'museum-object.pendingCorrections',
       config: {

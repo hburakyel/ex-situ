@@ -1,5 +1,7 @@
 /**
  * Ex Situ Design System — CSS Custom Properties
+ * @version 1.0
+ * @updated 2026-05-04
  *
  * Generated from lib/design-system/tokens.ts.
  * Every token is expressed as a CSS custom property for use
@@ -9,6 +11,7 @@
  *   @import "@/styles/tokens.css";
  *
  * Or consume via `var(--ds-color-bg-base)`.
+ * Reference: https://exsitu.app/design
  */
 
 /* ═══════════════════════════════════════════════════════════════════════════

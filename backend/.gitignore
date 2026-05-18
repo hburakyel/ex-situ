@@ -6,5 +6,6 @@ build/
 .cache/
 .tmp/
 *.log
+nohup.out
 public/uploads/*
 !public/uploads/.gitkeep

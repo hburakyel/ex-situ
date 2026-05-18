@@ -41,7 +41,6 @@ async function main() {
 
     // Drop all objects that reference manual_latitude / manual_longitude
     await client.query(`
-      DROP TRIGGER IF EXISTS museum_objects_geom_trigger ON public.museum_objects;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_lat;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_lon;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_coords;

@@ -84,6 +84,61 @@
       "relation": "manyToOne",
       "target": "api::place.place",
       "inversedBy": "museum_objects"
+    },
+    "institution_city_en": {
+      "type": "string"
+    },
+    "institution_country_en": {
+      "type": "string"
+    },
+    "place_name_normalized": {
+      "type": "text"
+    },
+    "normalized_origin": {
+      "type": "string"
+    },
+    "geocoding_confidence": {
+      "type": "float"
+    },
+    "geocoding_status": {
+      "type": "enumeration",
+      "enum": ["ok", "ambiguous", "disputed"]
+    },
+    "geocoding_notes": {
+      "type": "text"
+    },
+    "geocoded_country": {
+      "type": "string"
+    },
+    "geocoded_region": {
+      "type": "string"
+    },
+    "geocoder_source": {
+      "type": "string"
+    },
+    "review_status": {
+      "type": "enumeration",
+      "enum": ["pending", "verified", "rejected"]
+    },
+    "origin_type": {
+      "type": "enumeration",
+      "enum": ["valid_location", "historical_toponym", "cultural_area", "archaeological_micro_location", "invalid"]
+    },
+    "cultural_context": {
+      "type": "text"
+    },
+    "transfer_method": {
+      "type": "string"
+    },
+    "historical_relation": {
+      "type": "text"
+    },
+    "enrichment_confidence": {
+      "type": "enumeration",
+      "enum": ["high", "medium", "low"]
+    },
+    "inventory_number_normalized": {
+      "type": "string"
     }
   }
 }

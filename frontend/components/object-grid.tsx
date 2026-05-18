@@ -229,6 +229,15 @@ return (
           {object.attributes.review_status}
         </span>
       )}
+      {typeof object.attributes.geocoding_confidence === 'number' &&
+        object.attributes.geocoding_confidence < 0.5 && (
+        <span
+          className="absolute bottom-1 left-1 z-10 bg-amber-100 text-amber-700 text-[9px] font-medium px-1 py-0.5 rounded pointer-events-none leading-none"
+          title={`Low geocoding confidence (${Math.round(object.attributes.geocoding_confidence * 100)}%)`}
+        >
+          ~
+        </span>
+      )}
       <BlurhashImage
             src={object.attributes.img_url!}
             alt={object.attributes?.title || "Museum object"}

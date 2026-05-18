@@ -4,19 +4,33 @@ const fetch = require("node-fetch");
 const STRAPI_API_URL = process.env.STRAPI_BASE_URL || "http://127.0.0.1:1337/api/museum-objects";
 const STRAPI_TOKEN = process.env.API_TOKEN;
 if (!STRAPI_TOKEN) { console.error('Missing API_TOKEN in .env'); process.exit(1); }
-const BATCH_SIZE = 100; // Number of objects to process at a time
-const RETRY_LIMIT = 1; // Number of retries for failed updates
+const BATCH_SIZE = 100;
+const NOMINATIM_MAX_RETRIES = 4;   // attempts: 1 initial + 3 retries
+const NOMINATIM_BASE_DELAY_MS = 1100; // 1.1s base — respects Nominatim 1 req/s limit
+const DRY_RUN = process.argv.includes('--dry-run');
 
-// Reverse Geocoding Function
-async function fetchLocationData(latitude, longitude) {
+if (DRY_RUN) console.log('🔍 DRY RUN — no writes will be made.');
+
+/** Sleep for ms milliseconds */
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Reverse geocode with exponential backoff retry */
+async function fetchLocationData(latitude, longitude, attempt = 1) {
     if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
         return { city_en: "Unknown", country_en: "Unknown", city_native: "Unknown", country_native: "Unknown" };
     }
 
     try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en,ar`);
-        const data = await response.json();
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en,ar`,
+            { headers: { 'User-Agent': 'ex-situ/1.0 (https://exsitu.app)' } }
+        );
 
+        if (response.status === 429 || response.status >= 500) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
         if (data && data.address) {
             return {
                 country_en: data.address.country || "Unknown",
@@ -26,13 +40,19 @@ async function fetchLocationData(latitude, longitude) {
             };
         }
     } catch (error) {
-        console.error(`❌ Failed to fetch location data for ${latitude}, ${longitude}:`, error.message);
+        if (attempt < NOMINATIM_MAX_RETRIES) {
+            const delay = NOMINATIM_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+            console.warn(`⚠️  Nominatim error (attempt ${attempt}/${NOMINATIM_MAX_RETRIES}) for ${latitude},${longitude}: ${error.message} — retrying in ${delay}ms`);
+            await sleep(delay);
+            return fetchLocationData(latitude, longitude, attempt + 1);
+        }
+        console.error(`❌ Nominatim failed after ${NOMINATIM_MAX_RETRIES} attempts for ${latitude},${longitude}:`, error.message);
     }
     return { city_en: "Unknown", country_en: "Unknown", city_native: "Unknown", country_native: "Unknown" };
 }
 
 // Function to update a single Strapi object
-async function updateStrapiObject(obj, retryCount = 0) {
+async function updateStrapiObject(obj) {
     const { id, attributes } = obj;
 
     // Skip if lat/lon is missing
@@ -47,14 +67,13 @@ async function updateStrapiObject(obj, retryCount = 0) {
         return;
     }
 
-    // Fetch country/city data
+    // Fetch country/city data (with exponential backoff built in)
     const locationData = await fetchLocationData(attributes.latitude, attributes.longitude);
     if (!locationData) {
         console.log(`⚠️ Skipping object ID ${id}: Failed to fetch location data.`);
         return;
     }
 
-    // Prepare update payload
     const updatePayload = {
         data: {
             country_en: locationData.country_en,
@@ -63,6 +82,11 @@ async function updateStrapiObject(obj, retryCount = 0) {
             city_native: locationData.city_native,
         },
     };
+
+    if (DRY_RUN) {
+        console.log(`🔍 [DRY RUN] Would update object ID ${id}:`, JSON.stringify(updatePayload.data));
+        return;
+    }
 
     // Update object in Strapi
     try {
@@ -78,13 +102,6 @@ async function updateStrapiObject(obj, retryCount = 0) {
         console.log(`✅ Updated object ID ${id} with country and city data.`);
     } catch (error) {
         console.error(`❌ Failed to update object ID ${id}:`, error.message);
-
-        if (retryCount < RETRY_LIMIT) {
-            console.log(`🔄 Retrying update for object ID ${id}...`);
-            return updateStrapiObject(obj, retryCount + 1);
-        }
-
-        console.log(`⚠️ Skipping object ID ${id} after ${RETRY_LIMIT} retries.`);
     }
 }
 

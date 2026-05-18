@@ -254,10 +254,12 @@ function MapContent() {
         .forEach((a) => { map.set(a.institution_name, (map.get(a.institution_name) || 0) + a.object_count) })
       return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
     }
+    // At global zoom (no active country) aggregate from all arcs
+    const source = activeCountry ? countryArcs : filteredArcData
     const map = new Map<string, number>()
-    countryArcs.forEach((arc) => { map.set(arc.institution_name, (map.get(arc.institution_name) || 0) + arc.object_count) })
+    source.forEach((arc) => { map.set(arc.institution_name, (map.get(arc.institution_name) || 0) + arc.object_count) })
     return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
-  }, [countryArcs, filteredSubArcs, activeSite])
+  }, [countryArcs, filteredArcData, filteredSubArcs, activeSite, activeCountry])
 
   // ── Sites per country from cityArcData ──
   const sitesByCountry = useMemo(() => {
@@ -794,10 +796,15 @@ function MapContent() {
     if (drillLevel === "global" && objects.length === 0) {
       base = base.filter(o => !!o.attributes?.img_url)
     }
-    if (isWikipediaActive && wikiObjects.length > 0) {
-      return [...base, ...wikiObjects]
-    }
-    return base
+    let combined = isWikipediaActive && wikiObjects.length > 0 ? [...base, ...wikiObjects] : base
+    // Deduplicate by id to prevent the same object appearing twice in the gallery
+    const seen = new Set<string | number>()
+    combined = combined.filter(o => {
+      if (seen.has(o.id)) return false
+      seen.add(o.id)
+      return true
+    })
+    return combined
   }, [drillLevel, arcObjects, objects, allObjects, isWikipediaActive, wikiObjects])
 
   // Effective location name: derived from drill state, with manual fallback

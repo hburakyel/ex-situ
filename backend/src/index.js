@@ -7,7 +7,6 @@
  */
 
 const DROP_DEPENDENCIES_SQL = `
-  DROP TRIGGER IF EXISTS museum_objects_geom_trigger ON public.museum_objects;
   DROP INDEX IF EXISTS idx_museum_objects_resolved_lat;
   DROP INDEX IF EXISTS idx_museum_objects_resolved_lon;
   DROP INDEX IF EXISTS idx_museum_objects_resolved_coords;
@@ -19,29 +18,6 @@ const RESTORE_DEPENDENCIES_SQL = `
   -- Ensure columns exist
   ALTER TABLE public.museum_objects ADD COLUMN IF NOT EXISTS manual_latitude double precision;
   ALTER TABLE public.museum_objects ADD COLUMN IF NOT EXISTS manual_longitude double precision;
-
-  -- Trigger function
-  CREATE OR REPLACE FUNCTION public.update_geom_from_lat_lon()
-  RETURNS trigger LANGUAGE plpgsql AS $$
-  BEGIN
-      IF COALESCE(NEW.manual_latitude, NEW.latitude) IS NOT NULL
-         AND COALESCE(NEW.manual_longitude, NEW.longitude) IS NOT NULL THEN
-          NEW.geom := ST_SetSRID(ST_MakePoint(
-              COALESCE(NEW.manual_longitude, NEW.longitude),
-              COALESCE(NEW.manual_latitude, NEW.latitude)
-          ), 4326)::geography;
-      ELSE
-          NEW.geom := NULL;
-      END IF;
-      RETURN NEW;
-  END;
-  $$;
-
-  -- Trigger
-  DROP TRIGGER IF EXISTS museum_objects_geom_trigger ON public.museum_objects;
-  CREATE TRIGGER museum_objects_geom_trigger
-  BEFORE INSERT OR UPDATE ON public.museum_objects
-  FOR EACH ROW EXECUTE FUNCTION public.update_geom_from_lat_lon();
 
   -- Expression indexes
   CREATE INDEX IF NOT EXISTS idx_museum_objects_resolved_lat

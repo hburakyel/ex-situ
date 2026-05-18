@@ -24,7 +24,7 @@ const nextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "X-DNS-Prefetch-Control", value: "on" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum; connect-src 'self' https://api.protomaps.com https://fonts.openmaptiles.org https://protomaps.github.io; font-src 'self' data: https://fonts.openmaptiles.org; worker-src 'self' blob:; child-src blob:; frame-ancestors 'none'" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum https://framemark.vam.ac.uk; connect-src 'self' https://api.protomaps.com https://fonts.openmaptiles.org https://protomaps.github.io; font-src 'self' data: https://fonts.openmaptiles.org; worker-src 'self' blob:; child-src blob:; frame-ancestors 'none'" },
         ],
       },
       // ── CORS for API routes — restricted to our own origin ──

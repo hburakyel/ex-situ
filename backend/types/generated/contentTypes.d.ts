@@ -418,29 +418,54 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
       'admin::user'
     > &
       Attribute.Private;
+    cultural_context: Attribute.Text;
+    enrichment_confidence: Attribute.Enumeration<['high', 'medium', 'low']>;
+    geocoded_country: Attribute.String;
+    geocoded_region: Attribute.String;
+    geocoder_source: Attribute.String;
+    geocoding_confidence: Attribute.Float;
+    geocoding_notes: Attribute.Text;
+    geocoding_status: Attribute.Enumeration<['ok', 'ambiguous', 'disputed']>;
+    historical_relation: Attribute.Text;
     img_url: Attribute.Text;
+    institution_city_en: Attribute.String;
     institution_country: Attribute.String;
+    institution_country_en: Attribute.String;
     institution_latitude: Attribute.Float;
     institution_longitude: Attribute.Float;
     institution_name: Attribute.String;
     institution_place: Attribute.String;
     inventory_number: Attribute.String;
+    inventory_number_normalized: Attribute.String;
     latitude: Attribute.Float;
     longitude: Attribute.Float;
     manual_latitude: Attribute.Float;
     manual_longitude: Attribute.Float;
+    normalized_origin: Attribute.String;
     object_id: Attribute.BigInteger;
     object_links: Attribute.Component<'object-links.object-link-info', true>;
+    origin_type: Attribute.Enumeration<
+      [
+        'valid_location',
+        'historical_toponym',
+        'cultural_area',
+        'archaeological_micro_location',
+        'invalid'
+      ]
+    >;
     place: Attribute.Relation<
       'api::museum-object.museum-object',
       'manyToOne',
       'api::place.place'
     >;
     place_name: Attribute.Text;
+    place_name_normalized: Attribute.Text;
     publishedAt: Attribute.DateTime;
+    review_status: Attribute.Enumeration<['pending', 'verified', 'rejected']>;
     source_link: Attribute.Text;
     time: Attribute.Component<'time-name.time-info', true>;
     title: Attribute.Text;
+    transfer_method: Attribute.String;
     updatedAt: Attribute.DateTime;
     updatedBy: Attribute.Relation<
       'api::museum-object.museum-object',

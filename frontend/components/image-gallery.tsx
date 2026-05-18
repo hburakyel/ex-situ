@@ -247,7 +247,7 @@ export default function ImageGallery({
             </div>
             <div>
               <span style={{ color: "var(--panel-text-muted, #666)" }}>To: </span>
-              <span>{currentObject.attributes.institution_place || "Unknown"}</span>
+              <span>{currentObject.attributes.institution_city_en || currentObject.attributes.institution_place || "Unknown"}</span>
             </div>
             <div>
               <span style={{ color: "var(--panel-text-muted, #666)" }}>Collection: </span>

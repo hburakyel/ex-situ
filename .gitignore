@@ -35,12 +35,8 @@ frontend/out/
 frontend/.turbo/
 frontend/tsconfig.tsbuildinfo
 
-# Python ETL
-etl/__pycache__/
-etl/env/
-etl/venv/
-etl/myenv/
-etl/.venv/
+# Python ETL (not published to GitHub)
+etl/
 *.pyc
 
 # Credentials / keys
@@ -73,6 +69,8 @@ pnpm-debug.log*
 # ETL output / sensitive data
 etl/coordinates.json
 etl/geocode_cache.json
+etl/reverse_geocode_cache.json
+etl/*.jsonl
 temp_geo_data/
 
 # Dev notes

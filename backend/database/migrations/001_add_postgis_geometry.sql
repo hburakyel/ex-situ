@@ -22,23 +22,9 @@ ON museum_objects USING GIST(geom);
 CREATE INDEX IF NOT EXISTS idx_museum_objects_lat_lon
 ON museum_objects(latitude, longitude);
 
--- Add a trigger to automatically update geom when lat/lon changes
-CREATE OR REPLACE FUNCTION update_geom_from_lat_lon()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL THEN
-        NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326)::geography;
-    ELSE
-        NEW.geom := NULL;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER museum_objects_geom_trigger
-BEFORE INSERT OR UPDATE OF latitude, longitude ON museum_objects
-FOR EACH ROW
-EXECUTE FUNCTION update_geom_from_lat_lon();
+-- NOTE: The geom auto-update trigger was permanently removed (2025-05).
+-- The geom column does not exist in the Strapi-managed schema, causing trigger errors.
+-- Geometry is populated once by the UPDATE above; ETL scripts set it directly.
 
 -- Add institution geometry column for institution locations
 ALTER TABLE museum_objects

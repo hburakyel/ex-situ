@@ -37,6 +37,7 @@ export interface PlaceResult {
 // Collection short labels
 export const COLLECTION_LABELS: Record<string, string> = {
   "Ethnologisches Museum": "Ethnologisches Museum",
+  "Victoria and Albert Museum": "V&A",
   "The Metropolitan Museum of Art": "The Met",
   "Museum für Islamische Kunst": "Museum für Islamische Kunst",
   "Ägyptisches Museum und Papyrussammlung": "Ägyptisches Museum",
@@ -48,8 +49,8 @@ export const COLLECTION_LABELS: Record<string, string> = {
 
 export const WIKIPEDIA_COLLECTION = "Wikipedia"
 
-// Common Mapbox → arc data mappings
-const COUNTRY_ALIASES: Record<string, string> = {
+// Fallback country aliases used before the DB synonyms table is loaded
+const COUNTRY_ALIASES_FALLBACK: Record<string, string> = {
   "türkiye": "turkey",
   "côte d'ivoire": "ivory coast",
   "czech republic": "czech republic",
@@ -120,6 +121,8 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
   const [matchingArcs, setMatchingArcs] = useState<ArcData[]>([])
   const [matchingCollections, setMatchingCollections] = useState<CollectionResult[]>([])
   const [searchError, setSearchError] = useState<string | null>(null)
+  // DB-backed synonym map; falls back to COUNTRY_ALIASES_FALLBACK until loaded
+  const [synonymMap, setSynonymMap] = useState<Record<string, string>>(COUNTRY_ALIASES_FALLBACK)
 
   // Arc data
   const [arcData, setArcData] = useState<ArcData[]>([])
@@ -151,6 +154,24 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       })
       .catch(err => console.error('Failed to fetch city arc data:', err))
 
+    return () => { cancelled = true }
+  }, [])
+
+  // Load synonyms from DB-backed API (replaces hardcoded COUNTRY_ALIASES)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/proxy/museum-objects/synonyms')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!cancelled && Array.isArray(data?.data) && data.data.length > 0) {
+          const map: Record<string, string> = { ...COUNTRY_ALIASES_FALLBACK }
+          for (const { alias, canonical } of data.data) {
+            if (alias && canonical) map[alias] = canonical
+          }
+          setSynonymMap(map)
+        }
+      })
+      .catch(() => { /* keep fallback */ })
     return () => { cancelled = true }
   }, [])
 
@@ -236,11 +257,11 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     ).sort((a, b) => (b.object_count || 0) - (a.object_count || 0)).slice(0, 15)
   }, [allSearchableArcs])
 
-  // Normalize country name for matching
+  // Normalize country name for matching (uses DB synonyms when loaded)
   const normalizeCountry = useCallback((name: string): string => {
     const lower = name.toLowerCase().trim()
-    return COUNTRY_ALIASES[lower] || lower
-  }, [])
+    return synonymMap[lower] || lower
+  }, [synonymMap])
 
   // Build a Set of lowercase arc place names for fast lookup
   const arcCountrySet = useMemo(() => {
@@ -292,12 +313,21 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     const cols = findMatchingCollections(query)
     setMatchingCollections(cols)
 
+    // Fire suggest and geocode in parallel
+    const suggestPromise = fetch(`/api/proxy/museum-objects/suggest?q=${encodeURIComponent(query)}&limit=8`)
+      .then(res => res.ok ? res.json() : { data: [] })
+      .then(data => (Array.isArray(data?.data) ? data.data : []) as Array<{ place_name: string; country_en: string | null; city_en: string | null; latitude: number; longitude: number; object_count: number }>)
+      .catch(() => [] as Array<{ place_name: string; country_en: string | null; city_en: string | null; latitude: number; longitude: number; object_count: number }>)
+
     try {
       const params = new URLSearchParams({
         q: query,
         limit: "5",
       })
-      const response = await fetch(`/api/geocode?${params.toString()}`)
+      const [response, suggestResults] = await Promise.all([
+        fetch(`/api/geocode?${params.toString()}`),
+        suggestPromise,
+      ])
       if (!response.ok) throw new Error("Search failed")
       const data = await response.json()
 
@@ -340,7 +370,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
           }
         })
 
-        // Merge direct + country-based arc matches
+        // Merge direct + country-based arc matches + suggest results
         const countryArcs = findArcsByCountries(Array.from(countryNames))
         const seen = new Set(directArcs.map(a => a.cluster_id))
         const merged = [...directArcs]
@@ -350,11 +380,30 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
             seen.add(arc.cluster_id)
           }
         }
+        // Inject suggest results as synthetic PlaceResult entries if not already covered
+        const suggestPlaces: PlaceResult[] = suggestResults
+          .filter(s => !merged.some(a => (a.place_name || '').toLowerCase() === (s.place_name || '').toLowerCase()))
+          .map(s => ({
+            name: s.place_name,
+            longitude: s.longitude,
+            latitude: s.latitude,
+            type: 'place',
+            bbox: null,
+          }))
+        if (suggestPlaces.length > 0) setSearchResults(prev => [...prev, ...suggestPlaces].slice(0, 8))
         setMatchingArcs(merged.slice(0, 15))
       } else {
-        setSearchResults([])
+        // No geocode results — use direct arc matches + suggest
+        const suggestPlaces: PlaceResult[] = suggestResults.map(s => ({
+          name: s.place_name,
+          longitude: s.longitude,
+          latitude: s.latitude,
+          type: 'place',
+          bbox: null,
+        }))
+        if (suggestPlaces.length > 0) setSearchResults(suggestPlaces)
         setMatchingArcs(directArcs)
-        if (directArcs.length === 0 && cols.length === 0) setSearchError("No results found")
+        if (directArcs.length === 0 && suggestPlaces.length === 0 && cols.length === 0) setSearchError("No results found")
       }
     } catch {
       setMatchingArcs(directArcs)

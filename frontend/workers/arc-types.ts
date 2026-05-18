@@ -20,6 +20,8 @@ export interface ArcDatum {
   sampleImgUrl?: string
   /** Network centrality — connection count of the source node (depth indicator) */
   connectionCount?: number
+  /** Coordinate precision of the source location */
+  coordinatePrecision?: string
 }
 
 export interface ArcCardData {

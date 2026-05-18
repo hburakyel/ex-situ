@@ -151,6 +151,7 @@ function processStatisticsOrClusters(
       toCountry,
       count,
       sampleImgUrl: arc.sample_img_url || "",
+      coordinatePrecision: arc.coordinate_precision || undefined,
     })
 
     arcCards.push({
@@ -222,6 +223,7 @@ function processObjects(data: any[]): ProcessedArcsResult {
         toCountry,
         count: 0,
         sampleImgUrl,
+        coordinatePrecision: obj.coordinate_precision || undefined,
       })
     }
 

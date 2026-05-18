@@ -1,5 +1,8 @@
 /**
  * Ex Situ Design System — Foundational Tokens
+ * @version 1.0
+ * @updated 2026-05-04
+ * @see https://exsitu.app/design
  *
  * Extracted from the codebase (components/map/*, app/map/*,
  * app/globals.css, styles/globals.css, tailwind.config.js).

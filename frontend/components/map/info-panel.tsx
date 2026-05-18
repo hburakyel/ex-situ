@@ -216,8 +216,8 @@ export default function InfoPanel({
                 </div>
               )}
 
-              {/* Institutions (country) */}
-              {drillLevel !== "global" && drillInstitutions.length > 0 && (
+              {/* Institutions — shown at all zoom levels */}
+              {drillInstitutions.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="panel-text-muted">

@@ -392,6 +392,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ${latExpr} as resolved_latitude,
           ${lonExpr} as resolved_longitude,
           institution_place,
+          institution_city_en,
           institution_name,
           place_name,
           source_link,
@@ -448,7 +449,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           img_url: row.img_url,
           latitude: row.resolved_latitude ? parseFloat(row.resolved_latitude) : 0,
           longitude: row.resolved_longitude ? parseFloat(row.resolved_longitude) : 0,
-          institution_place: row.institution_place || 'Unknown',
+          institution_place: row.institution_city_en || row.institution_place || 'Unknown',
+          institution_city_en: row.institution_city_en || null,
           institution_name: row.institution_name || 'Unmapped',
           place_name: row.place_name,
           source_link: row.object_link_url || row.source_link,
@@ -536,6 +538,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           country_en,
           institution_name,
           institution_place,
+          institution_city_en,
           inventory_number,
           source_link,
           ${latExpr} as latitude,
@@ -578,6 +581,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             country: row.country_en,
             institution_name: row.institution_name,
             institution_place: row.institution_place,
+            institution_city_en: row.institution_city_en || null,
             inventory_number: row.inventory_number,
             source_link: row.object_link_url || row.source_link,
             object_links: row.object_link_url ? [{ link_text: row.object_link_url, link_display: row.object_link_display }] : null,
@@ -603,7 +607,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
   },
 
   /**
-   * Fetch a single object by inventory_number (exact match).
+   * Fetch a single object by inventory_number (exact match, then normalized fallback).
    * Returns the Strapi-shaped { id, attributes } object or null.
    */
   async getObjectByInventoryNumber(inventoryNumber) {
@@ -662,7 +666,24 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       `;
 
       const result = await db.raw(dataQuery, { inventoryNumber });
-      const rows = this.getRows(result);
+      let rows = this.getRows(result);
+
+      // Normalized fallback: if no exact match, try matching against
+      // inventory_number_normalized using the same normalization as migration 011.
+      if (rows.length === 0) {
+        const normalizedInput = inventoryNumber
+          .trim()
+          .toLowerCase()
+          .replace(/[,\s]*[a-zA-Z]\s*(,\s*[a-zA-Z]\s*)*$/g, '')
+          .trim();
+
+        const fallbackQuery = dataQuery.replace(
+          'WHERE published_at IS NOT NULL AND inventory_number = :inventoryNumber',
+          'WHERE published_at IS NOT NULL AND inventory_number_normalized = :inventoryNumber'
+        );
+        const fallbackResult = await db.raw(fallbackQuery, { inventoryNumber: normalizedInput });
+        rows = this.getRows(fallbackResult);
+      }
       if (!rows.length) return null;
 
       const row = rows[0];
@@ -1024,8 +1045,93 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     }
   },
 
-  async applyCorrection(id, correctionData) {
+  /**
+   * Phase 7: Data quality statistics per institution.
+   * Returns counts, null-coordinate rates, geocoding confidence distribution,
+   * and coordinate_precision breakdown for the quality dashboard.
+   */
+  async getQualityStats() {
     const db = strapi.db.connection;
+    try {
+      // Check which Phase 1/3 columns exist before using them in aggregation
+      const [hasConfidence, hasPrecision, hasReviewStatus] = await Promise.all([
+        db.schema.hasColumn('museum_objects', 'geocoding_confidence'),
+        db.schema.hasColumn('museum_objects', 'coordinate_precision'),
+        db.schema.hasColumn('museum_objects', 'review_status'),
+      ]);
+
+      const confidenceExpr = hasConfidence
+        ? `ROUND(AVG(geocoding_confidence)::numeric, 3)`
+        : `NULL`;
+      const lowConfExpr = hasConfidence
+        ? `COUNT(*) FILTER (WHERE geocoding_confidence < 0.5 AND geocoding_confidence IS NOT NULL)::integer`
+        : `0`;
+      const reviewPendingExpr = hasReviewStatus
+        ? `COUNT(*) FILTER (WHERE review_status = 'pending')::integer`
+        : `0`;
+
+      const precisionCols = hasPrecision
+        ? `COUNT(*) FILTER (WHERE coordinate_precision = 'exact')::integer   AS prec_exact,
+           COUNT(*) FILTER (WHERE coordinate_precision = 'site')::integer    AS prec_site,
+           COUNT(*) FILTER (WHERE coordinate_precision = 'city')::integer    AS prec_city,
+           COUNT(*) FILTER (WHERE coordinate_precision = 'region')::integer  AS prec_region,
+           COUNT(*) FILTER (WHERE coordinate_precision = 'country')::integer AS prec_country,`
+        : `0 AS prec_exact, 0 AS prec_site, 0 AS prec_city, 0 AS prec_region, 0 AS prec_country,`;
+
+      const query = `
+        SELECT
+          COALESCE(NULLIF(institution_name, ''), 'Unknown') AS institution,
+          COUNT(*)::integer                                                     AS total,
+          COUNT(*) FILTER (WHERE latitude IS NOT NULL
+                               AND longitude IS NOT NULL)::integer             AS has_coords,
+          COUNT(*) FILTER (WHERE latitude IS NULL
+                             OR  longitude IS NULL)::integer                   AS missing_coords,
+          ROUND(
+            100.0 * COUNT(*) FILTER (WHERE latitude IS NOT NULL AND longitude IS NOT NULL)
+            / NULLIF(COUNT(*), 0), 1
+          )                                                                     AS coord_coverage_pct,
+          ${confidenceExpr}                                                     AS avg_confidence,
+          ${lowConfExpr}                                                        AS low_confidence_count,
+          ${reviewPendingExpr}                                                  AS pending_review_count,
+          ${precisionCols}
+          0 AS _dummy
+        FROM museum_objects
+        WHERE published_at IS NOT NULL
+          AND institution_name IS NOT NULL
+          AND institution_name != ''
+        GROUP BY COALESCE(NULLIF(institution_name, ''), 'Unknown')
+        ORDER BY total DESC;
+      `;
+
+      const result = await db.raw(query);
+      const rows = this.getRows(result);
+
+      return {
+        institutions: rows.map(row => ({
+          institution:       row.institution,
+          total:             parseInt(row.total) || 0,
+          hasCoords:         parseInt(row.has_coords) || 0,
+          missingCoords:     parseInt(row.missing_coords) || 0,
+          coordCoveragePct:  parseFloat(row.coord_coverage_pct) || 0,
+          avgConfidence:     row.avg_confidence != null ? parseFloat(row.avg_confidence) : null,
+          lowConfidenceCount: parseInt(row.low_confidence_count) || 0,
+          pendingReviewCount: parseInt(row.pending_review_count) || 0,
+          coordinatePrecision: {
+            exact:   parseInt(row.prec_exact)   || 0,
+            site:    parseInt(row.prec_site)    || 0,
+            city:    parseInt(row.prec_city)    || 0,
+            region:  parseInt(row.prec_region)  || 0,
+            country: parseInt(row.prec_country) || 0,
+          },
+        })),
+      };
+    } catch (error) {
+      strapi.log.error('Error in getQualityStats:', error);
+      throw error;
+    }
+  },
+
+  async applyCorrection(id, correctionData) {    const db = strapi.db.connection;
     const { country_en, city_en, manual_latitude, manual_longitude, geocoding_status, note } = correctionData;
     try {
       const setClauses = [];
@@ -1083,6 +1189,102 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     } catch (error) {
       strapi.log.error('Error in applyCorrection:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Autocomplete suggest endpoint — returns ranked place name suggestions using
+   * PostgreSQL tsvector full-text search. Falls back to ILIKE if search_vector
+   * column does not yet exist (pre-migration).
+   * @param {string} query - User search query (min 2 chars)
+   * @param {number} limit - Max results to return (default 8, max 20)
+   * @returns {Promise<Array<{place_name: string, country_en: string, city_en: string, latitude: number, longitude: number, object_count: number}>>}
+   */
+  async getSuggestions(query, limit = 8) {
+    const db = strapi.db.connection;
+    const safeLimit = Math.min(Math.max(1, parseInt(limit) || 8), 20);
+
+    // Sanitize query: strip characters that break tsquery, collapse whitespace
+    const cleanQuery = String(query).replace(/[^a-zA-Z0-9\s\u00C0-\u024F\-']/g, '').trim().slice(0, 100);
+    if (!cleanQuery) return [];
+
+    try {
+      const hasVector = await db.schema.hasColumn('museum_objects', 'search_vector');
+
+      let rows;
+      if (hasVector) {
+        // Full-text search with prefix matching (term:*) and weighted ranking
+        const tsQuery = cleanQuery.split(/\s+/).filter(Boolean).map(w => `${w}:*`).join(' & ');
+        const result = await db.raw(`
+          SELECT
+            place_name,
+            country_en,
+            city_en,
+            AVG(COALESCE(manual_latitude, latitude))  AS latitude,
+            AVG(COALESCE(manual_longitude, longitude)) AS longitude,
+            COUNT(*)                                   AS object_count,
+            MAX(ts_rank(search_vector, to_tsquery('simple', :tsQuery))) AS rank
+          FROM museum_objects
+          WHERE search_vector @@ to_tsquery('simple', :tsQuery)
+            AND place_name IS NOT NULL
+          GROUP BY place_name, country_en, city_en
+          ORDER BY rank DESC, object_count DESC
+          LIMIT :limit
+        `, { tsQuery, limit: safeLimit });
+        rows = this.getRows(result);
+      } else {
+        // Fallback: ILIKE on key columns before migration is applied
+        const result = await db.raw(`
+          SELECT
+            place_name,
+            country_en,
+            city_en,
+            AVG(COALESCE(manual_latitude, latitude))  AS latitude,
+            AVG(COALESCE(manual_longitude, longitude)) AS longitude,
+            COUNT(*)                                   AS object_count
+          FROM museum_objects
+          WHERE (
+            place_name ILIKE :pattern
+            OR country_en ILIKE :pattern
+            OR city_en ILIKE :pattern
+          )
+            AND place_name IS NOT NULL
+          GROUP BY place_name, country_en, city_en
+          ORDER BY object_count DESC
+          LIMIT :limit
+        `, { pattern: `${cleanQuery}%`, limit: safeLimit });
+        rows = this.getRows(result);
+      }
+
+      return rows.map(r => ({
+        place_name: r.place_name,
+        country_en: r.country_en || null,
+        city_en: r.city_en || null,
+        latitude: parseFloat(r.latitude) || 0,
+        longitude: parseFloat(r.longitude) || 0,
+        object_count: parseInt(r.object_count) || 0,
+      }));
+    } catch (error) {
+      strapi.log.error('Error in getSuggestions:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Return all rows from the place_name_synonyms table so the frontend can
+   * cache them and replace the hardcoded COUNTRY_ALIASES map.
+   * @returns {Promise<Array<{alias: string, canonical: string}>>}
+   */
+  async getSynonyms() {
+    const db = strapi.db.connection;
+    try {
+      const tableExists = await db.schema.hasTable('place_name_synonyms');
+      if (!tableExists) return [];
+      const result = await db.raw('SELECT alias, canonical FROM place_name_synonyms ORDER BY alias');
+      return this.getRows(result).map(r => ({ alias: r.alias, canonical: r.canonical }));
+    } catch (error) {
+      strapi.log.error('Error in getSynonyms:', error);
+      return [];
     }
   },
 }));

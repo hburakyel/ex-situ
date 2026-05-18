@@ -176,7 +176,7 @@ export default function UnifiedSearchBox({
               </div>
             )}
 
-            {/* Collections */
+            {/* Collections */}
             {collections.length > 0 && (
               <div className="space-y-0.5 pt-1">
                 <p className="text-xs text-gray-400 px-1 pb-1">Collections</p>

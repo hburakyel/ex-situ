@@ -1041,8 +1041,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
-            {/* ── Institutions Section (country drill-down) ── */}
-            {drillLevel !== "global" && drillInstitutions.length > 0 && (
+            {/* ── Institutions Section — shown at all zoom levels ── */}
+            {drillInstitutions.length > 0 && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
