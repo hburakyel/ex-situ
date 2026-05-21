@@ -143,8 +143,9 @@ ex-situ/
 └── etl/                    # Python ETL pipeline
     ├── scrape_smb_am_api.py
     ├── scrape_met_api.py
-    ├── scrape_va_api.py
-    └── postgis_geocoder.py
+    ├── scrape_vam.py
+    ├── postgis_geocoder.py
+    └── normalize_place_names.py
 ```
 
 ---
