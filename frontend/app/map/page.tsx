@@ -18,10 +18,14 @@ import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/co
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
   place_name: string
+  place_name_normalized?: string
   institution_name: string
   object_count: number
   latitude: number
   longitude: number
+  institution_latitude?: number
+  institution_longitude?: number
+  country?: string
   sample_img_url: string | null
   cluster_id: string
 }
@@ -131,6 +135,8 @@ function MapContent() {
   // Keep ref in sync with state
   useEffect(() => { drillLevelRef.current = drillLevel }, [drillLevel])
   const [activeCountry, setActiveCountry] = useState<string | null>(urlCountry || null)
+  const activeCountryRef = useRef<string | null>(urlCountry || null)
+  useEffect(() => { activeCountryRef.current = activeCountry }, [activeCountry])
   const [activeSite, setActiveSite] = useState<string | null>(urlSite || null)
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
   const [subArcs, setSubArcs] = useState<SubArc[]>([])
@@ -216,13 +222,15 @@ function MapContent() {
       ? filteredSubArcs.filter((a) => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
       : filteredSubArcs
     // Prefer place_name_normalized for display if available
-    const map = new Map<string, { totalCount: number; institutions: Set<string>; lat: number; lng: number; displayName: string }>()
+    const map = new Map<string, { totalCount: number; institutions: Set<string>; lat: number; lng: number; displayName: string; rawNames: Set<string> }>()
     source.forEach((arc) => {
       const displayName = arc.place_name_normalized || arc.place_name
       const existing = map.get(arc.place_name)
       if (existing) {
         existing.totalCount += arc.object_count
         existing.institutions.add(arc.institution_name)
+        existing.rawNames.add(arc.place_name)
+        existing.rawNames.add(displayName)
       } else {
         map.set(arc.place_name, {
           totalCount: arc.object_count,
@@ -230,6 +238,7 @@ function MapContent() {
           lat: arc.latitude,
           lng: arc.longitude,
           displayName,
+          rawNames: new Set([arc.place_name, displayName]),
         })
       }
     })
@@ -241,6 +250,7 @@ function MapContent() {
         lat: data.lat,
         lng: data.lng,
         displayName: data.displayName,
+        rawNames: Array.from(data.rawNames),
       }))
       .sort((a, b) => b.totalCount - a.totalCount)
   }, [filteredSubArcs, activeInstitution])
@@ -660,12 +670,19 @@ function MapContent() {
   const handleSelectArc = useCallback((arc: SelectedArc | null) => {
     setSelectedArc(arc)
     if (arc) {
-      // Determine country and site from arc
-      const country = arc.fromCountry || arc.from
-      const site = arc.from && arc.from !== country ? arc.from : null
+      const country = arc.fromCountry || activeCountryRef.current || arc.from
+      // At city zoom (≥4) arc.from is always a city cluster, even if its name
+      // matches the country (e.g. "Morocco" cluster inside Morocco country).
+      // At country zoom (<4) arc.from IS the country — skip as site.
+      const isCityZoom = currentZoomRef.current >= 4
+      const site = isCityZoom
+        ? (arc.from || null)
+        : (arc.from && arc.from !== country ? arc.from : null)
+      // arc.to is the institution the arc points to — filter objects to it
+      const institution = arc.to || null
       setActiveCountry(country)
       setActiveSite(site)
-      setActiveInstitution(null)
+      setActiveInstitution(institution)
       setDrillLevel(site ? "objects" : "country")
       drillLevelRef.current = site ? "objects" : "country"  // sync ref immediately to prevent stale closure geocode
       debouncedGeocode.cancel()           // cancel any pending reverse-geocode
@@ -859,7 +876,7 @@ function MapContent() {
           onExpandView={() => setContainerSize(prev => prev === "default" ? "expanded" : "default")}
           viewMode={viewMode}
           containerSize={containerSize}
-          locationName={locationName}
+          locationName={drillLevel === "country" ? (activeCountry || locationName) : locationName}
           onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
           isObjectContainerVisible={isObjectContainerVisible}
           toggleObjectContainerVisibility={() => setIsObjectContainerVisible(prev => !prev)}
@@ -888,6 +905,7 @@ function MapContent() {
           onToggleSite={handleToggleSite}
           onToggleInstitution={handleToggleInstitution}
           isLoadingSubArcs={isLoadingSubArcs}
+          drillArcs={filteredSubArcs}
         />
 
         {/* Floating object container — images only (+ header on mobile) */}

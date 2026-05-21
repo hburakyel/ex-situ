@@ -41,6 +41,7 @@ interface InfoPanelProps {
   clearAllFilters: () => void
   locationName?: string
   geocodedName?: string
+  activeCountry?: string | null
 }
 
 export default function InfoPanel({
@@ -142,8 +143,8 @@ export default function InfoPanel({
                 <span>
                   {drillLevel === "global"
                     ? (collectionCount > 0 ? ` from ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "")
-                    : (displayName || locationName)
-                      ? ` from ${displayName || locationName}`
+                    : drillInstitutions.length > 0
+                      ? ` · ${drillInstitutions.length} collection${drillInstitutions.length !== 1 ? "s" : ""}`
                       : ""}
                 </span>
                 {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
@@ -177,7 +178,7 @@ export default function InfoPanel({
                           <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
-                            <span className="truncate max-w-[70%]">{origin.country}</span>
+                            <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
                             <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
                           </div>
                         ))}
@@ -207,7 +208,7 @@ export default function InfoPanel({
                             className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
-                            <span className="truncate max-w-[70%]">{site.name}</span>
+                            <span className="truncate max-w-[70%]" title={site.name}>{site.name}</span>
                             <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
                           </div>
                         ))}
@@ -236,7 +237,7 @@ export default function InfoPanel({
                             className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleInstitution?.(inst.name)}
                           >
-                            <span className="truncate max-w-[70%]">{inst.name}</span>
+                            <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
                             <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
                           </div>
                         ))}

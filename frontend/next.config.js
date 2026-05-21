@@ -9,6 +9,14 @@ const nextConfig = {
       os: false,
     }
 
+    // pnpm uses symlinked node_modules; webpack's snapshot resolver can't
+    // follow the real paths, causing "Unable to snapshot resolve dependencies".
+    // Setting managedPaths to [] makes webpack treat all paths uniformly.
+    config.snapshot = {
+      ...config.snapshot,
+      managedPaths: [],
+    }
+
     return config
   },
   async headers() {

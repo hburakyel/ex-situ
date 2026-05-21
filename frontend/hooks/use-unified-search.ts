@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 // Arc data from geospatial API
 export interface ArcData {
   place_name: string
+  place_name_normalized?: string
   country?: string | null
   latitude: number
   longitude: number
@@ -98,6 +99,7 @@ interface UseUnifiedSearchOptions {
 function normalizeArcItem(raw: any): ArcData {
   return {
     place_name: raw.place_name || raw.country_en || '',
+    place_name_normalized: raw.place_name_normalized,
     country: raw.country || raw.country_en || null,
     latitude: raw.latitude ?? raw.center?.latitude ?? 0,
     longitude: raw.longitude ?? raw.center?.longitude ?? 0,

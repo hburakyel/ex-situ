@@ -45,6 +45,8 @@ export interface GroupedOrigin {
 /** Grouped site row (city-level arc data within a country). */
 export interface GroupedSite {
   name: string
+  displayName: string
+  rawNames: string[]
   totalCount: number
   institutions: string[]
   lat: number

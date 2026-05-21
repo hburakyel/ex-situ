@@ -12,7 +12,6 @@ export type FacetedFilters = {
   institutions: string[]
   countries: string[]
   cities: string[]
-  resolvers: string[]
 }
 
 export interface CommandPaletteHandlers {
@@ -378,7 +377,7 @@ export default function V3CommandPalette({
   )
 
   const clearAllFilters = useCallback(() => {
-    onFacetedFiltersChange({ institutions: [], countries: [], cities: [], resolvers: [] })
+    onFacetedFiltersChange({ institutions: [], countries: [], cities: [] })
   }, [onFacetedFiltersChange])
 
   // ── Keyboard ──

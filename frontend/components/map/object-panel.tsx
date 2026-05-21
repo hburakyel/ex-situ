@@ -38,6 +38,8 @@ export interface GroupedOrigin {
 
 export interface GroupedSite {
   name: string
+  displayName: string
+  rawNames: string[]
   totalCount: number
   institutions: string[]
   lat: number
@@ -72,6 +74,7 @@ interface ObjectPanelProps {
   groupedSites?: GroupedSite[]
   drillInstitutions?: InstitutionItem[]
   activeSite?: string | null
+  activeCountry?: string | null
   activeInstitution?: string | null
   onToggleSite?: (site: string, lat?: number, lng?: number) => void
   onToggleInstitution?: (inst: string) => void
@@ -110,6 +113,7 @@ export default function ObjectPanel({
   groupedSites = [],
   drillInstitutions = [],
   activeSite = null,
+  activeCountry = null,
   activeInstitution = null,
   onToggleSite,
   onToggleInstitution,
@@ -856,6 +860,7 @@ export default function ObjectPanel({
                 clearAllFilters={clearAllFilters}
                 locationName={locationName}
                 geocodedName={geocodedName}
+                activeCountry={activeCountry}
               />
           </div>
         ) : (
@@ -886,6 +891,7 @@ export default function ObjectPanel({
                 clearAllFilters={clearAllFilters}
                 locationName={locationName}
                 geocodedName={geocodedName}
+                activeCountry={activeCountry}
               />
             </div>
             <div className="flex items-center gap-2 shrink-0 pt-2 pr-4">
@@ -1018,7 +1024,7 @@ export default function ObjectPanel({
                     <div className="flex items-end justify-between mt-1 pl-0">
                       <span className="text-[9px] text-gray-400 leading-none">Wikipedia</span>
                       <span className="text-[9px] text-gray-400 leading-none truncate ml-1 max-w-[60%] text-right">
-                        {linkCard.attributes.place_name || linkCard.attributes.country_en || ''}
+                        {linkCard.attributes.place_name_normalized || linkCard.attributes.place_name || linkCard.attributes.country_en || ''}
                       </span>
                     </div>
                   </div>

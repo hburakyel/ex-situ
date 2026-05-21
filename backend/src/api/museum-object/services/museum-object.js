@@ -383,8 +383,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       strapi.log.info(`getIndividualObjects: bbox=[${minLat},${maxLat},${minLon},${maxLon}], institution=${filters.institution || 'all'}, city=${filters.city || 'all'}, country=${filters.country || 'all'}`);
 
       // SAFETY GATE: Use Named Bindings to ensure query always sees 4 bindings
+      // Deduplicate by inventory_number+institution so duplicate DB rows show only once
       const query = `
-        SELECT
+        SELECT * FROM (
+          SELECT DISTINCT ON (
+            CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
+              THEN inventory_number ELSE id::text END, institution_name
+          )
           id,
           object_id,
           title,
@@ -395,6 +400,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           institution_city_en,
           institution_name,
           place_name,
+          place_name_normalized,
           source_link,
           inventory_number,
           institution_latitude,
@@ -410,15 +416,19 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
            JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
            WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
            ORDER BY moc."order" LIMIT 1) as object_link_display
-        FROM museum_objects
-        WHERE published_at IS NOT NULL
-          AND ${latFilter}
-          AND ${lonFilter}
-          AND ${latExpr} BETWEEN :minLat AND :maxLat
-          AND ${lonExpr} BETWEEN :minLon AND :maxLon
-          ${institutionFilter.clause}
-          ${cityFilter.clause}
-          ${countryFilter.clause}
+          FROM museum_objects
+          WHERE published_at IS NOT NULL
+            AND ${latFilter}
+            AND ${lonFilter}
+            AND ${latExpr} BETWEEN :minLat AND :maxLat
+            AND ${lonExpr} BETWEEN :minLon AND :maxLon
+            ${institutionFilter.clause}
+            ${cityFilter.clause}
+            ${countryFilter.clause}
+          ORDER BY
+            CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
+              THEN inventory_number ELSE id::text END, institution_name, id
+        ) deduped
         ORDER BY object_id
         LIMIT 5000;
       `;
@@ -453,9 +463,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           institution_city_en: row.institution_city_en || null,
           institution_name: row.institution_name || 'Unmapped',
           place_name: row.place_name,
+          place_name_normalized: row.place_name_normalized,
           source_link: row.object_link_url || row.source_link,
-          inventory_number: row.inventory_number,
-          institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,
           institution_longitude: row.institution_longitude ? parseFloat(row.institution_longitude) : null,
           country_en: row.country_en || null,
           city_en: row.city_en || null,
@@ -508,11 +517,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       // Match country_en OR place_name so that arc-click works at every zoom level.
       // At country level the arc passes a country name (matches country_en),
       // at city/object level it passes a place_name (may differ from country_en).
-      let whereClause = `WHERE published_at IS NOT NULL AND (country_en ILIKE :country OR place_name ILIKE :country)`;
+      let whereClause = `WHERE published_at IS NOT NULL AND (country_en ILIKE :country OR COALESCE(place_name_normalized, place_name) ILIKE :country)`;
       const bindings = { country: `%${country}%` };
 
       if (site) {
-        whereClause += ` AND (city_en ILIKE :site OR place_name ILIKE :site)`;
+        whereClause += ` AND (city_en ILIKE :site OR COALESCE(place_name_normalized, place_name) ILIKE :site)`;
         bindings.site = `%${site}%`;
       }
 
@@ -521,40 +530,56 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         bindings.institution = `%${institution}%`;
       }
 
-      // Count query (fast with index)
-      const countQuery = `SELECT COUNT(*)::integer as total FROM museum_objects ${whereClause}`;
+      // Dedup key: use inventory_number when present, else fall back to id so rows
+      // without an inventory number are never merged together.
+      const dedupKey = `CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
+          THEN inventory_number ELSE id::text END, institution_name`;
+
+      // Count query — deduplicate first so the count reflects unique objects
+      const countQuery = `
+        SELECT COUNT(*)::integer as total FROM (
+          SELECT DISTINCT ON (${dedupKey}) id
+          FROM museum_objects
+          ${whereClause}
+          ORDER BY ${dedupKey}, id
+        ) deduped
+      `;
       const countResult = await db.raw(countQuery, bindings);
       const total = this.getRows(countResult)[0]?.total || 0;
 
-      // Data query — only the fields needed for the research grid
+      // Data query — deduplicate (pick the lowest id per inv+institution group), then page
       const dataQuery = `
-        SELECT
-          id,
-          object_id,
-          title,
-          img_url,
-          place_name,
-          city_en,
-          country_en,
-          institution_name,
-          institution_place,
-          institution_city_en,
-          inventory_number,
-          source_link,
-          ${latExpr} as latitude,
-          ${lonExpr} as longitude,
-          institution_latitude,
-          institution_longitude,
-          (SELECT ol.link_text FROM museum_objects_components moc
-           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
-           WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
-           ORDER BY moc."order" LIMIT 1) as object_link_url,
-          (SELECT ol.link_display FROM museum_objects_components moc
-           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
-           WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
-           ORDER BY moc."order" LIMIT 1) as object_link_display
-        FROM museum_objects
-        ${whereClause}
+        SELECT * FROM (
+          SELECT DISTINCT ON (${dedupKey})
+            id,
+            object_id,
+            title,
+            img_url,
+            place_name,
+            place_name_normalized,
+            city_en,
+            country_en,
+            institution_name,
+            institution_place,
+            institution_city_en,
+            inventory_number,
+            source_link,
+            ${latExpr} as latitude,
+            ${lonExpr} as longitude,
+            institution_latitude,
+            institution_longitude,
+            (SELECT ol.link_text FROM museum_objects_components moc
+             JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
+             WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
+             ORDER BY moc."order" LIMIT 1) as object_link_url,
+            (SELECT ol.link_display FROM museum_objects_components moc
+             JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
+             WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
+             ORDER BY moc."order" LIMIT 1) as object_link_display
+          FROM museum_objects
+          ${whereClause}
+          ORDER BY ${dedupKey}, id
+        ) deduped
         ORDER BY id DESC
         LIMIT :limit OFFSET :offset
       `;
@@ -576,6 +601,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             title: row.title,
             img_url: row.img_url,
             place_name: row.place_name,
+            place_name_normalized: row.place_name_normalized,
             city_en: row.city_en,
             country_en: row.country_en,
             country: row.country_en,

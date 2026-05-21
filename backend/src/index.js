@@ -51,7 +51,9 @@ const MV_COUNTRY_SQL = `
       institution_name,
       avg(institution_latitude)                         AS inst_lat,
       avg(institution_longitude)                        AS inst_lon,
-      count(*)::integer                                 AS object_count,
+      COUNT(DISTINCT CASE
+          WHEN inventory_number IS NOT NULL AND inventory_number != ''
+          THEN inventory_number ELSE id::text END)::integer AS object_count,
       min(img_url)                                      AS sample_img_url
   FROM museum_objects
   WHERE
@@ -79,7 +81,9 @@ const MV_CITY_SQL = `
       institution_name,
       avg(institution_latitude)                  AS inst_lat,
       avg(institution_longitude)                 AS inst_lon,
-      count(*)::integer                          AS object_count,
+      COUNT(DISTINCT CASE
+          WHEN inventory_number IS NOT NULL AND inventory_number != ''
+          THEN inventory_number ELSE id::text END)::integer AS object_count,
       min(img_url)                               AS sample_img_url,
       min(COALESCE(manual_latitude, latitude))   AS min_lat,
       max(COALESCE(manual_latitude, latitude))   AS max_lat,

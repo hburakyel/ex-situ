@@ -131,6 +131,7 @@ export function useArcWorker(
         institution_longitude: obj.attributes.institution_longitude,
         institution_latitude: obj.attributes.institution_latitude,
         place_name: obj.attributes.place_name,
+        place_name_normalized: obj.attributes.place_name_normalized,
         institution_place: obj.attributes.institution_place,
         institution_name: obj.attributes.institution_name,
         city_en: obj.attributes.city_en,

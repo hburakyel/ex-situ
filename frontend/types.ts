@@ -29,6 +29,7 @@ export interface MuseumObject {
     institution_longitude: number
     institution_latitude: number
     place_name?: string
+    place_name_normalized?: string
     institution_place?: string
     country?: string
     country_en?: string
@@ -118,6 +119,7 @@ export interface GeospatialBbox {
 // Matches backend API response from getCountryStatistics and getClusteredData
 export interface AggregatedArc {
   place_name: string           // origin place name (country at zoom<5, city at zoom 5-9)
+  place_name_normalized?: string // normalized canonical form of place_name
   latitude: number             // origin latitude
   longitude: number            // origin longitude
   institution_name: string
@@ -157,6 +159,7 @@ export interface GeospatialObject {
   city_en?: string
   institution_name: string
   place_name?: string
+  place_name_normalized?: string
   source_link?: string
   inventory_number?: string
   institution_latitude?: number

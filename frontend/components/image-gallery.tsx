@@ -243,7 +243,7 @@ export default function ImageGallery({
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
             <div>
               <span style={{ color: "var(--panel-text-muted, #666)" }}>From: </span>
-              <span>{currentObject.attributes.place_name || "Unknown"}</span>
+              <span>{currentObject.attributes.place_name_normalized || currentObject.attributes.place_name || "Unknown"}</span>
             </div>
             <div>
               <span style={{ color: "var(--panel-text-muted, #666)" }}>To: </span>

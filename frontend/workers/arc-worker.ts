@@ -30,6 +30,7 @@ interface ArcDatum {
   count: number
   sampleImgUrl?: string
   connectionCount?: number
+  coordinatePrecision?: string
 }
 
 interface ArcCardData {
@@ -77,6 +78,7 @@ interface FlatObjectAttrs {
   institution_city_en?: string
   institution_country_en?: string
   img_url?: string
+  coordinate_precision?: string
 }
 
 // ── Cancellation flag ───────────────────────────────────────────────
@@ -135,7 +137,7 @@ function processStatisticsOrClusters(
     const fromCity = isCountryLevel ? "" : arc.city_en || arc.place_name || ""
     const fromCountry = isCountryLevel
       ? arc.place_name || ""
-      : arc.country_en || arc.geocoded_country || ""
+      : arc.country || arc.country_en || arc.geocoded_country || ""
     const toCity = arc.institution_city_en || ""
     const toCountry = arc.institution_country_en || ""
     const count = arc.object_count || 1

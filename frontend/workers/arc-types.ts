@@ -101,6 +101,7 @@ export interface FlatObjectAttrs {
   institution_longitude: number
   institution_latitude: number
   place_name?: string
+  place_name_normalized?: string
   institution_place?: string
   institution_name: string
   city_en?: string

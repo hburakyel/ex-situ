@@ -82,10 +82,13 @@ export async function GET(request: NextRequest) {
 
   const cacheKey = `${url}:${targetWidth}`
 
+  const toResponseBody = (buffer: Buffer): ArrayBuffer =>
+    buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
+
   // Check in-memory cache
   const cached = imageCache.get(cacheKey)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return new NextResponse(cached.buffer, {
+    return new NextResponse(toResponseBody(cached.buffer), {
       status: 200,
       headers: {
         "Content-Type": cached.contentType,
@@ -147,7 +150,7 @@ export async function GET(request: NextRequest) {
       timestamp: Date.now(),
     })
 
-    return new NextResponse(resized.data, {
+    return new NextResponse(toResponseBody(resized.data), {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",

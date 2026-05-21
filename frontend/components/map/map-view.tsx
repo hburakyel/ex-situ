@@ -122,6 +122,7 @@ interface MapViewProps {
   onToggleSite?: (site: string, lat?: number, lng?: number) => void
   onToggleInstitution?: (inst: string) => void
   isLoadingSubArcs?: boolean
+  drillArcs?: { place_name: string; institution_name: string; object_count: number; latitude: number; longitude: number; institution_latitude?: number; institution_longitude?: number }[]
   onCommandPaletteOpen?: () => void
   onWikiDocumentsChange?: (docs: any[]) => void
 }
@@ -171,6 +172,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       onToggleSite,
       onToggleInstitution,
       isLoadingSubArcs = false,
+      drillArcs = [],
       onCommandPaletteOpen,
       onWikiDocumentsChange,
     },
@@ -191,7 +193,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Old UI state
     const [showArcs, setShowArcs] = useState(true)
-    const [showCollections, setShowCollections] = useState(true)
+    const [showCollections, setShowCollections] = useState(false)
     const [hoveredArc, setHoveredArc] = useState<{
       fromName: string; toName: string; count: number
       fromCity?: string; fromCountry?: string
@@ -226,6 +228,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // Ref for onZoomChange to avoid stale closure in map event listener
     const onZoomChangeRef = useRef(onZoomChange)
     useEffect(() => { onZoomChangeRef.current = onZoomChange }, [onZoomChange])
+
+    // Ref for onToggleSite to avoid stale closure in arc click handlers
+    const onToggleSiteRef = useRef(onToggleSite)
+    useEffect(() => { onToggleSiteRef.current = onToggleSite }, [onToggleSite])
 
     const [isRateLimited, setIsRateLimited] = useState(false)
 
@@ -728,6 +734,71 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       })
     }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredArc])
 
+    // ── Drill arc layer: persistent city-cluster arcs ──
+    // Shown at city zoom (< 7) always. At zoom 7+, shown only when arcLayer has
+    // no individual-object data (e.g. institution with no bbox objects) — this
+    // keeps arcs always visible while avoiding duplicate arcs when arcLayer
+    // already covers the same route.
+    const drillArcLayer = useMemo(() => {
+      if (!isMapReady || drillLevel === "global" || drillArcs.length === 0) return null
+      // At zoom 7+, hide when arcLayer already has individual object arcs
+      if (currentZoom >= 7 && processedArcs.arcLayerData.length > 0) return null
+      const validArcs = drillArcs.filter(a =>
+        a.institution_latitude != null && a.institution_longitude != null &&
+        !isNaN(a.institution_latitude!) && !isNaN(a.institution_longitude!)
+      )
+      if (validArcs.length === 0) return null
+      return new ArcLayer({
+        id: "arc-layer-drill",
+        data: validArcs,
+        getSourcePosition: (d: any) => [d.longitude, d.latitude],
+        getTargetPosition: (d: any) => [d.institution_longitude, d.institution_latitude],
+        getSourceColor: (d: any): [number, number, number, number] =>
+          activeSite === d.place_name ? [59, 130, 246, 255] : [239, 95, 0, 200],
+        getTargetColor: (d: any): [number, number, number, number] =>
+          activeSite === d.place_name ? [147, 51, 234, 255] : [239, 95, 0, 200],
+        getWidth: (d: any) =>
+          activeSite === d.place_name ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
+        widthMinPixels: isMobile ? 2.5 : 1.5,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [59, 130, 246],
+        updateTriggers: {
+          getSourceColor: [activeSite],
+          getTargetColor: [activeSite],
+          getWidth: [activeSite],
+        },
+        onHover: (info: any) => {
+          if (info.object) {
+            const d = info.object
+            setHoveredArc({ fromName: d.place_name, toName: d.institution_name, count: d.object_count, x: info.x, y: info.y })
+          } else {
+            setHoveredArc(null)
+          }
+        },
+        onClick: (info: any) => {
+          if (!info.object) return
+          const d = info.object
+          // Use onSelectArc (same path as main arcLayer) so handleSelectArc sets
+          // both activeSite and activeInstitution, filtering the object panel correctly
+          onSelectArcRef.current?.({
+            key: `${d.place_name}-${d.institution_name}`,
+            from: d.place_name,
+            to: d.institution_name,
+            fromLat: d.latitude,
+            fromLng: d.longitude,
+            fromCity: d.place_name,
+            fromCountry: d.country || '',
+            toCity: '',
+            toCountry: '',
+            objectCount: d.object_count,
+          })
+          isProgrammaticMove.current = true
+          animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 900 })
+        },
+      })
+    }, [isMapReady, drillLevel, drillArcs, activeSite, isMobile, currentZoom, processedArcs.arcLayerData.length])
+
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({
       arcCards: processedArcs.arcCards,
@@ -737,10 +808,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const layers = useMemo(() => {
       if (!isMapReady) return []
       const result: any[] = []
+      if (drillArcLayer) result.push(drillArcLayer)
       if (arcLayer) result.push(arcLayer)
       if (wikiLayer) result.push(wikiLayer)
       return result
-    }, [isMapReady, arcLayer, wikiLayer])
+    }, [isMapReady, arcLayer, drillArcLayer, wikiLayer])
 
     // Push layers to MapboxOverlay
     useEffect(() => {
@@ -809,11 +881,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         {/* Arc hover tooltip */}
         {hoveredArc && (
           <div
-            className="absolute bg-white p-2 rounded-[10px] text-sm z-50 pointer-events-none border shadow-lg"
+            className="absolute bg-white p-3 rounded-xl text-sm z-50 pointer-events-none border shadow-lg"
             style={{ left: hoveredArc.x + 10, top: hoveredArc.y + 10, maxWidth: "300px" }}
           >
             <div className="mb-1">
-              <span className="text-muted-foreground mr-2">From:</span>
+              <span className="text-muted-foreground mr-2">from:</span>
               <span className="text-foreground">{hoveredArc.fromName}</span>
               {(hoveredArc.fromCity || hoveredArc.fromCountry) && (
                 (() => {
@@ -825,7 +897,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               )}
             </div>
             <div className="mb-1">
-              <span className="text-muted-foreground mr-2">To:</span>
+              <span className="text-muted-foreground mr-2">to:</span>
               <span className="text-foreground">{hoveredArc.toName}</span>
               {(hoveredArc.toCity || hoveredArc.toCountry) && (
                 (() => {
@@ -837,9 +909,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               )}
             </div>
             <div>
-              <span className="text-muted-foreground mr-2">Count:</span>
+              <span className="text-muted-foreground mr-2">artifact:</span>
               <span className="text-foreground">
-                {hoveredArc.count} artifact{hoveredArc.count !== 1 ? "s" : ""}
+                {hoveredArc.count}
               </span>
             </div>
           </div>
@@ -998,7 +1070,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
-                            <span className="truncate max-w-[70%]">{origin.country}</span>
+                            <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
                             <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
                           </div>
                       ))}
@@ -1009,7 +1081,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             )}
 
             {/* ── Sites Section (country drill-down) ── */}
-            {drillLevel !== "global" && groupedSites.length > 0 && (
+            {drillLevel !== "global" && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
@@ -1031,7 +1103,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                         >
-                          <span className="truncate max-w-[70%]">{site.name}</span>
+                          <span className="truncate max-w-[70%]" title={site.name}>{site.name}</span>
                           <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
                         </div>
                       ))}
@@ -1041,12 +1113,13 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
-            {/* ── Institutions Section — shown at all zoom levels ── */}
-            {drillInstitutions.length > 0 && (
+            {/* ── Institutions Section — shown at all drill levels ── */}
+            {(
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
                     Collections
+                    {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowCollections(!showCollections)}
@@ -1062,7 +1135,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleInstitution?.(inst.name)}
                         >
-                          <span className="truncate max-w-[70%]">{inst.name}</span>
+                          <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
                           <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
                         </div>
                       ))}
