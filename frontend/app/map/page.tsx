@@ -71,12 +71,15 @@ function MapContent() {
   const clamp = (val: number, min: number, max: number, fallback: number) =>
     Number.isFinite(val) ? Math.min(Math.max(val, min), max) : fallback
 
+  // Detect mobile at mount time (before any resize events) for initial view defaults
+  const isMobileInit = typeof window !== 'undefined' && window.innerWidth < 768
+
   const [objects, setObjects] = useState<MuseumObject[]>([])
   const [allObjects, setAllObjects] = useState<MuseumObject[]>([])
   const [viewState, setViewState] = useState({
-    longitude: clamp(urlLng ? parseFloat(urlLng) : 0, -180, 180, 0),
-    latitude: clamp(urlLat ? parseFloat(urlLat) : 20, -90, 90, 20),
-    zoom: clamp(urlZoom ? parseFloat(urlZoom) : 2, 0, 22, 2),
+    longitude: clamp(urlLng ? parseFloat(urlLng) : (isMobileInit ? 15 : 0), -180, 180, isMobileInit ? 15 : 0),
+    latitude: clamp(urlLat ? parseFloat(urlLat) : (isMobileInit ? 15 : 20), -90, 90, isMobileInit ? 15 : 20),
+    zoom: clamp(urlZoom ? parseFloat(urlZoom) : (isMobileInit ? 1.2 : 2), 0, 22, isMobileInit ? 1.2 : 2),
     name: "",
   })
   const [error, setError] = useState<string | null>(null)
@@ -99,7 +102,7 @@ function MapContent() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [wikiDocs, setWikiDocs] = useState<any[]>([])
   const [initialGalleryArtifact, setInitialGalleryArtifact] = useState<MuseumObject | null>(null)
-  const initialZoom = clamp(urlZoom ? parseFloat(urlZoom) : 2, 0, 22, 2)
+  const initialZoom = clamp(urlZoom ? parseFloat(urlZoom) : (isMobileInit ? 1.2 : 2), 0, 22, isMobileInit ? 1.2 : 2)
   const [currentZoom, setCurrentZoom] = useState(initialZoom)
   const currentZoomRef = useRef(initialZoom)
 
@@ -186,8 +189,12 @@ function MapContent() {
 
   // ── Grouped origins from arcData (like research page) ──
   const groupedOrigins = useMemo(() => {
+    // When institution is selected at global level (no country), filter places to that institution
+    const source = (activeInstitution && !activeCountry)
+      ? filteredArcData.filter(a => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
+      : filteredArcData
     const countryMap = new Map<string, { arcs: ArcData[]; totalCount: number }>()
-    filteredArcData.forEach((arc) => {
+    source.forEach((arc) => {
       const country = arc.place_name
       const existing = countryMap.get(country)
       if (existing) {
@@ -206,7 +213,7 @@ function MapContent() {
         lng: data.arcs[0].longitude,
       }))
       .sort((a, b) => b.totalCount - a.totalCount)
-  }, [filteredArcData])
+  }, [filteredArcData, activeInstitution, activeCountry])
 
   // ── Country-level arcs for the active country ──
   const countryArcs = useMemo(() => {
@@ -407,15 +414,15 @@ function MapContent() {
     return () => { cancelled = true }
   }, [activeCountry])
 
-  // ── Fetch objects when drill-down filters change (country level) ──
+  // ── Fetch objects when drill-down filters change (country or institution level) ──
   const fetchDrillObjects = useCallback(async (page: number, append = false) => {
-    if (!activeCountry) return
+    if (!activeCountry && !activeInstitution) return
     setArcObjectsLoading(true)
     try {
       // Use explicit drill-down institution, or fall back to faceted filter institution
       const effectiveInstitution = activeInstitution || facetedFilters.institutions[0] || undefined
       const result = await fetchObjectsByCountry(
-        activeCountry, page, 60,
+        activeCountry || null, page, 60,
         activeSite || undefined,
         effectiveInstitution,
       )
@@ -445,6 +452,17 @@ function MapContent() {
       fetchDrillObjects(1)
     }
   }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, fetchDrillObjects, drillLevel])
+
+  // Trigger institution-only fetch at global level (no country selected)
+  useEffect(() => {
+    if (drillLevel === "global" && activeInstitution && !activeCountry) {
+      fetchDrillObjects(1)
+    } else if (drillLevel === "global" && !activeInstitution) {
+      setArcObjects([])
+      setArcObjectsTotal(0)
+      setArcObjectsHasMore(false)
+    }
+  }, [activeInstitution, drillLevel, activeCountry, fetchDrillObjects])
 
   const handleDrillLoadMore = useCallback(() => {
     if (!arcObjectsHasMore || arcObjectsLoading) return
@@ -523,12 +541,22 @@ function MapContent() {
   const handleToggleInstitution = useCallback((inst: string) => {
     const next = activeInstitution === inst ? null : inst
     setActiveInstitution(next)
-    const nextLevel = next ? "objects" : (activeSite ? "objects" : "country")
-    setDrillLevel(nextLevel)
-    drillLevelRef.current = nextLevel
+    setArcObjects([])
+    setArcObjectsPage(1)
     debouncedGeocode.cancel()
     geocodeAbort.current?.abort()
     setGeocodedName("")
+
+    if (!activeCountry) {
+      // Global level: stay at global drill level, institution-only fetch
+      // The useEffect above will trigger fetchDrillObjects when activeInstitution changes
+      return
+    }
+
+    // Country/site level drill-down (existing behaviour)
+    const nextLevel = next ? "objects" : (activeSite ? "objects" : "country")
+    setDrillLevel(nextLevel)
+    drillLevelRef.current = nextLevel
     setLocationName(activeSite || activeCountry || "")
     // Clear site if institution doesn't have it
     if (next && activeSite) {
@@ -539,8 +567,6 @@ function MapContent() {
         setActiveSite(null)
       }
     }
-    setArcObjects([])
-    setArcObjectsPage(1)
   }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode])
 
   const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
@@ -805,12 +831,13 @@ function MapContent() {
   // Container objects — drill-down objects, bbox objects, or global preview (allObjects)
   // When Wikipedia is selected, append wiki docs so they appear in the grid
   const isWikipediaActive = false // Wikipedia feature disabled — see ENABLE_WIKIPEDIA in faceted-filter.tsx
+  // Derived flag: institution selected at global level (no country) needs arcObjects too
+  const isGlobalInstitutionDrill = drillLevel === "global" && !!activeInstitution && !activeCountry
   const containerObjects = useMemo(() => {
-    let base = drillLevel !== "global" ? arcObjects : (objects.length > 0 ? objects : allObjects)
-    // At globe level the items are aggregates with often-missing images;
-    // filter to only show items that actually have an image so the grid
-    // isn't filled with empty cards.
-    if (drillLevel === "global" && objects.length === 0) {
+    const useDrillObjects = drillLevel !== "global" || isGlobalInstitutionDrill
+    let base = useDrillObjects ? arcObjects : (objects.length > 0 ? objects : allObjects)
+    // At globe level with no institution filter, hide items without images
+    if (drillLevel === "global" && !isGlobalInstitutionDrill && objects.length === 0) {
       base = base.filter(o => !!o.attributes?.img_url)
     }
     let combined = isWikipediaActive && wikiObjects.length > 0 ? [...base, ...wikiObjects] : base
@@ -822,7 +849,7 @@ function MapContent() {
       return true
     })
     return combined
-  }, [drillLevel, arcObjects, objects, allObjects, isWikipediaActive, wikiObjects])
+  }, [drillLevel, isGlobalInstitutionDrill, arcObjects, objects, allObjects, isWikipediaActive, wikiObjects])
 
   // Effective location name: derived from drill state, with manual fallback
   // This ensures the object panel header ALWAYS reflects the current drill-down
@@ -836,11 +863,11 @@ function MapContent() {
   // Container total count
   const containerTotalCount = useMemo(() => {
     const wikiCount = isWikipediaActive ? wikiObjects.length : 0
-    if (drillLevel !== "global") return arcObjectsTotal + wikiCount
+    if (drillLevel !== "global" || isGlobalInstitutionDrill) return arcObjectsTotal + wikiCount
     // At global level: real bbox count if available, otherwise aggregate total from initial data
     const base = objects.length > 0 ? totalCount : (allObjects.length > 0 ? totalCount : 0)
     return base + wikiCount
-  }, [drillLevel, arcObjectsTotal, totalCount, objects.length, allObjects.length, isWikipediaActive, wikiObjects.length])
+  }, [drillLevel, isGlobalInstitutionDrill, arcObjectsTotal, totalCount, objects.length, allObjects.length, isWikipediaActive, wikiObjects.length])
 
   const handleMapError = useCallback((error: string) => {
     console.error("Map error:", error)
@@ -912,10 +939,10 @@ function MapContent() {
         {isObjectContainerVisible && (
           <ObjectPanel
             objects={containerObjects}
-            onLoadMore={drillLevel !== "global" ? handleDrillLoadMore : handleLoadMore}
-            hasMore={drillLevel !== "global" ? arcObjectsHasMore : hasMore}
+            onLoadMore={isGlobalInstitutionDrill || drillLevel !== "global" ? handleDrillLoadMore : handleLoadMore}
+            hasMore={isGlobalInstitutionDrill || drillLevel !== "global" ? arcObjectsHasMore : hasMore}
             totalCount={containerTotalCount}
-            isLoading={drillLevel !== "global" ? arcObjectsLoading : isLoading}
+            isLoading={isGlobalInstitutionDrill || drillLevel !== "global" ? arcObjectsLoading : isLoading}
             onObjectClick={handleObjectClick}
             isMobile={isMobile}
             viewMode={viewMode}

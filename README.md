@@ -149,6 +149,19 @@ ex-situ/
 
 ---
 
+## ETL — Adding a Resolver
+
+Each institution is ingested by a self-contained resolver in `etl/`. The pattern is always the same:
+
+1. **Fetch** — paginate the institution's public API
+2. **Map** — extract `title`, `place_name`, `object_date`, `image_url`, `source_url`
+3. **Geocode** — resolve `place_name` → `(latitude, longitude)` via the shared geocoding pipeline
+4. **Insert** — bulk-upsert into `museum_objects`
+
+To add a new institution, copy an existing resolver and adapt the API client and field mapping. Full setup instructions are in [etl/README.md](etl/README.md).
+
+---
+
 ## Self-Hosting
 
 Fully self-hostable. No proprietary cloud dependencies.
@@ -164,7 +177,7 @@ Fully self-hostable. No proprietary cloud dependencies.
 
 Contributions welcome, particularly:
 
-- New institution resolvers (ETL plugins for new collections)
+- New institution resolvers — see [etl/README.md](etl/README.md) for the pattern
 - Geocoding improvements for historical place names
 - Frontend performance optimizations
 - Translations of non-English place name variants

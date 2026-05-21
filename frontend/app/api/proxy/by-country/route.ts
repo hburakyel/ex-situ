@@ -13,8 +13,9 @@ export async function GET(request: NextRequest) {
     : "http://127.0.0.1:1337/api"
 
   const country = searchParams.get("country")
-  if (!country) {
-    return NextResponse.json({ error: "country parameter is required" }, { status: 400 })
+  const institution = searchParams.get("institution")
+  if (!country && !institution) {
+    return NextResponse.json({ error: "country or institution parameter is required" }, { status: 400 })
   }
 
   // Cache key

@@ -113,8 +113,8 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
     try {
       const { country, site, institution, page, pageSize } = ctx.query;
 
-      if (!country) {
-        return ctx.badRequest('country parameter is required');
+      if (!country && !institution) {
+        return ctx.badRequest('country or institution parameter is required');
       }
 
       const pageNum = parseInt(page) || 1;
@@ -122,7 +122,7 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
 
       const data = await strapi
         .service('api::museum-object.museum-object')
-        .getObjectsByCountry(country, {
+        .getObjectsByCountry(country || null, {
           site: site || null,
           institution: institution || null,
           page: pageNum,

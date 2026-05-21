@@ -135,7 +135,7 @@ export default function ObjectPanel({
   const [galleryArtifact, setGalleryArtifact] = useState<MuseumObject | null>(null)
   const [showOrigins, setShowOrigins] = useState(false)
   const [showSites, setShowSites] = useState(false)
-  const [showCollections, setShowCollections] = useState(false)
+  const [showCollections, setShowCollections] = useState(true)
   const [showCopied, setShowCopied] = useState(false)
 
   // ── Mobile bottom-sheet drag-to-resize ──

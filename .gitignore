@@ -35,9 +35,27 @@ frontend/out/
 frontend/.turbo/
 frontend/tsconfig.tsbuildinfo
 
-# Python ETL (not published to GitHub)
-etl/
+# Python ETL — keep only public resolvers; exclude internal tooling
+etl/.venv/
+etl/__pycache__/
+etl/*.pyc
 *.pyc
+etl/geocode_cache.json
+etl/geocode_cache.py
+etl/reverse_geocode_cache.json
+etl/out.jsonl
+etl/*.jsonl
+etl/reports/
+etl/enrich.log
+etl/scrape_log.txt
+etl/enrich_*.py
+etl/fix_*.py
+etl/fix_*.sql
+etl/institution_coords.py
+etl/normalize_city_en.py
+etl/scrape_europeana.py
+etl/pyrightconfig.json
+etl/smb_*.json
 
 # Credentials / keys
 *.pem
@@ -66,11 +84,8 @@ pnpm-debug.log*
 # Large binary tiles
 *.pmtiles
 
-# ETL output / sensitive data
+# ETL scratch / sensitive data
 etl/coordinates.json
-etl/geocode_cache.json
-etl/reverse_geocode_cache.json
-etl/*.jsonl
 temp_geo_data/
 
 # Dev notes

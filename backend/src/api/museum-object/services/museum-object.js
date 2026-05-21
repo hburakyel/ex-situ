@@ -515,10 +515,14 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const lonExpr = hasManual ? 'COALESCE(manual_longitude, longitude)' : 'longitude';
       // Build WHERE clauses with parameterized queries for safety
       // Match country_en OR place_name so that arc-click works at every zoom level.
-      // At country level the arc passes a country name (matches country_en),
-      // at city/object level it passes a place_name (may differ from country_en).
-      let whereClause = `WHERE published_at IS NOT NULL AND (country_en ILIKE :country OR COALESCE(place_name_normalized, place_name) ILIKE :country)`;
-      const bindings = { country: `%${country}%` };
+      // country is optional — when null, only institution filter is used (global institution drill-down).
+      let whereClause = `WHERE published_at IS NOT NULL`;
+      const bindings = {};
+
+      if (country) {
+        whereClause += ` AND (country_en ILIKE :country OR COALESCE(place_name_normalized, place_name) ILIKE :country)`;
+        bindings.country = `%${country}%`;
+      }
 
       if (site) {
         whereClause += ` AND (city_en ILIKE :site OR COALESCE(place_name_normalized, place_name) ILIKE :site)`;

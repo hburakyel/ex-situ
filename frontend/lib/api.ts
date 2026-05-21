@@ -537,21 +537,22 @@ export async function fetchGeospatialData(
 
 // Function to fetch objects filtered by country (and optionally site/institution) via PostGIS
 export async function fetchObjectsByCountry(
-  country: string,
+  country: string | null,
   page = 1,
   pageSize = 60,
   site?: string,
   institution?: string,
 ): Promise<{ objects: MuseumObject[]; pagination: { page: number; pageSize: number; pageCount: number; total: number } }> {
+  if (!country && !institution) throw new Error("fetchObjectsByCountry: country or institution is required")
   const params = new URLSearchParams({
-    country,
     page: page.toString(),
     pageSize: pageSize.toString(),
   })
+  if (country) params.set('country', country)
   if (site) params.append('site', site)
   if (institution) params.append('institution', institution)
 
-  const cacheKey = `by-country:${country}:${site || ''}:${institution || ''}:page:${page}:size:${pageSize}`
+  const cacheKey = `by-country:${country || ''}:${site || ''}:${institution || ''}:page:${page}:size:${pageSize}`
 
   try {
     const isServer = typeof window === "undefined"

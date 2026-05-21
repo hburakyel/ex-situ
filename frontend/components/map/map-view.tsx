@@ -193,7 +193,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Old UI state
     const [showArcs, setShowArcs] = useState(true)
-    const [showCollections, setShowCollections] = useState(false)
+    const [showCollections, setShowCollections] = useState(true)
     const [hoveredArc, setHoveredArc] = useState<{
       fromName: string; toName: string; count: number
       fromCity?: string; fromCountry?: string
