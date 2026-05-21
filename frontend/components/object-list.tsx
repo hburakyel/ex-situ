@@ -337,7 +337,7 @@ export default function ObjectList({
       </div>
 
       {objects.length === 0 && !isLoading && (
-        <div className="text-center py-8 text-sm text-gray-500 bg-white">No objects found in this area.</div>
+        <div className="text-center py-8 text-sm text-gray-500 bg-white">No artifacts found in this area.</div>
       )}
 
       {hasMore && <div ref={ref} className="h-10" />}

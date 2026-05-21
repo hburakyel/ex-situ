@@ -168,7 +168,7 @@ export default function ObjectGrid({
   if (objects.length === 0 && !isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
-        <p className="text-sm text-gray-500 mb-4">No objects found in this area.</p>
+        <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
         <p className="text-xs text-gray-500">Try zooming out or panning to a different location on the map.</p>
       </div>
     )

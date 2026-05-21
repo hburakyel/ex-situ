@@ -453,17 +453,6 @@ function MapContent() {
     }
   }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, fetchDrillObjects, drillLevel])
 
-  // Trigger institution-only fetch at global level (no country selected)
-  useEffect(() => {
-    if (drillLevel === "global" && activeInstitution && !activeCountry) {
-      fetchDrillObjects(1)
-    } else if (drillLevel === "global" && !activeInstitution) {
-      setArcObjects([])
-      setArcObjectsTotal(0)
-      setArcObjectsHasMore(false)
-    }
-  }, [activeInstitution, drillLevel, activeCountry, fetchDrillObjects])
-
   const handleDrillLoadMore = useCallback(() => {
     if (!arcObjectsHasMore || arcObjectsLoading) return
     fetchDrillObjects(arcObjectsPage + 1, true)
@@ -548,8 +537,23 @@ function MapContent() {
     setGeocodedName("")
 
     if (!activeCountry) {
-      // Global level: stay at global drill level, institution-only fetch
-      // The useEffect above will trigger fetchDrillObjects when activeInstitution changes
+      // Global level: fetch institution objects directly with the new value
+      // (direct call avoids useEffect timing race where arcObjectsLoading isn't set yet)
+      if (next) {
+        setArcObjectsLoading(true)
+        fetchObjectsByCountry(null, 1, 60, undefined, next)
+          .then(result => {
+            setArcObjects(result.objects)
+            setArcObjectsTotal(result.pagination?.total || 0)
+            setArcObjectsHasMore((result.pagination?.page || 1) < (result.pagination?.pageCount || 1))
+            setArcObjectsPage(1)
+          })
+          .catch(err => console.error("[GlobalInstitution] fetch failed:", err))
+          .finally(() => setArcObjectsLoading(false))
+      } else {
+        setArcObjectsTotal(0)
+        setArcObjectsHasMore(false)
+      }
       return
     }
 
