@@ -8,10 +8,10 @@ Python pipelines for ingesting, geocoding, and normalising collection data from 
 
 ```
 etl/
-├── scrape_smb_am_api.py       # Staatliche Museen zu Berlin resolver
+├── scrape_smb_am_api.py       # Staatliche Museen zu Berlin — Antikensammlung resolver
 ├── scrape_met_api.py          # Metropolitan Museum of Art resolver
 ├── scrape_vam.py              # Victoria and Albert Museum resolver
-├── postgis_geocoder.py        # Geocoding pipeline (Nominatim → PostGIS)
+├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
 ├── normalize_place_names.py   # Place name normalization + deduplication
 └── requirements.txt           # Python dependencies
 ```
@@ -47,6 +47,12 @@ pip install -r requirements.txt
 
 Each scraper is self-contained and reads DB credentials from the environment.
 
+**Staatliche Museen zu Berlin — Antikensammlung**
+
+```bash
+python scrape_smb_am_api.py
+```
+
 **Metropolitan Museum of Art**
 
 ```bash
@@ -64,12 +70,6 @@ python scrape_vam.py --collection east-asia --dry-run
 
 # Resume from page 5
 python scrape_vam.py --collection south-asia --start-page 5
-```
-
-**Staatliche Museen zu Berlin**
-
-```bash
-python scrape_smb_am_api.py
 ```
 
 Common flags available on all resolvers:
