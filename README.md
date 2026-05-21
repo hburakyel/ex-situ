@@ -185,6 +185,8 @@ Contributions welcome, particularly:
 
 Open an issue before submitting a pull request.
 
+See [COLLECTIONS.md](COLLECTIONS.md) for the full collection roadmap.
+
 ---
 
 ## Attribution
