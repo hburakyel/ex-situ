@@ -44,6 +44,13 @@ function normalizePlaceKey(value?: string | null): string {
   return (value || "").trim().toLocaleLowerCase()
 }
 
+function hasValidCoordinates(lat?: number | null, lng?: number | null): boolean {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
+  return Math.abs(lat as number) <= 90
+    && Math.abs(lng as number) <= 180
+    && !(Math.abs(lat as number) < 1e-6 && Math.abs(lng as number) < 1e-6)
+}
+
 function prefersPlaceLabel(nextLabel: string, currentLabel: string): boolean {
   if (!currentLabel) return true
   const nextHasUppercase = /\p{Lu}/u.test(nextLabel)
@@ -435,7 +442,7 @@ function MapContent() {
     if (country) params.set("place", country)
     if (site) params.set("site", site)
     if (institution) params.set("institution", institution)
-    if (lat !== 20 || lng !== 0 || zoom !== 2) {
+    if (hasValidCoordinates(lat, lng) && (lat !== 20 || lng !== 0 || zoom !== 2)) {
       params.set("lat", lat.toFixed(4))
       params.set("lng", lng.toFixed(4))
       params.set("zoom", zoom.toFixed(1))
@@ -480,8 +487,10 @@ function MapContent() {
         const lat = parseFloat(urlLat)
         const lng = parseFloat(urlLng)
         const zoom = urlZoom ? parseFloat(urlZoom) : 5
-        mapRef.current.flyToLocation(lng, lat, zoom, 1400)
-        setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom }))
+        if (hasValidCoordinates(lat, lng)) {
+          mapRef.current.flyToLocation(lng, lat, zoom, 1400)
+          setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom }))
+        }
       }
       // Set location name from most specific filter
       setLocationName(urlSite || urlCountry!)
@@ -582,10 +591,12 @@ function MapContent() {
     setArcObjects([])
     setLocationName(country)
     // Fly to origin
-    if (lat != null && lng != null && mapRef.current) {
-      mapRef.current.flyToLocation(lng, lat, 5, 1600)
-      setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom: 5 }))
-      debouncedGeocode(lng, lat)
+    if (hasValidCoordinates(lat, lng) && mapRef.current) {
+      const targetLat = lat as number
+      const targetLng = lng as number
+      mapRef.current.flyToLocation(targetLng, targetLat, 5, 1600)
+      setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 5 }))
+      debouncedGeocode(targetLng, targetLat)
     }
   }, [debouncedGeocode])
 
@@ -608,10 +619,12 @@ function MapContent() {
       }
     }
     // Fly to site location
-    if (next && lat != null && lng != null && mapRef.current) {
-      mapRef.current.flyToLocation(lng, lat, 10, 1400)
-      setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom: 10 }))
-      debouncedGeocode(lng, lat)
+    if (next && hasValidCoordinates(lat, lng) && mapRef.current) {
+      const targetLat = lat as number
+      const targetLng = lng as number
+      mapRef.current.flyToLocation(targetLng, targetLat, 10, 1400)
+      setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 10 }))
+      debouncedGeocode(targetLng, targetLat)
     }
     setArcObjects([])
     setArcObjectsPage(1)
@@ -731,7 +744,7 @@ function MapContent() {
       setGeocodedName("")
       setArcObjects([])
       setArcObjectsPage(1)
-      if (mapRef.current) {
+      if (mapRef.current && hasValidCoordinates(lat, lng)) {
         mapRef.current.flyToLocation(lng, lat, 10, 1400)
         setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom: 10 }))
         debouncedGeocode(lng, lat)
@@ -840,6 +853,7 @@ function MapContent() {
       }
 
       if (!mapRef.current) return
+      if (!hasValidCoordinates(latitude, longitude)) return
       const fallbackZoom = Math.min(Math.max(currentZoomRef.current, 5), 6)
       mapRef.current.flyToLocation(longitude, latitude, fallbackZoom, 1200)
       setViewState(prev => ({ ...prev, longitude, latitude, zoom: fallbackZoom }))
@@ -851,14 +865,20 @@ function MapContent() {
       const objectCountry = object.attributes.country_en || object.attributes.country || object.attributes.place_name || null
       const objectSite = object.attributes.place_name_normalized || object.attributes.place_name || null
       const objectInstitution = object.attributes.institution_name || null
+      const objectLat = object.attributes.latitude
+      const objectLng = object.attributes.longitude
+      const fallbackLat = hasValidCoordinates(latitude, longitude) ? latitude : null
+      const fallbackLng = hasValidCoordinates(latitude, longitude) ? longitude : null
+      const targetLat = hasValidCoordinates(objectLat, objectLng) ? objectLat : fallbackLat
+      const targetLng = hasValidCoordinates(objectLat, objectLng) ? objectLng : fallbackLng
 
       if (objectSite && objectInstitution) {
         setSelectedArc({
           key: `${objectSite}-${objectInstitution}`,
           from: objectSite,
           to: objectInstitution,
-          fromLat: object.attributes.latitude || latitude,
-          fromLng: object.attributes.longitude || longitude,
+          fromLat: targetLat ?? viewState.latitude,
+          fromLng: targetLng ?? viewState.longitude,
           toLat: object.attributes.institution_latitude,
           toLng: object.attributes.institution_longitude,
           fromCity: object.attributes.city_en,
@@ -879,6 +899,7 @@ function MapContent() {
     }
 
     if (!mapRef.current) return
+  if (!hasValidCoordinates(latitude, longitude)) return
 
     // ── Step 2: Country level → fly to object detail ──
     mapRef.current.flyToLocation(longitude, latitude, 14, 1200)

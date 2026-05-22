@@ -82,6 +82,18 @@ function normalizePlaceKey(value?: string | null): string {
   return (value || "").trim().toLocaleLowerCase()
 }
 
+function hasValidCoordinates(lat?: number | null, lng?: number | null): boolean {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
+  return Math.abs(lat as number) <= 90
+    && Math.abs(lng as number) <= 180
+    && !(Math.abs(lat as number) < 1e-6 && Math.abs(lng as number) < 1e-6)
+}
+
+function hasValidCoordinatePair(position?: [number, number] | number[]): boolean {
+  if (!position || position.length < 2) return false
+  return hasValidCoordinates(position[1], position[0])
+}
+
 interface MapViewProps {
   initialViewState: ViewState
   onBoundsChange: (bounds: MapBounds) => void
@@ -663,7 +675,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // ArcLayer: görsel ve etkileşim bir arada, mobilde hover/tıklama sırasında geçici olarak genişler
     const arcLayer = useMemo(() => {
       if (!isMapReady || processedArcs.arcLayerData.length === 0) return null
-      const { arcLayerData, dataSource, layerStyle } = processedArcs
+      const { dataSource, layerStyle } = processedArcs
+      const arcLayerData = processedArcs.arcLayerData.filter((arc) =>
+        hasValidCoordinatePair(arc.sourcePosition) && hasValidCoordinatePair(arc.targetPosition)
+      )
+      if (arcLayerData.length === 0) return null
       const { sourceColor, targetColor } = layerStyle
       const layerId = dataSource === 'geospatial-country' || dataSource === 'geospatial-city' ? 'arc-layer-geospatial'
         : dataSource === 'geospatial-objects' ? 'arc-layer-objects' : 'arc-layer-fallback'
@@ -762,8 +778,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       // individual object routes for the current viewport.
       if (currentZoom >= 7 && processedArcs.dataSource === 'geospatial-objects' && processedArcs.arcLayerData.length > 0) return null
       const validArcs = drillArcs.filter(a =>
+        hasValidCoordinates(a.latitude, a.longitude) &&
         a.institution_latitude != null && a.institution_longitude != null &&
-        !isNaN(a.institution_latitude!) && !isNaN(a.institution_longitude!)
+        hasValidCoordinates(a.institution_latitude, a.institution_longitude)
       )
       if (validArcs.length === 0) return null
       return new ArcLayer({
