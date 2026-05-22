@@ -794,13 +794,9 @@ function MapContent() {
     setSelectedArc(arc)
     if (arc) {
       const country = arc.fromCountry || activeCountryRef.current || arc.from
-      // At city zoom (≥4) arc.from is always a city cluster, even if its name
-      // matches the country (e.g. "Morocco" cluster inside Morocco country).
-      // At country zoom (<4) arc.from IS the country — skip as site.
-      const isCityZoom = currentZoomRef.current >= 4
-      const site = isCityZoom
-        ? (arc.from || null)
-        : (arc.from && arc.from !== country ? arc.from : null)
+      const site = arc.from && normalizePlaceKey(arc.from) !== normalizePlaceKey(country)
+        ? arc.from
+        : null
       // arc.to is the institution the arc points to — filter objects to it
       const institution = arc.to || null
       setActiveCountry(country)

@@ -680,7 +680,7 @@ export default function ObjectPanel({
       window.open(obj.attributes.source_link, '_blank', 'noopener,noreferrer')
       return
     }
-    onObjectClick(longitude, latitude)
+    onObjectClick(longitude, latitude, obj)
     setSelectedIndex(index)
     if (galleryObjects.length > 0) {
       setGalleryOpen(true)
