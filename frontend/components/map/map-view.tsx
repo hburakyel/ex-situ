@@ -110,7 +110,7 @@ function HeaderAccordionList({ children }: { children: React.ReactNode }) {
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-8"
+        className="pointer-events-none absolute inset-x-0 top-0 h-5"
         style={HEADER_ACCORDION_TOP_FADE_STYLE}
       />
       <div
