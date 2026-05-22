@@ -135,6 +135,9 @@ export default function ObjectPanel({
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [galleryArtifact, setGalleryArtifact] = useState<MuseumObject | null>(null)
+  // Snapshot of gallery objects taken at click time so the gallery stays open
+  // while the background drill-down empties and refills containerObjects.
+  const gallerySnapshot = useRef<MuseumObject[]>([])
   const [showOrigins, setShowOrigins] = useState(false)
   const [showSites, setShowSites] = useState(false)
   const [showCollections, setShowCollections] = useState(true)
@@ -534,15 +537,18 @@ export default function ObjectPanel({
     return pairs
   }, [objects, linkObjects])
 
-  // Close gallery when objects become empty or selectedIndex goes out of bounds
-  // Skip when showing a deep-linked artifact (galleryArtifact overrides objects[])
+  // Close gallery when objects become empty or selectedIndex goes out of bounds.
+  // While gallery is open we use the snapshot so a background drill-down
+  // (which temporarily empties containerObjects) cannot close the gallery.
+  // Skip when showing a deep-linked artifact (galleryArtifact overrides objects[]).
   useEffect(() => {
     if (galleryArtifact) return
-    if (galleryOpen && galleryObjects.length === 0) {
+    const active = gallerySnapshot.current.length > 0 ? gallerySnapshot.current : galleryObjects
+    if (galleryOpen && active.length === 0) {
       setGalleryOpen(false)
       setSelectedIndex(0)
-    } else if (galleryOpen && selectedIndex >= galleryObjects.length) {
-      setSelectedIndex(Math.max(0, galleryObjects.length - 1))
+    } else if (galleryOpen && selectedIndex >= active.length) {
+      setSelectedIndex(Math.max(0, active.length - 1))
     }
   }, [galleryObjects, galleryOpen, selectedIndex, galleryArtifact])
 
@@ -680,6 +686,10 @@ export default function ObjectPanel({
       window.open(obj.attributes.source_link, '_blank', 'noopener,noreferrer')
       return
     }
+    // Pass obj so the parent zooms to the right location and starts the
+    // drill-down in the background. The snapshot keeps the gallery open
+    // during the transition — when the user closes it the new objects are ready.
+    gallerySnapshot.current = [...galleryObjects]
     onObjectClick(longitude, latitude, obj)
     setSelectedIndex(index)
     if (galleryObjects.length > 0) {
@@ -1040,9 +1050,9 @@ export default function ObjectPanel({
         >
           <ImageGallery
             key={galleryKey}
-            objects={galleryArtifact ? [galleryArtifact] : galleryObjects}
+            objects={galleryArtifact ? [galleryArtifact] : (gallerySnapshot.current.length > 0 ? gallerySnapshot.current : galleryObjects)}
             initialIndex={galleryArtifact ? 0 : selectedIndex}
-            onClose={() => { setGalleryArtifact(null); setGalleryOpen(false) }}
+            onClose={() => { gallerySnapshot.current = []; setGalleryArtifact(null); setGalleryOpen(false) }}
             isFullscreen={containerSize === "expanded"}
             isMobile={isMobile}
           />
