@@ -681,6 +681,9 @@ export default function ObjectPanel({
       return
     }
     onObjectClick(longitude, latitude, obj)
+    if (drillLevel === "global") {
+      return
+    }
     setSelectedIndex(index)
     if (galleryObjects.length > 0) {
       setGalleryOpen(true)

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "rea
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import MapView, { type FacetedFilters } from "@/components/map/map-view"
 import ObjectPanel, { type ContainerSize } from "@/components/map/object-panel"
-import { fetchMuseumObjects, fetchGeospatialData, fetchObjectsByCountry } from "@/lib/api"
+import { fetchMuseumObjects, fetchObjectsByCountry } from "@/lib/api"
 import type { MuseumObject, MapBounds, SelectedArc } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { AlertTriangle } from "lucide-react"
@@ -92,7 +92,6 @@ function MapContent() {
   const isMobileInit = typeof window !== 'undefined' && window.innerWidth < 768
 
   const [objects, setObjects] = useState<MuseumObject[]>([])
-  const [allObjects, setAllObjects] = useState<MuseumObject[]>([])
   const [viewState, setViewState] = useState({
     longitude: clamp(urlLng ? parseFloat(urlLng) : (isMobileInit ? 15 : 0), -180, 180, isMobileInit ? 15 : 0),
     latitude: clamp(urlLat ? parseFloat(urlLat) : (isMobileInit ? 15 : 20), -90, 90, isMobileInit ? 15 : 20),
@@ -110,7 +109,6 @@ function MapContent() {
   const [isRateLimited, setIsRateLimited] = useState(false)
   const mapRef = useRef<any>(null)
   const isMobile = useMediaQuery("(max-width: 768px)")
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [containerSize, setContainerSize] = useState<ContainerSize>("default")
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
@@ -168,7 +166,6 @@ function MapContent() {
   const [arcObjectsHasMore, setArcObjectsHasMore] = useState(false)
   const [arcObjectsTotal, setArcObjectsTotal] = useState(0)
   const [arcObjectsLoading, setArcObjectsLoading] = useState(false)
-  const [institutionImageCounts, setInstitutionImageCounts] = useState<Record<string, number>>({})
 
   const handleZoomChange = useCallback((zoom: number) => {
     currentZoomRef.current = zoom
@@ -205,6 +202,52 @@ function MapContent() {
     return data
   }, [subArcs, facetedFilters.institutions])
 
+  const filteredGlobalAggregateArcs = useMemo(() => {
+    const institutionFilters = new Set(facetedFilters.institutions.map(normalizePlaceKey))
+    const countryFilters = new Set(facetedFilters.countries.map(normalizePlaceKey))
+    const cityFilters = new Set(facetedFilters.cities.map(normalizePlaceKey))
+    const aggregateSource = cityFilters.size > 0 ? cityArcData : arcData
+
+    return aggregateSource.filter((arc) => {
+      const matchesInstitution = institutionFilters.size === 0 || matchesAnyFilter(arc.institution_name, institutionFilters)
+      const matchesCountry = countryFilters.size === 0 || [
+        arc.country,
+        arc.place_name,
+      ].some((value) => matchesAnyFilter(value, countryFilters))
+      const matchesCity = cityFilters.size === 0 || [
+        arc.place_name_normalized,
+        arc.place_name,
+      ].some((value) => matchesAnyFilter(value, cityFilters))
+
+      return matchesInstitution && matchesCountry && matchesCity
+    })
+  }, [arcData, cityArcData, facetedFilters.institutions, facetedFilters.countries, facetedFilters.cities])
+
+  const allObjects = useMemo<MuseumObject[]>(() => {
+    const previewSource = facetedFilters.cities.length > 0 ? cityArcData : arcData
+
+    return previewSource
+      .filter((item) => !!item.sample_img_url)
+      .map((item, idx) => ({
+        id: `preview-${item.cluster_id || idx}`,
+        attributes: {
+          place_name: item.place_name || item.country || '',
+          place_name_normalized: item.place_name_normalized || item.place_name || '',
+          city_en: item.place_name || item.country || '',
+          country_en: item.country || item.place_name || '',
+          latitude: item.latitude ?? 0,
+          longitude: item.longitude ?? 0,
+          institution_name: item.institution_name || '',
+          institution_place: item.institution_place || item.institution_name || '',
+          institution_latitude: item.institution_latitude ?? 0,
+          institution_longitude: item.institution_longitude ?? 0,
+          img_url: item.sample_img_url,
+          title: '',
+          inventory_number: '',
+        } as any,
+      }))
+  }, [arcData, cityArcData, facetedFilters.cities.length])
+
   const filteredGlobalPreviewObjects = useMemo(() => {
     const institutionFilters = new Set(facetedFilters.institutions.map(normalizePlaceKey))
     const countryFilters = new Set(facetedFilters.countries.map(normalizePlaceKey))
@@ -236,8 +279,8 @@ function MapContent() {
   const groupedOrigins = useMemo(() => {
     // When institution is selected at global level (no country), filter places to that institution
     const source = (activeInstitution && !activeCountry)
-      ? filteredArcData.filter(a => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
-      : filteredArcData
+      ? filteredGlobalAggregateArcs.filter(a => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
+      : filteredGlobalAggregateArcs
     const countryMap = new Map<string, { arcs: ArcData[]; totalCount: number; displayName: string; hasImage: boolean }>()
     source.forEach((arc) => {
       const displayName = (arc.place_name_normalized || arc.place_name || "").trim()
@@ -270,7 +313,7 @@ function MapContent() {
         lng: data.arcs[0].longitude,
       }))
       .sort((a, b) => b.totalCount - a.totalCount)
-  }, [filteredArcData, activeInstitution, activeCountry])
+  }, [filteredGlobalAggregateArcs, activeInstitution, activeCountry])
 
   // ── Country-level arcs for the active country ──
   const countryArcs = useMemo(() => {
@@ -343,62 +386,18 @@ function MapContent() {
       return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
     }
     // At global zoom (no active country) aggregate from all arcs
-    let source = activeCountry ? countryArcs : filteredArcData
+    let source = activeCountry ? countryArcs : filteredGlobalAggregateArcs
     if (activeInstitution) {
       source = source.filter((arc) => arc.institution_name.toLowerCase() === activeInstitution.toLowerCase())
     }
     const map = new Map<string, number>()
     source.forEach((arc) => { map.set(arc.institution_name, (map.get(arc.institution_name) || 0) + arc.object_count) })
     return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
-  }, [countryArcs, filteredArcData, filteredSubArcs, activeSite, activeCountry, activeInstitution])
-
-  useEffect(() => {
-    const institutionNames = aggregateInstitutions.map((inst) => inst.name).filter(Boolean)
-
-    if ((!activeCountry && !activeInstitution) || institutionNames.length === 0) {
-      setInstitutionImageCounts({})
-      return
-    }
-
-    let cancelled = false
-
-    Promise.all(
-      institutionNames.map(async (name) => {
-        try {
-          const result = await fetchObjectsByCountry(
-            activeCountry || null,
-            1,
-            1,
-            activeSite || undefined,
-            name,
-            true,
-          )
-          return [name, result.pagination?.total || 0] as const
-        } catch {
-          return [name, 0] as const
-        }
-      })
-    ).then((entries) => {
-      if (cancelled) return
-      setInstitutionImageCounts(Object.fromEntries(entries))
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [activeCountry, activeInstitution, activeSite, aggregateInstitutions])
+  }, [countryArcs, filteredGlobalAggregateArcs, filteredSubArcs, activeSite, activeCountry, activeInstitution])
 
   const institutions = useMemo(() => {
-    return aggregateInstitutions
-      .map((institution) => ({
-        ...institution,
-        count: institutionImageCounts[institution.name]
-          ?? (activeInstitution && institution.name === activeInstitution && arcObjectsTotal > 0
-            ? arcObjectsTotal
-            : institution.count),
-      }))
-      .sort((a, b) => b.count - a.count)
-  }, [aggregateInstitutions, institutionImageCounts, activeInstitution, arcObjectsTotal])
+    return [...aggregateInstitutions].sort((a, b) => b.count - a.count)
+  }, [aggregateInstitutions])
 
   // ── Sites per country from cityArcData ──
   const sitesByCountry = useMemo(() => {
@@ -490,41 +489,6 @@ function MapContent() {
 
     return () => clearTimeout(restoreTimer)
   }, [urlCountry, urlSite, urlInstitution, urlLat, urlLng, urlZoom])
-
-  // Fetch initial geospatial data
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setIsLoading(true)
-        const geoData = await fetchGeospatialData(2) as any
-        const mapped: MuseumObject[] = (geoData.data || []).map((item: any, idx: number) => ({
-          id: String(-(idx + 1)) as any,
-          attributes: {
-            place_name: item.place_name || item.origin_country || '',
-            city_en: item.city_en || item.origin_country || '',
-            country_en: item.country_en || item.origin_country || '',
-            latitude: item.latitude ?? item.origin_lat ?? 0,
-            longitude: item.longitude ?? item.origin_lon ?? 0,
-            institution_name: item.institution_name || '',
-            institution_place: item.institution_name || '',
-            institution_latitude: item.institution_latitude ?? item.inst_lat ?? 0,
-            institution_longitude: item.institution_longitude ?? item.inst_lon ?? 0,
-            img_url: item.img_url || item.sample_img_url || null,
-            title: '', inventory_number: '',
-          } as any,
-        }))
-        setAllObjects(mapped)
-        const total = (geoData.data || []).reduce((s: number, d: any) => s + (d.object_count || d.total_objects || 0), 0)
-        setTotalCount(total)
-        setInitialLoadComplete(true)
-      } catch (err) {
-        console.error("Failed to fetch initial data:", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchInitialData()
-  }, [])
 
   // ── Fetch sub-arcs when country is selected ──
   useEffect(() => {
@@ -911,7 +875,7 @@ function MapContent() {
       if (objectCountry && objectSite) {
         setActiveCountry(objectCountry)
         setActiveSite(objectSite)
-        setActiveInstitution(objectInstitution)
+        setActiveInstitution(null)
         setDrillLevel("objects")
         drillLevelRef.current = "objects"
         setLocationName(objectSite)
@@ -1023,18 +987,24 @@ function MapContent() {
   const effectiveLocationName = activeSite || activeCountry || locationName || ''
 
   // Global-level stats: arc count and unique collection count
-  const globalArcCount = filteredArcData.length
-  const globalCollectionCount = useMemo(() => new Set(filteredArcData.map(a => a.institution_name)).size, [filteredArcData])
+  const globalArcCount = filteredGlobalAggregateArcs.length
+  const globalCollectionCount = useMemo(() => new Set(filteredGlobalAggregateArcs.map(a => a.institution_name)).size, [filteredGlobalAggregateArcs])
+  const globalTotalCount = useMemo(
+    () => filteredGlobalAggregateArcs.reduce((sum, arc) => sum + (arc.object_count || 0), 0),
+    [filteredGlobalAggregateArcs],
+  )
 
-  // Container total count
+  const mapTotalCount = drillLevel === "global" && objects.length === 0 ? globalTotalCount : totalCount
+
+  // Container total count — aggregate data is the single source of truth for all counts
   const containerTotalCount = useMemo(() => {
     const wikiCount = isWikipediaActive ? wikiObjects.length : 0
-    if (drillLevel !== "global" || isGlobalInstitutionDrill) return arcObjectsTotal + wikiCount
-    if (objects.length === 0 && filteredGlobalPreviewObjects) return filteredGlobalPreviewObjects.length + wikiCount
-    // At global level: real bbox count if available, otherwise aggregate total from initial data
-    const base = objects.length > 0 ? totalCount : (allObjects.length > 0 ? totalCount : 0)
-    return base + wikiCount
-  }, [drillLevel, isGlobalInstitutionDrill, arcObjectsTotal, totalCount, objects.length, filteredGlobalPreviewObjects, allObjects.length, isWikipediaActive, wikiObjects.length])
+    if (drillLevel !== "global" || isGlobalInstitutionDrill) {
+      const aggregateTotal = aggregateInstitutions.reduce((sum, i) => sum + i.count, 0)
+      return (aggregateTotal > 0 ? aggregateTotal : arcObjectsTotal) + wikiCount
+    }
+    return mapTotalCount + wikiCount
+  }, [drillLevel, isGlobalInstitutionDrill, aggregateInstitutions, arcObjectsTotal, mapTotalCount, isWikipediaActive, wikiObjects.length])
 
   const handleMapError = useCallback((error: string) => {
     console.error("Map error:", error)
@@ -1065,7 +1035,7 @@ function MapContent() {
           objects={objects}
           allObjects={allObjects}
           onError={handleMapError}
-          totalCount={containerTotalCount}
+          totalCount={mapTotalCount}
           onToggleView={() => setViewMode(prev => prev === "grid" ? "list" : "grid")}
           onExpandView={() => setContainerSize(prev => prev === "default" ? "expanded" : "default")}
           viewMode={viewMode}
