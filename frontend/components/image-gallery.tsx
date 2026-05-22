@@ -9,6 +9,8 @@ import type { MuseumObject } from "../types"
 import BlurhashImage from "@/components/blurhash-image"
 import { Check, Link2 } from "lucide-react"
 
+const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
+
 interface ImageGalleryProps {
   objects: MuseumObject[]
   initialIndex: number
@@ -24,6 +26,7 @@ export default function ImageGallery({
   isFullscreen = false,
   isMobile = false,
 }: ImageGalleryProps) {
+  const galleryObjects = objects.filter((object) => hasImageUrl(object.attributes?.img_url))
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageError, setImageError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -32,12 +35,12 @@ export default function ImageGallery({
 
   // Clamp currentIndex when objects array changes (e.g. filters, navigation)
   useEffect(() => {
-    if (objects && objects.length > 0 && currentIndex >= objects.length) {
-      setCurrentIndex(Math.max(0, objects.length - 1))
+    if (galleryObjects.length > 0 && currentIndex >= galleryObjects.length) {
+      setCurrentIndex(Math.max(0, galleryObjects.length - 1))
     }
-  }, [objects, currentIndex])
+  }, [galleryObjects, currentIndex])
 
-  const currentObject = objects && objects.length > 0 ? objects[currentIndex] : null
+  const currentObject = galleryObjects.length > 0 ? galleryObjects[currentIndex] : null
 
   // Log container width on mount and resize
   useEffect(() => {
@@ -86,21 +89,21 @@ export default function ImageGallery({
   }, [currentIndex, objects?.length, onClose])
 
   const handleNext = useCallback(() => {
-    if (!objects || objects.length === 0) return
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % objects.length)
-  }, [objects])
+    if (galleryObjects.length === 0) return
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % galleryObjects.length)
+  }, [galleryObjects])
 
   const handlePrevious = useCallback(() => {
-    if (!objects || objects.length === 0) return
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + objects.length) % objects.length)
-  }, [objects])
+    if (galleryObjects.length === 0) return
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + galleryObjects.length) % galleryObjects.length)
+  }, [galleryObjects])
 
   const handleImageLoad = () => {
     setIsLoading(false)
   }
 
   // Early return if no valid objects or current object (transient state during re-renders)
-  if (!objects || objects.length === 0 || !currentObject) {
+  if (galleryObjects.length === 0 || !currentObject) {
     return null
   }
 
@@ -172,7 +175,7 @@ export default function ImageGallery({
 
         <div className="flex items-center justify-between px-4 pt-3 pb-2 bg-white">
           <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm" style={{fontSize:14}}>
-            <span className="text-black">{currentIndex + 1} / {objects.length}</span>
+            <span className="text-black">{currentIndex + 1} / {galleryObjects.length}</span>
             {currentObject.attributes.inventory_number && (
               <span className="text-[#666] ml-2">
                 ID: <span className="text-black">{currentObject.attributes.inventory_number}</span>
@@ -180,10 +183,10 @@ export default function ImageGallery({
             )}
           </div>
           <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-8 w-8" disabled={objects.length <= 1}>
+            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-8 w-8" disabled={galleryObjects.length <= 1}>
               <ChevronLeftIcon className="h-5 w-5 text-gray-500" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8" disabled={objects.length <= 1}>
+            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8" disabled={galleryObjects.length <= 1}>
               <ChevronRightIcon className="h-5 w-5 text-gray-500" />
             </Button>
             {(() => {
@@ -284,35 +287,19 @@ export default function ImageGallery({
           )}
 
           {!imageError ? (
-            currentObject.attributes.img_url ? (
-              <div className="gallery-image-bg" style={{ width: "100%", height: "100%" }}>
-                <BlurhashImage
-                src={currentObject.attributes.img_url}
-                alt={currentObject.attributes.title || "Museum object"}
-                className="w-full h-full flex items-center justify-center"
-                imgClassName="max-h-full max-w-full object-contain"
-                imgStyle={{ backgroundColor: "white", margin: "0", padding: "0" }}
-                wrapperStyle={{ backgroundColor: "white" }}
-               onError={() => setImageError(true)}
-               onLoad={handleImageLoad}
-               loading="eager"
-                 />
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  height: "100%",
-                  width: "100%",
-                  backgroundColor: "white",
-                }}
-              >
-                <span style={{ color: "#999", fontSize: "14px" }}>No image available</span>
-              </div>
-            )
+            <div className="gallery-image-bg" style={{ width: "100%", height: "100%" }}>
+              <BlurhashImage
+              src={currentObject.attributes.img_url!}
+              alt={currentObject.attributes.title || "Museum object"}
+              className="w-full h-full flex items-center justify-center"
+              imgClassName="max-h-full max-w-full object-contain"
+              imgStyle={{ backgroundColor: "white", margin: "0", padding: "0" }}
+              wrapperStyle={{ backgroundColor: "white" }}
+             onError={() => setImageError(true)}
+             onLoad={handleImageLoad}
+             loading="eager"
+               />
+            </div>
           ) : (
             <div
               style={{

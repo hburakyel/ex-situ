@@ -17,6 +17,8 @@ import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
 
+const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
+
 export type ContainerSize = "default" | "expanded" | "minimized"
 
 export type FacetedFilters = { institutions: string[]; countries: string[]; cities: string[] }
@@ -137,6 +139,10 @@ export default function ObjectPanel({
   const [showSites, setShowSites] = useState(false)
   const [showCollections, setShowCollections] = useState(true)
   const [showCopied, setShowCopied] = useState(false)
+
+  const galleryObjects = useMemo(() => {
+    return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
+  }, [objects])
 
   // ── Mobile bottom-sheet drag-to-resize ──
   const containerSizeRef = useRef<ContainerSize>(containerSize)
@@ -551,13 +557,13 @@ export default function ObjectPanel({
   // Skip when showing a deep-linked artifact (galleryArtifact overrides objects[])
   useEffect(() => {
     if (galleryArtifact) return
-    if (galleryOpen && (!objects || objects.length === 0)) {
+    if (galleryOpen && galleryObjects.length === 0) {
       setGalleryOpen(false)
       setSelectedIndex(0)
-    } else if (galleryOpen && selectedIndex >= objects.length) {
-      setSelectedIndex(Math.max(0, objects.length - 1))
+    } else if (galleryOpen && selectedIndex >= galleryObjects.length) {
+      setSelectedIndex(Math.max(0, galleryObjects.length - 1))
     }
-  }, [objects, galleryOpen, selectedIndex, galleryArtifact])
+  }, [galleryObjects, galleryOpen, selectedIndex, galleryArtifact])
 
   // Deep-link: auto-open gallery when a specific artifact is passed via prop
   useEffect(() => {
@@ -601,14 +607,14 @@ export default function ObjectPanel({
     }
   }, [galleryOpen, isMobile, setContainerSize])
   useEffect(() => {
-    if (!galleryArtifact || !galleryOpen || objects.length === 0) return
-    const idx = objects.findIndex(o => String(o.id) === String(galleryArtifact.id))
+    if (!galleryArtifact || !galleryOpen || galleryObjects.length === 0) return
+    const idx = galleryObjects.findIndex(o => String(o.id) === String(galleryArtifact.id))
     if (idx !== -1) {
       setSelectedIndex(idx)
       setGalleryArtifact(null)
       setGalleryKey(k => k + 1) // force remount so initialIndex is picked up
     }
-  }, [objects, galleryArtifact, galleryOpen])
+  }, [galleryObjects, galleryArtifact, galleryOpen])
 
   const getContainerStyle = (): React.CSSProperties => {
     if (isMobile) {
@@ -682,7 +688,8 @@ export default function ObjectPanel({
   }
 
   const handleObjectClick = (longitude: number, latitude: number, index: number) => {
-    const obj = objects[index]
+    const obj = galleryObjects[index]
+    if (!obj) return
     // Wikipedia articles: open source link in new tab instead of gallery
     if (obj && String(obj.id).startsWith('wiki-') && obj.attributes?.source_link) {
       window.open(obj.attributes.source_link, '_blank', 'noopener,noreferrer')
@@ -690,7 +697,7 @@ export default function ObjectPanel({
     }
     onObjectClick(longitude, latitude)
     setSelectedIndex(index)
-    if (objects && objects.length > 0) {
+    if (galleryObjects.length > 0) {
       setGalleryOpen(true)
     }
   }
@@ -1070,7 +1077,7 @@ export default function ObjectPanel({
         >
           <ImageGallery
             key={galleryKey}
-            objects={galleryArtifact ? [galleryArtifact] : objects}
+            objects={galleryArtifact ? [galleryArtifact] : galleryObjects}
             initialIndex={galleryArtifact ? 0 : selectedIndex}
             onClose={() => { setGalleryArtifact(null); setGalleryOpen(false) }}
             isFullscreen={containerSize === "expanded"}

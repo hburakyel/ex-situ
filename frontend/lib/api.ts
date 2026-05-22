@@ -542,6 +542,7 @@ export async function fetchObjectsByCountry(
   pageSize = 60,
   site?: string,
   institution?: string,
+  onlyWithImages = true,
 ): Promise<{ objects: MuseumObject[]; pagination: { page: number; pageSize: number; pageCount: number; total: number } }> {
   if (!country && !institution) throw new Error("fetchObjectsByCountry: country or institution is required")
   const params = new URLSearchParams({
@@ -551,8 +552,9 @@ export async function fetchObjectsByCountry(
   if (country) params.set('country', country)
   if (site) params.append('site', site)
   if (institution) params.append('institution', institution)
+  if (onlyWithImages) params.append('onlyWithImages', 'true')
 
-  const cacheKey = `by-country:${country || ''}:${site || ''}:${institution || ''}:page:${page}:size:${pageSize}`
+  const cacheKey = `by-country:${country || ''}:${site || ''}:${institution || ''}:page:${page}:size:${pageSize}:images:${onlyWithImages}`
 
   try {
     const isServer = typeof window === "undefined"

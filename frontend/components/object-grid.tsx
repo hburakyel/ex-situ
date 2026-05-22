@@ -6,6 +6,8 @@ import BlurhashImage from "@/components/blurhash-image"
 import { useInView } from "react-intersection-observer"
 import { Spinner } from "@radix-ui/themes"
 
+const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
+
 interface ObjectGridProps {
   objects: MuseumObject[]
   onLoadMore: () => void
@@ -51,10 +53,14 @@ export default function ObjectGrid({
     setLoadedImages({})
   }, [objectIdsFingerprint])
 
+  const imageObjects = useMemo(() => {
+    return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
+  }, [objects])
+
   // Calculate visible objects based on current range
   const visibleObjects = useMemo(() => {
-    return objects.slice(visibleRange.start, visibleRange.end)
-  }, [objects, visibleRange])
+    return imageObjects.slice(visibleRange.start, visibleRange.end)
+  }, [imageObjects, visibleRange])
 
   // Load more when reaching the end of the list
   useEffect(() => {
@@ -71,15 +77,15 @@ export default function ObjectGrid({
     const scrollPosition = scrollTop + clientHeight
 
     // If we're near the bottom of our current range, load more items into view
-    if (scrollPosition > scrollHeight - 200 && visibleRange.end < objects.length) {
+    if (scrollPosition > scrollHeight - 200 && visibleRange.end < imageObjects.length) {
       setVisibleRange((prev) => ({
         start: prev.start,
-        end: Math.min(prev.end + 40, objects.length),
+        end: Math.min(prev.end + 40, imageObjects.length),
       }))
     }
 
     // If near bottom AND we've shown all loaded objects, fetch next page
-    if (scrollPosition > scrollHeight - 400 && visibleRange.end >= objects.length - 5 && hasMore && !isLoading) {
+    if (scrollPosition > scrollHeight - 400 && visibleRange.end >= imageObjects.length - 5 && hasMore && !isLoading) {
       onLoadMore()
     }
 
@@ -90,7 +96,7 @@ export default function ObjectGrid({
         end: prev.end,
       }))
     }
-  }, [objects.length, visibleRange, hasMore, isLoading, onLoadMore])
+  }, [imageObjects.length, visibleRange, hasMore, isLoading, onLoadMore])
 
   // Attach scroll listener
   useEffect(() => {
@@ -128,22 +134,24 @@ export default function ObjectGrid({
 
   // When new objects are appended, expand visible range to include them
   useEffect(() => {
-    if (objects.length === 0) {
+    if (imageObjects.length === 0) {
       setVisibleRange({ start: 0, end: 50 })
     } else {
       setVisibleRange((prev) => ({
         start: prev.start,
-        end: Math.max(prev.end, Math.min(objects.length, prev.end + 40)),
+        end: Math.max(prev.end, Math.min(imageObjects.length, prev.end + 40)),
       }))
     }
-  }, [objects.length])
+  }, [imageObjects.length])
 
   const handleImageClick = (index: number) => {
-    const object = objects[visibleRange.start + index]
+    const object = visibleObjects[index]
     if (!object) return
+    const imageIndex = imageObjects.findIndex((candidate) => candidate.id === object.id)
+    if (imageIndex === -1) return
     const lng = object.attributes.longitude || 0
     const lat = object.attributes.latitude || 0
-    onObjectClick(lng, lat, visibleRange.start + index)
+    onObjectClick(lng, lat, imageIndex)
   }
 
   const handleImageError = (id: string) => {
@@ -165,10 +173,10 @@ export default function ObjectGrid({
     return null
   }
 
-  if (objects.length === 0 && !isLoading) {
+  if (imageObjects.length === 0 && !isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
-        <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
+        <p className="text-sm text-gray-500 mb-4">No image-bearing artifacts found in this area.</p>
         <p className="text-xs text-gray-500">Try zooming out or panning to a different location on the map.</p>
       </div>
     )
@@ -177,7 +185,7 @@ export default function ObjectGrid({
 return (
   <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
     <div className={`grid ${gridClass} gap-3`}>
-      {visibleObjects.filter(o => !!o.attributes?.img_url).map((object, index) => {
+      {visibleObjects.map((object, index) => {
         if (brokenImages[object.id]) return null
         const isSelected = object.id === selectedImageId
 
@@ -267,9 +275,9 @@ return (
       </div>
     )}
 
-    {!hasMore && objects.length > 0 && (
+    {!hasMore && imageObjects.length > 0 && (
       <div className="text-center py-4 text-[10px] text-gray-300">
-        {objects.length} of {totalCount} artifacts
+        {imageObjects.length} artifact{imageObjects.length !== 1 ? "s" : ""} with images
       </div>
     )}
   </div>

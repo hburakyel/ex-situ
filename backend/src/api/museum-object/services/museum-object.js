@@ -506,7 +506,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
    */
   async getObjectsByCountry(country, options = {}) {
     const db = strapi.db.connection;
-    const { site, institution, page = 1, pageSize = 60 } = options;
+    const { site, institution, page = 1, pageSize = 60, onlyWithImages = false } = options;
     const offset = (page - 1) * pageSize;
 
     try {
@@ -532,6 +532,10 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       if (institution) {
         whereClause += ` AND institution_name ILIKE :institution`;
         bindings.institution = `%${institution}%`;
+      }
+
+      if (onlyWithImages) {
+        whereClause += ` AND NULLIF(BTRIM(COALESCE(img_url, '')), '') IS NOT NULL`;
       }
 
       // Dedup key: use inventory_number when present, else fall back to id so rows

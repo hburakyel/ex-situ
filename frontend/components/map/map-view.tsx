@@ -741,8 +741,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // already covers the same route.
     const drillArcLayer = useMemo(() => {
       if (!isMapReady || drillLevel === "global" || drillArcs.length === 0) return null
-      // At zoom 7+, hide when arcLayer already has individual object arcs
-      if (currentZoom >= 7 && processedArcs.arcLayerData.length > 0) return null
+      // At zoom 7+, only hide when the active arc layer is already rendering
+      // individual object routes for the current viewport.
+      if (currentZoom >= 7 && processedArcs.dataSource === 'geospatial-objects' && processedArcs.arcLayerData.length > 0) return null
       const validArcs = drillArcs.filter(a =>
         a.institution_latitude != null && a.institution_longitude != null &&
         !isNaN(a.institution_latitude!) && !isNaN(a.institution_longitude!)
@@ -797,7 +798,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 900 })
         },
       })
-    }, [isMapReady, drillLevel, drillArcs, activeSite, isMobile, currentZoom, processedArcs.arcLayerData.length])
+    }, [isMapReady, drillLevel, drillArcs, activeSite, isMobile, currentZoom, processedArcs.dataSource, processedArcs.arcLayerData.length])
 
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({
