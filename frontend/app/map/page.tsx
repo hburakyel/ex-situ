@@ -168,6 +168,7 @@ function MapContent() {
   const [arcObjectsHasMore, setArcObjectsHasMore] = useState(false)
   const [arcObjectsTotal, setArcObjectsTotal] = useState(0)
   const [arcObjectsLoading, setArcObjectsLoading] = useState(false)
+  const [institutionImageCounts, setInstitutionImageCounts] = useState<Record<string, number>>({})
 
   const handleZoomChange = useCallback((zoom: number) => {
     currentZoomRef.current = zoom
@@ -327,20 +328,77 @@ function MapContent() {
   }, [filteredSubArcs, activeInstitution])
 
   // ── Institutions for the active country (filtered by site) ──
-  const institutions = useMemo(() => {
+  const aggregateInstitutions = useMemo(() => {
     if (activeSite && filteredSubArcs.length > 0) {
       const map = new Map<string, number>()
-      filteredSubArcs
+      let source = filteredSubArcs
         .filter((a) => a.place_name.toLowerCase() === activeSite.toLowerCase())
+
+      if (activeInstitution) {
+        source = source.filter((a) => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
+      }
+
+      source
         .forEach((a) => { map.set(a.institution_name, (map.get(a.institution_name) || 0) + a.object_count) })
       return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
     }
     // At global zoom (no active country) aggregate from all arcs
-    const source = activeCountry ? countryArcs : filteredArcData
+    let source = activeCountry ? countryArcs : filteredArcData
+    if (activeInstitution) {
+      source = source.filter((arc) => arc.institution_name.toLowerCase() === activeInstitution.toLowerCase())
+    }
     const map = new Map<string, number>()
     source.forEach((arc) => { map.set(arc.institution_name, (map.get(arc.institution_name) || 0) + arc.object_count) })
     return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
-  }, [countryArcs, filteredArcData, filteredSubArcs, activeSite, activeCountry])
+  }, [countryArcs, filteredArcData, filteredSubArcs, activeSite, activeCountry, activeInstitution])
+
+  useEffect(() => {
+    const institutionNames = aggregateInstitutions.map((inst) => inst.name).filter(Boolean)
+
+    if ((!activeCountry && !activeInstitution) || institutionNames.length === 0) {
+      setInstitutionImageCounts({})
+      return
+    }
+
+    let cancelled = false
+
+    Promise.all(
+      institutionNames.map(async (name) => {
+        try {
+          const result = await fetchObjectsByCountry(
+            activeCountry || null,
+            1,
+            1,
+            activeSite || undefined,
+            name,
+            true,
+          )
+          return [name, result.pagination?.total || 0] as const
+        } catch {
+          return [name, 0] as const
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) return
+      setInstitutionImageCounts(Object.fromEntries(entries))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeCountry, activeInstitution, activeSite, aggregateInstitutions])
+
+  const institutions = useMemo(() => {
+    return aggregateInstitutions
+      .map((institution) => ({
+        ...institution,
+        count: institutionImageCounts[institution.name]
+          ?? (activeInstitution && institution.name === activeInstitution && arcObjectsTotal > 0
+            ? arcObjectsTotal
+            : institution.count),
+      }))
+      .sort((a, b) => b.count - a.count)
+  }, [aggregateInstitutions, institutionImageCounts, activeInstitution, arcObjectsTotal])
 
   // ── Sites per country from cityArcData ──
   const sitesByCountry = useMemo(() => {
@@ -490,6 +548,7 @@ function MapContent() {
         activeCountry || null, page, 60,
         activeSite || undefined,
         effectiveInstitution,
+        true,
       )
       if (append) {
         setArcObjects((prev) => {
@@ -609,7 +668,7 @@ function MapContent() {
       // (direct call avoids useEffect timing race where arcObjectsLoading isn't set yet)
       if (next) {
         setArcObjectsLoading(true)
-        fetchObjectsByCountry(null, 1, 60, undefined, next)
+        fetchObjectsByCountry(null, 1, 60, undefined, next, true)
           .then(result => {
             setArcObjects(result.objects)
             setArcObjectsTotal(result.pagination?.total || 0)

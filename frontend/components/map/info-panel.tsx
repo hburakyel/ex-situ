@@ -77,7 +77,7 @@ export default function InfoPanel({
 
   const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length
   const displayName = geocodedName || ''
-  const headerLocation = displayName || locationName || ""
+  const headerLocation = drillLevel === "global" ? "" : (displayName || locationName || "")
 
   return (
     <div className={`${isMobile ? "px-4 pt-0 pb-4" : "p-4 pt-2"} flex flex-col bg-white`}>

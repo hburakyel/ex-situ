@@ -483,25 +483,6 @@ export default function ObjectPanel({
   // Show resolved line when both names exist and differ
   const showResolved = !!(geocodedName && locationName && geocodedName.toLowerCase() !== locationName.toLowerCase())
 
-  // Related objects filler: when < 12 results, fill with related objects from same region
-  const relatedObjects = useMemo(() => {
-    if (objects.length >= 12 || objects.length === 0 || allObjects.length === 0) return []
-    const needed = 12 - objects.length
-    const objectIds = new Set(objects.map(o => o.id))
-    // Determine current region from locationName or first object
-    const region = locationName || objects[0]?.attributes?.country_en || ''
-    // Prefer same country, then any
-    const sameRegion = allObjects.filter(o =>
-      !objectIds.has(o.id) &&
-      o.attributes?.img_url &&
-      (o.attributes?.country_en === region || o.attributes?.place_name === region)
-    )
-    const others = allObjects.filter(o =>
-      !objectIds.has(o.id) && o.attributes?.img_url && !sameRegion.includes(o)
-    )
-    return [...sameRegion, ...others].slice(0, needed)
-  }, [objects, allObjects, locationName])
-
   // Match museum objects to wiki link cards by place/origin overlap
   const wikiLinks = useMemo(() => {
     if (linkObjects.length === 0 || objects.length === 0) return [] as { museum: MuseumObject; linkCard: MuseumObject }[]
@@ -947,28 +928,6 @@ export default function ObjectPanel({
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
           />
-          {relatedObjects.length > 0 && objects.length > 0 && objects.length < 12 && (
-            <div className="px-4 pb-4 bg-white">
-              <div className="flex items-center gap-3 py-2">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-sm text-gray-400 uppercase tracking-wider whitespace-nowrap">Related from region</span>
-                <div className="flex-1 h-px bg-gray-200" />
-              </div>
-              <ObjectGrid
-                objects={relatedObjects}
-                onLoadMore={() => {}}
-                hasMore={false}
-                totalCount={relatedObjects.length}
-                isLoading={false}
-                onObjectClick={(longitude, latitude, index) => {
-                  if (longitude && latitude) onObjectClick(longitude, latitude)
-                }}
-                isFullscreen={containerSize === "expanded"}
-                panelSize={containerSize === "expanded" ? 100 : 40}
-                mobileColumns={3}
-              />
-            </div>
-          )}
           {/* Links section — paired museum image + wiki link cards */}
           {wikiLinks.length > 0 && (
             <div className="px-4 pb-4 bg-white">
