@@ -349,6 +349,15 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           map.current.flyTo({ center: [lng, lat], zoom, essential: true, duration })
         }
       },
+      jumpToLocation: (lng: number, lat: number, zoom: number = 10) => {
+        if (map.current) {
+          isProgrammaticMove.current = true
+          setViewportState({ longitude: lng, latitude: lat, zoom })
+          lastViewRef.current = { lng, lat, zoom }
+          prevViewStateRef.current = { longitude: lng, latitude: lat, zoom } as any
+          map.current.jumpTo({ center: [lng, lat], zoom })
+        }
+      },
     }))
 
     // ── Animate helper ──

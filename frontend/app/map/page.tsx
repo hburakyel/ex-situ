@@ -148,10 +148,45 @@ function MapContent() {
   useEffect(() => {
     const artifactId = artifactIdRef.current
     if (!artifactId) return
+    let cancelled = false
+
     fetch(`/api/proxy/object/${encodeURIComponent(artifactId)}`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.data) setInitialGalleryArtifact(data.data as MuseumObject) })
+      .then((data) => {
+        if (cancelled || !data?.data) return
+
+        const artifact = data.data as MuseumObject
+        const objectCountry = artifact.attributes.country_en || artifact.attributes.country || artifact.attributes.place_name || null
+        const objectSite = artifact.attributes.place_name_normalized || artifact.attributes.place_name || null
+        const originLat = artifact.attributes.latitude
+        const originLng = artifact.attributes.longitude
+        const fallbackLat = artifact.attributes.institution_latitude
+        const fallbackLng = artifact.attributes.institution_longitude
+        const hasOriginCoordinates = hasValidCoordinates(originLat, originLng)
+        const hasFallbackCoordinates = hasValidCoordinates(fallbackLat, fallbackLng)
+        const targetLat = hasOriginCoordinates ? originLat : (hasFallbackCoordinates ? fallbackLat : null)
+        const targetLng = hasOriginCoordinates ? originLng : (hasFallbackCoordinates ? fallbackLng : null)
+
+        setInitialGalleryArtifact(artifact)
+        setIsObjectContainerVisible(true)
+        setSelectedArc(null)
+        setActiveCountry(objectCountry)
+        setActiveSite(objectSite)
+        setActiveInstitution(null)
+        setDrillLevel("objects")
+        drillLevelRef.current = "objects"
+        setLocationName(objectSite || objectCountry || "")
+        setArcObjects([])
+        setArcObjectsPage(1)
+
+        if (targetLat !== null && targetLng !== null) {
+          setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 14 }))
+        }
+      })
       .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, []) // run once on mount — artifactIdRef is stable
 
   // ── Drill-down state (research page pattern) ──
