@@ -516,7 +516,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               this._popup.style.left = `${rect.right + 8}px`
             }
             this._popup.innerHTML = `
-              <div style="font-weight:600;margin-bottom:6px;font-size:14px;color:#000">Ex Situ</div>
               <div style="margin-bottom:10px;color:#555">Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact's origin and current repository, it refuses problematic taxonomies and routes researchers directly to canonical institutional metadata sources.</div>
               <div style="display:flex;flex-direction:column;gap:6px">
                 <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" style="color:#333;text-decoration:none;display:flex;align-items:center;gap:6px">
