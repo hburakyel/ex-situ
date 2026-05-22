@@ -44,6 +44,34 @@ interface InfoPanelProps {
   activeCountry?: string | null
 }
 
+const PANEL_BOTTOM_FADE_STYLE = {
+  background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
+const PANEL_TOP_FADE_STYLE = {
+  background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
+function FadedAccordionList({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-4">
+        {children}
+      </div>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-8"
+        style={PANEL_TOP_FADE_STYLE}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+        style={PANEL_BOTTOM_FADE_STYLE}
+      />
+    </div>
+  )
+}
+
 export default function InfoPanel({
   isMobile,
   containerSize,
@@ -178,7 +206,7 @@ export default function InfoPanel({
                     </Button>
                   </div>
                   {showOrigins && (
-                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <FadedAccordionList>
                         {groupedOrigins.map((origin, index) => (
                           <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
@@ -187,7 +215,7 @@ export default function InfoPanel({
                             <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
                           </div>
                         ))}
-                    </div>
+                    </FadedAccordionList>
                   )}
                 </div>
               )}
@@ -207,7 +235,7 @@ export default function InfoPanel({
                     </Button>
                   </div>
                   {showSites && (
-                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <FadedAccordionList>
                         {groupedSites.map((site, index) => (
                           <div key={index}
                             className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
@@ -217,7 +245,7 @@ export default function InfoPanel({
                             <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
                           </div>
                         ))}
-                    </div>
+                    </FadedAccordionList>
                   )}
                 </div>
               )}
@@ -236,7 +264,7 @@ export default function InfoPanel({
                     </Button>
                   </div>
                   {showCollections && (
-                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <FadedAccordionList>
                         {drillInstitutions.map((inst, index) => (
                           <div key={index}
                             className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
@@ -246,7 +274,7 @@ export default function InfoPanel({
                             <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
                           </div>
                         ))}
-                    </div>
+                    </FadedAccordionList>
                   )}
                 </div>
               )}

@@ -78,6 +78,14 @@ interface InstitutionItem {
   count: number
 }
 
+const HEADER_ACCORDION_FADE_STYLE = {
+  background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
+const HEADER_ACCORDION_TOP_FADE_STYLE = {
+  background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
 function normalizePlaceKey(value?: string | null): string {
   return (value || "").trim().toLocaleLowerCase()
 }
@@ -92,6 +100,26 @@ function hasValidCoordinates(lat?: number | null, lng?: number | null): boolean 
 function hasValidCoordinatePair(position?: [number, number] | number[]): boolean {
   if (!position || position.length < 2) return false
   return hasValidCoordinates(position[1], position[0])
+}
+
+function HeaderAccordionList({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-4">
+        {children}
+      </div>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-8"
+        style={HEADER_ACCORDION_TOP_FADE_STYLE}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+        style={HEADER_ACCORDION_FADE_STYLE}
+      />
+    </div>
+  )
 }
 
 interface MapViewProps {
@@ -1099,7 +1127,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
                 {showArcs && (
                   <div className="mt-1">
-                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <HeaderAccordionList>
                       {groupedOrigins.map((origin, index) => (
                           <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
@@ -1108,7 +1136,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                             <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
                           </div>
                       ))}
-                    </div>
+                    </HeaderAccordionList>
                   </div>
                 )}
               </div>
@@ -1131,7 +1159,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
                 {showArcs && (
                   <div className="mt-1 pl-0">
-                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <HeaderAccordionList>
                       {groupedSites.map((site, index) => (
                         <div key={index}
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
@@ -1141,7 +1169,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
                         </div>
                       ))}
-                    </div>
+                    </HeaderAccordionList>
                   </div>
                 )}
               </div>
@@ -1163,7 +1191,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 </div>
                 {showCollections && (
                   <div className="mt-1 pl-0">
-                    <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+                    <HeaderAccordionList>
                       {drillInstitutions.map((inst, index) => (
                         <div key={index}
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
@@ -1173,7 +1201,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
                         </div>
                       ))}
-                    </div>
+                    </HeaderAccordionList>
                   </div>
                 )}
               </div>

@@ -20,6 +20,14 @@ interface ObjectGridProps {
   mobileColumns?: number
 }
 
+const GRID_BOTTOM_FADE_STYLE = {
+  background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
+const GRID_TOP_FADE_STYLE = {
+  background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
 export default function ObjectGrid({
   objects,
   onLoadMore,
@@ -183,8 +191,9 @@ export default function ObjectGrid({
   }
 
 return (
-  <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
-    <div className={`grid ${gridClass} gap-3`}>
+  <div className="relative h-full bg-white">
+    <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
+      <div className={`grid ${gridClass} gap-3`}>
       {visibleObjects.map((object, index) => {
         if (brokenImages[object.id]) return null
         const isSelected = object.id === selectedImageId
@@ -259,27 +268,38 @@ return (
   </div>
 )
       })}
+      </div>
+
+      {/* Infinite scroll sentinel */}
+      {hasMore && (
+        <div ref={observerRef} className="flex items-center justify-center py-6">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <Spinner size="1" />
+              <span>Loading more artifacts…</span>
+            </div>
+          ) : (
+            <div className="h-8" />
+          )}
+        </div>
+      )}
+
+      {!hasMore && imageObjects.length > 0 && (
+        <div className="text-center py-4 text-[10px] text-gray-300">
+          {imageObjects.length} artifact{imageObjects.length !== 1 ? "s" : ""} with images
+        </div>
+      )}
     </div>
-
-    {/* Infinite scroll sentinel */}
-    {hasMore && (
-      <div ref={observerRef} className="flex items-center justify-center py-6">
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <Spinner size="1" />
-            <span>Loading more artifacts…</span>
-          </div>
-        ) : (
-          <div className="h-8" />
-        )}
-      </div>
-    )}
-
-    {!hasMore && imageObjects.length > 0 && (
-      <div className="text-center py-4 text-[10px] text-gray-300">
-        {imageObjects.length} artifact{imageObjects.length !== 1 ? "s" : ""} with images
-      </div>
-    )}
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 top-0 h-8"
+      style={GRID_TOP_FADE_STYLE}
+    />
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+      style={GRID_BOTTOM_FADE_STYLE}
+    />
   </div>
 )
 }
