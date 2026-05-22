@@ -14,7 +14,7 @@ interface ObjectGridProps {
   hasMore: boolean
   totalCount: number
   isLoading: boolean
-  onObjectClick?: (longitude: number, latitude: number, index: number) => void
+  onObjectClick?: (longitude: number, latitude: number, index: number, object?: MuseumObject) => void
   isFullscreen?: boolean
   panelSize?: number
   mobileColumns?: number
@@ -147,11 +147,11 @@ export default function ObjectGrid({
   const handleImageClick = (index: number) => {
     const object = visibleObjects[index]
     if (!object) return
-    const imageIndex = imageObjects.findIndex((candidate) => candidate.id === object.id)
-    if (imageIndex === -1) return
     const lng = object.attributes.longitude || 0
     const lat = object.attributes.latitude || 0
-    onObjectClick(lng, lat, imageIndex)
+    const imageIndex = imageObjects.findIndex((candidate) => candidate.id === object.id)
+    if (imageIndex === -1) return
+    onObjectClick(lng, lat, imageIndex, object)
   }
 
   const handleImageError = (id: string) => {
@@ -247,14 +247,14 @@ return (
         </span>
       )}
       <BlurhashImage
-            src={object.attributes.img_url!}
-            alt={object.attributes?.title || "Museum object"}
-            className="block"
-            imgClassName="block max-h-44 w-auto bg-white"
-            onLoad={() => handleImageLoad(object.id)}
-            onError={() => handleImageError(object.id)}
-            loading="lazy"
-          />
+        src={object.attributes.img_url!}
+        alt={object.attributes?.title || "Museum object"}
+        className="block"
+        imgClassName="block max-h-44 w-auto bg-white"
+        onLoad={() => handleImageLoad(object.id)}
+        onError={() => handleImageError(object.id)}
+        loading="lazy"
+      />
     </div>
   </div>
 )

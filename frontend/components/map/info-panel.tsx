@@ -77,7 +77,7 @@ export default function InfoPanel({
 
   const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length
   const displayName = geocodedName || ''
-  const showResolved = !!(geocodedName && locationName && geocodedName.toLowerCase() !== locationName.toLowerCase())
+  const headerLocation = displayName || locationName || ""
 
   return (
     <div className={`${isMobile ? "px-4 pt-0 pb-4" : "p-4 pt-2"} flex flex-col bg-white`}>
@@ -149,6 +149,11 @@ export default function InfoPanel({
                 </span>
                 {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
               </div>
+              {headerLocation && (
+                <div className="truncate text-sm text-black leading-normal mt-0.5">
+                  {headerLocation}
+                </div>
+              )}
             </div>
             {actionSlot && (
               <div className="flex-shrink-0">{actionSlot}</div>

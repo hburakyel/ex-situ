@@ -40,6 +40,23 @@ async function fetchSubArcs(country: string): Promise<SubArc[]> {
   } catch { return [] }
 }
 
+function normalizePlaceKey(value?: string | null): string {
+  return (value || "").trim().toLocaleLowerCase()
+}
+
+function prefersPlaceLabel(nextLabel: string, currentLabel: string): boolean {
+  if (!currentLabel) return true
+  const nextHasUppercase = /\p{Lu}/u.test(nextLabel)
+  const currentHasUppercase = /\p{Lu}/u.test(currentLabel)
+  if (nextHasUppercase !== currentHasUppercase) return nextHasUppercase
+  return nextLabel.length < currentLabel.length
+}
+
+function matchesAnyFilter(value: string | null | undefined, filters: Set<string>): boolean {
+  if (filters.size === 0) return true
+  return filters.has(normalizePlaceKey(value))
+}
+
 export default function MapPage() {
   return (
     <Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-white"><div className="text-gray-400">loading map...</div></div>}>
@@ -187,26 +204,65 @@ function MapContent() {
     return data
   }, [subArcs, facetedFilters.institutions])
 
+  const filteredGlobalPreviewObjects = useMemo(() => {
+    const institutionFilters = new Set(facetedFilters.institutions.map(normalizePlaceKey))
+    const countryFilters = new Set(facetedFilters.countries.map(normalizePlaceKey))
+    const cityFilters = new Set(facetedFilters.cities.map(normalizePlaceKey))
+
+    if (institutionFilters.size === 0 && countryFilters.size === 0 && cityFilters.size === 0) {
+      return null
+    }
+
+    return allObjects.filter((object) => {
+      const attrs = object.attributes
+      const matchesInstitution = matchesAnyFilter(attrs.institution_name, institutionFilters)
+      const matchesCountry = countryFilters.size === 0 || [
+        attrs.country_en,
+        attrs.country,
+        attrs.place_name,
+      ].some((value) => matchesAnyFilter(value, countryFilters))
+      const matchesCity = cityFilters.size === 0 || [
+        attrs.place_name_normalized,
+        attrs.place_name,
+        attrs.city_en,
+      ].some((value) => matchesAnyFilter(value, cityFilters))
+
+      return matchesInstitution && matchesCountry && matchesCity
+    })
+  }, [allObjects, facetedFilters.institutions, facetedFilters.countries, facetedFilters.cities])
+
   // ── Grouped origins from arcData (like research page) ──
   const groupedOrigins = useMemo(() => {
     // When institution is selected at global level (no country), filter places to that institution
     const source = (activeInstitution && !activeCountry)
       ? filteredArcData.filter(a => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
       : filteredArcData
-    const countryMap = new Map<string, { arcs: ArcData[]; totalCount: number }>()
+    const countryMap = new Map<string, { arcs: ArcData[]; totalCount: number; displayName: string; hasImage: boolean }>()
     source.forEach((arc) => {
-      const country = arc.place_name
-      const existing = countryMap.get(country)
+      const displayName = (arc.place_name_normalized || arc.place_name || "").trim()
+      const countryKey = normalizePlaceKey(displayName)
+      if (!countryKey) return
+      const existing = countryMap.get(countryKey)
       if (existing) {
         existing.arcs.push(arc)
         existing.totalCount += arc.object_count
+        existing.hasImage = existing.hasImage || !!arc.sample_img_url
+        if (prefersPlaceLabel(displayName, existing.displayName)) {
+          existing.displayName = displayName
+        }
       } else {
-        countryMap.set(country, { arcs: [arc], totalCount: arc.object_count })
+        countryMap.set(countryKey, {
+          arcs: [arc],
+          totalCount: arc.object_count,
+          displayName,
+          hasImage: !!arc.sample_img_url,
+        })
       }
     })
     return Array.from(countryMap.entries())
-      .map(([country, data]) => ({
-        country,
+      .filter(([, data]) => data.hasImage)
+      .map(([, data]) => ({
+        country: data.displayName,
         totalCount: data.totalCount,
         institutions: [...new Set(data.arcs.map((a) => a.institution_name))],
         lat: data.arcs[0].latitude,
@@ -229,29 +285,37 @@ function MapContent() {
       ? filteredSubArcs.filter((a) => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
       : filteredSubArcs
     // Prefer place_name_normalized for display if available
-    const map = new Map<string, { totalCount: number; institutions: Set<string>; lat: number; lng: number; displayName: string; rawNames: Set<string> }>()
+    const map = new Map<string, { totalCount: number; institutions: Set<string>; lat: number; lng: number; displayName: string; rawNames: Set<string>; hasImage: boolean }>()
     source.forEach((arc) => {
-      const displayName = arc.place_name_normalized || arc.place_name
-      const existing = map.get(arc.place_name)
+      const displayName = (arc.place_name_normalized || arc.place_name || "").trim()
+      const placeKey = normalizePlaceKey(displayName)
+      if (!placeKey) return
+      const existing = map.get(placeKey)
       if (existing) {
         existing.totalCount += arc.object_count
         existing.institutions.add(arc.institution_name)
         existing.rawNames.add(arc.place_name)
         existing.rawNames.add(displayName)
+        existing.hasImage = existing.hasImage || !!arc.sample_img_url
+        if (prefersPlaceLabel(displayName, existing.displayName)) {
+          existing.displayName = displayName
+        }
       } else {
-        map.set(arc.place_name, {
+        map.set(placeKey, {
           totalCount: arc.object_count,
           institutions: new Set([arc.institution_name]),
           lat: arc.latitude,
           lng: arc.longitude,
           displayName,
           rawNames: new Set([arc.place_name, displayName]),
+          hasImage: !!arc.sample_img_url,
         })
       }
     })
     return Array.from(map.entries())
-      .map(([name, data]) => ({
-        name,
+      .filter(([, data]) => data.hasImage)
+      .map(([, data]) => ({
+        name: data.displayName,
         totalCount: data.totalCount,
         institutions: Array.from(data.institutions),
         lat: data.lat,
@@ -282,10 +346,11 @@ function MapContent() {
   const sitesByCountry = useMemo(() => {
     const map = new Map<string, Set<string>>()
     cityArcData.forEach((arc: any) => {
-      const c = arc.country
+      const c = normalizePlaceKey(arc.country)
+      const site = (arc.place_name_normalized || arc.place_name || "").trim()
       if (c) {
         if (!map.has(c)) map.set(c, new Set())
-        map.get(c)!.add(arc.place_name)
+        if (site) map.get(c)!.add(site)
       }
     })
     return map
@@ -482,6 +547,7 @@ function MapContent() {
 
   // ── Drill-down handlers ──
   const handleOriginClick = useCallback((country: string, lat?: number, lng?: number) => {
+    setSelectedArc(null)
     setActiveCountry(country)
     setActiveSite(null)
     setActiveInstitution(null)
@@ -501,7 +567,8 @@ function MapContent() {
   }, [debouncedGeocode])
 
   const handleToggleSite = useCallback((site: string, lat?: number, lng?: number) => {
-    const next = activeSite === site ? null : site
+    const next = normalizePlaceKey(activeSite) === normalizePlaceKey(site) ? null : site
+    setSelectedArc(null)
     setActiveSite(next)
     const nextLevel = next ? "objects" : "country"
     setDrillLevel(nextLevel)
@@ -512,7 +579,7 @@ function MapContent() {
     setLocationName(next || activeCountry || "")
     // Clear institution if the site doesn't have it
     if (next && activeInstitution) {
-      const siteData = groupedSites.find(s => s.name === next)
+      const siteData = groupedSites.find(s => normalizePlaceKey(s.name) === normalizePlaceKey(next))
       if (siteData && !siteData.institutions.includes(activeInstitution)) {
         setActiveInstitution(null)
       }
@@ -529,6 +596,7 @@ function MapContent() {
 
   const handleToggleInstitution = useCallback((inst: string) => {
     const next = activeInstitution === inst ? null : inst
+    setSelectedArc(null)
     setActiveInstitution(next)
     setArcObjects([])
     setArcObjectsPage(1)
@@ -575,6 +643,7 @@ function MapContent() {
 
   const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
     if (level === "global") {
+      setSelectedArc(null)
       setActiveCountry(null)
       setActiveSite(null)
       setActiveInstitution(null)
@@ -593,6 +662,7 @@ function MapContent() {
         debouncedGeocode(0, 20)
       }
     } else if (level === "country") {
+      setSelectedArc(null)
       setActiveSite(null)
       setActiveInstitution(null)
       setDrillLevel("country")
@@ -605,7 +675,7 @@ function MapContent() {
       setArcObjectsPage(1)
       // Fly back to country center at zoom 5
       if (activeCountry && mapRef.current) {
-        const origin = groupedOrigins.find(o => o.country === activeCountry)
+        const origin = groupedOrigins.find(o => normalizePlaceKey(o.country) === normalizePlaceKey(activeCountry))
         if (origin) {
           mapRef.current.flyToLocation(origin.lng, origin.lat, 5, 1400)
           setViewState(prev => ({ ...prev, longitude: origin.lng, latitude: origin.lat, zoom: 5 }))
@@ -735,36 +805,67 @@ function MapContent() {
     }
   }, [])
 
-  const handleObjectClick = useCallback((longitude: number, latitude: number) => {
-    if (!mapRef.current) return
+  const handleObjectClick = useCallback((longitude: number, latitude: number, object?: MuseumObject) => {
     const drill = drillLevelRef.current
-    const zoom = currentZoomRef.current
 
-    // ── Step 1: Global → drill into the object's country ──
     if (drill === "global") {
-      // Try to resolve country from allObjects (aggregated data at global level)
-      const match = allObjects.find(
-        o =>
-          Math.abs((o.attributes?.longitude ?? 0) - longitude) < 0.01 &&
-          Math.abs((o.attributes?.latitude ?? 0) - latitude) < 0.01
-      )
-      const country = match?.attributes?.place_name || match?.attributes?.country_en
-      if (country) {
-        handleOriginClick(country, latitude, longitude)
+      const objectCountry = object?.attributes.country_en || object?.attributes.country || object?.attributes.place_name || null
+      if (objectCountry) {
+        const origin = groupedOrigins.find(o => normalizePlaceKey(o.country) === normalizePlaceKey(objectCountry))
+        handleOriginClick(
+          objectCountry,
+          origin?.lat ?? latitude,
+          origin?.lng ?? longitude,
+        )
         return
       }
-      // Fallback: if no country match (e.g. bbox objects at zoom 7+), just fly closer
-      mapRef.current.flyToLocation(longitude, latitude, Math.max(zoom, 8), 1200)
-      setViewState(prev => ({ ...prev, longitude, latitude, zoom: Math.max(zoom, 8) }))
+
+      if (!mapRef.current) return
+      const fallbackZoom = Math.min(Math.max(currentZoomRef.current, 5), 6)
+      mapRef.current.flyToLocation(longitude, latitude, fallbackZoom, 1200)
+      setViewState(prev => ({ ...prev, longitude, latitude, zoom: fallbackZoom }))
       debouncedGeocode(longitude, latitude)
       return
     }
+
+    if (object) {
+      const objectCountry = object.attributes.country_en || object.attributes.country || object.attributes.place_name || null
+      const objectSite = object.attributes.place_name_normalized || object.attributes.place_name || null
+      const objectInstitution = object.attributes.institution_name || null
+
+      if (objectSite && objectInstitution) {
+        setSelectedArc({
+          key: `${objectSite}-${objectInstitution}`,
+          from: objectSite,
+          to: objectInstitution,
+          fromLat: object.attributes.latitude || latitude,
+          fromLng: object.attributes.longitude || longitude,
+          toLat: object.attributes.institution_latitude,
+          toLng: object.attributes.institution_longitude,
+          fromCity: object.attributes.city_en,
+          fromCountry: objectCountry || undefined,
+          toCity: object.attributes.institution_city_en,
+          toCountry: object.attributes.institution_country_en,
+        })
+      }
+
+      if (objectCountry && objectSite) {
+        setActiveCountry(objectCountry)
+        setActiveSite(objectSite)
+        setActiveInstitution(objectInstitution)
+        setDrillLevel("objects")
+        drillLevelRef.current = "objects"
+        setLocationName(objectSite)
+      }
+    }
+
+    if (!mapRef.current) return
 
     // ── Step 2: Country level → fly to object detail ──
     mapRef.current.flyToLocation(longitude, latitude, 14, 1200)
     setViewState(prev => ({ ...prev, longitude, latitude, zoom: 14 }))
     debouncedGeocode(longitude, latitude)
-  }, [allObjects, handleOriginClick, debouncedGeocode])
+  }, [groupedOrigins, handleOriginClick, debouncedGeocode])
 
   const handleStatsItemClick = useCallback((type: "country" | "city" | "institution", name: string, centroid?: { lat: number; lng: number }) => {
     if (centroid && mapRef.current) {
@@ -839,7 +940,9 @@ function MapContent() {
   const isGlobalInstitutionDrill = drillLevel === "global" && !!activeInstitution && !activeCountry
   const containerObjects = useMemo(() => {
     const useDrillObjects = drillLevel !== "global" || isGlobalInstitutionDrill
-    let base = useDrillObjects ? arcObjects : (objects.length > 0 ? objects : allObjects)
+    let base = useDrillObjects
+      ? arcObjects
+      : (objects.length > 0 ? objects : (filteredGlobalPreviewObjects || allObjects))
     // At globe level with no institution filter, hide items without images
     if (drillLevel === "global" && !isGlobalInstitutionDrill && objects.length === 0) {
       base = base.filter(o => !!o.attributes?.img_url)
@@ -853,7 +956,7 @@ function MapContent() {
       return true
     })
     return combined
-  }, [drillLevel, isGlobalInstitutionDrill, arcObjects, objects, allObjects, isWikipediaActive, wikiObjects])
+  }, [drillLevel, isGlobalInstitutionDrill, arcObjects, objects, filteredGlobalPreviewObjects, allObjects, isWikipediaActive, wikiObjects])
 
   // Effective location name: derived from drill state, with manual fallback
   // This ensures the object panel header ALWAYS reflects the current drill-down
@@ -868,10 +971,11 @@ function MapContent() {
   const containerTotalCount = useMemo(() => {
     const wikiCount = isWikipediaActive ? wikiObjects.length : 0
     if (drillLevel !== "global" || isGlobalInstitutionDrill) return arcObjectsTotal + wikiCount
+    if (objects.length === 0 && filteredGlobalPreviewObjects) return filteredGlobalPreviewObjects.length + wikiCount
     // At global level: real bbox count if available, otherwise aggregate total from initial data
     const base = objects.length > 0 ? totalCount : (allObjects.length > 0 ? totalCount : 0)
     return base + wikiCount
-  }, [drillLevel, isGlobalInstitutionDrill, arcObjectsTotal, totalCount, objects.length, allObjects.length, isWikipediaActive, wikiObjects.length])
+  }, [drillLevel, isGlobalInstitutionDrill, arcObjectsTotal, totalCount, objects.length, filteredGlobalPreviewObjects, allObjects.length, isWikipediaActive, wikiObjects.length])
 
   const handleMapError = useCallback((error: string) => {
     console.error("Map error:", error)

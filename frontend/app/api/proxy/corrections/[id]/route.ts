@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const rawUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   if (!rawUrl) {
@@ -10,7 +10,7 @@ export async function PATCH(
   }
 
   // Validate ID is numeric to prevent path traversal
-  const { id } = params
+  const { id } = await params
   if (!id || !/^\d+$/.test(id)) {
     return NextResponse.json({ error: "Invalid object ID" }, { status: 400 })
   }

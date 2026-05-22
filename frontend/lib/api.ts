@@ -542,7 +542,7 @@ export async function fetchObjectsByCountry(
   pageSize = 60,
   site?: string,
   institution?: string,
-  onlyWithImages = true,
+  onlyWithImages = false,
 ): Promise<{ objects: MuseumObject[]; pagination: { page: number; pageSize: number; pageCount: number; total: number } }> {
   if (!country && !institution) throw new Error("fetchObjectsByCountry: country or institution is required")
   const params = new URLSearchParams({

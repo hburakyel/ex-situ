@@ -78,6 +78,10 @@ interface InstitutionItem {
   count: number
 }
 
+function normalizePlaceKey(value?: string | null): string {
+  return (value || "").trim().toLocaleLowerCase()
+}
+
 interface MapViewProps {
   initialViewState: ViewState
   onBoundsChange: (bounds: MapBounds) => void
@@ -666,24 +670,37 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       const isCountryLevel = dataSource === 'geospatial-country'
       const maxCount = arcLayerData.reduce((m, d) => Math.max(m, d.count), 1)
 
+      const isHighlightedArc = (d: ArcDatum) => {
+        const selectedFrom = normalizePlaceKey(selectedArcRef.current?.from)
+        const selectedTo = normalizePlaceKey(selectedArcRef.current?.to)
+        const datumFrom = normalizePlaceKey(d.fromName)
+        const datumTo = normalizePlaceKey(d.toName)
+
+        const matchesSelectedArc = !!selectedArcRef.current && (
+          selectedArcRef.current.key === `${d.fromName}-${d.toName}` ||
+          (selectedFrom.length > 0 && selectedTo.length > 0 && selectedFrom === datumFrom && selectedTo === datumTo)
+        )
+
+        return matchesSelectedArc || (
+          normalizePlaceKey(activeSite).length > 0 && normalizePlaceKey(activeSite) === datumFrom
+        )
+      }
+
       return new ArcLayer<ArcDatum>({
         id: layerId,
         data: arcLayerData,
         getSourcePosition: (d) => d.sourcePosition,
         getTargetPosition: (d) => d.targetPosition,
         getSourceColor: (d): [number, number, number, number] => {
-          const arcKey = `${d.fromName}-${d.toName}`
-          const highlighted = selectedArcRef.current?.key === arcKey || (activeSite && d.fromName === activeSite)
+          const highlighted = isHighlightedArc(d)
           return highlighted ? [59, 130, 246, 255] : [...sourceColor, 255] as [number, number, number, number]
         },
         getTargetColor: (d): [number, number, number, number] => {
-          const arcKey = `${d.fromName}-${d.toName}`
-          const highlighted = selectedArcRef.current?.key === arcKey || (activeSite && d.fromName === activeSite)
+          const highlighted = isHighlightedArc(d)
           return highlighted ? [147, 51, 234, 255] : [...targetColor, 255] as [number, number, number, number]
         },
         getWidth: (d) => {
-          const arcKey = `${d.fromName}-${d.toName}`
-          const highlighted = selectedArcRef.current?.key === arcKey || (activeSite && d.fromName === activeSite)
+          const highlighted = isHighlightedArc(d)
           const isHovered = hoveredArc && hoveredArc.fromName === d.fromName && hoveredArc.toName === d.toName
           const baseWidth = dataSource === 'geospatial-country' || dataSource === 'geospatial-city'
             ? Math.max(0.5, Math.min(3, 0.5 + Math.log(d.count + 1) * 0.45))
@@ -755,11 +772,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         getSourcePosition: (d: any) => [d.longitude, d.latitude],
         getTargetPosition: (d: any) => [d.institution_longitude, d.institution_latitude],
         getSourceColor: (d: any): [number, number, number, number] =>
-          activeSite === d.place_name ? [59, 130, 246, 255] : [239, 95, 0, 200],
+          normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ? [59, 130, 246, 255] : [239, 95, 0, 200],
         getTargetColor: (d: any): [number, number, number, number] =>
-          activeSite === d.place_name ? [147, 51, 234, 255] : [239, 95, 0, 200],
+          normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ? [147, 51, 234, 255] : [239, 95, 0, 200],
         getWidth: (d: any) =>
-          activeSite === d.place_name ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
+          normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
         widthMinPixels: isMobile ? 2.5 : 1.5,
         pickable: true,
         autoHighlight: true,

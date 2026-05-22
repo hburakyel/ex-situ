@@ -59,7 +59,7 @@ interface ObjectPanelProps {
   hasMore: boolean
   totalCount: number
   isLoading: boolean
-  onObjectClick: (longitude: number, latitude: number) => void
+  onObjectClick: (longitude: number, latitude: number, object?: MuseumObject) => void
   isMobile?: boolean
   viewMode: "grid" | "list"
   setViewMode: (mode: "grid" | "list") => void
@@ -687,15 +687,19 @@ export default function ObjectPanel({
     setContainerSize(containerSize === "minimized" ? "default" : "minimized")
   }
 
-  const handleObjectClick = (longitude: number, latitude: number, index: number) => {
-    const obj = galleryObjects[index]
-    if (!obj) return
+  const handleObjectClick = (longitude: number, latitude: number, index: number, object?: MuseumObject) => {
+    const obj = index >= 0 ? galleryObjects[index] : null
+    const selectedObject = obj || object
+    if (!obj) {
+      onObjectClick(longitude, latitude, selectedObject)
+      return
+    }
     // Wikipedia articles: open source link in new tab instead of gallery
     if (obj && String(obj.id).startsWith('wiki-') && obj.attributes?.source_link) {
       window.open(obj.attributes.source_link, '_blank', 'noopener,noreferrer')
       return
     }
-    onObjectClick(longitude, latitude)
+    onObjectClick(longitude, latitude, obj)
     setSelectedIndex(index)
     if (galleryObjects.length > 0) {
       setGalleryOpen(true)
@@ -938,7 +942,7 @@ export default function ObjectPanel({
             hasMore={hasMore}
             totalCount={totalCount}
             isLoading={isLoading}
-            onObjectClick={(longitude, latitude, index) => handleObjectClick(longitude, latitude, index)}
+            onObjectClick={(longitude, latitude, index, object) => handleObjectClick(longitude, latitude, index, object)}
             isFullscreen={containerSize === "expanded"}
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
