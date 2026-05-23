@@ -41,10 +41,12 @@ export default function RootLayout({
 export const metadata = {
   metadataBase: new URL('https://exsitu.app'),
   title: 'Ex Situ',
-  description: 'An open-source geospatial infrastructure that transforms institutional hyperlinks into a unified spatial index of cultural heritage provenance.',
+  description: `A spatial index of displaced cultural artifacts — 
+mapped from origin site to holding institution.`,
   openGraph: {
     title: 'Ex Situ',
-    description: 'An open-source geospatial infrastructure that transforms institutional hyperlinks into a unified spatial index of cultural heritage provenance.',
+    description: `A spatial index of displaced cultural artifacts — 
+mapped from origin site to holding institution.`,
     url: 'https://exsitu.app',
     siteName: 'Ex Situ',
     type: 'website',
