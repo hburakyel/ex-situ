@@ -297,7 +297,12 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ),
           city_aggregations AS (
             SELECT
-              COALESCE(NULLIF(city_en, ''), COALESCE(NULLIF(country_en, ''), 'Unknown')) as origin_city,
+              COALESCE(
+                CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
+                          AND octet_length(city_en) = char_length(city_en)
+                     THEN city_en END,
+                COALESCE(NULLIF(country_en, ''), 'Unknown')
+              ) as origin_city,
               country_en,
               AVG(latitude) as origin_lat,
               AVG(longitude) as origin_lon,
@@ -308,7 +313,12 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               MIN(img_url) as sample_img_url
             FROM bbox_filter
             GROUP BY 
-              COALESCE(NULLIF(city_en, ''), COALESCE(NULLIF(country_en, ''), 'Unknown')),
+              COALESCE(
+                CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
+                          AND octet_length(city_en) = char_length(city_en)
+                     THEN city_en END,
+                COALESCE(NULLIF(country_en, ''), 'Unknown')
+              ),
               country_en,
               institution_name
           )

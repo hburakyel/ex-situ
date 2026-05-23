@@ -74,7 +74,12 @@ const MV_COUNTRY_SQL = `
 const MV_CITY_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_city_institution_stats AS
   SELECT
-      COALESCE(NULLIF(city_en::text, ''), COALESCE(NULLIF(country_en::text, ''), 'Unknown')) AS origin_city,
+      COALESCE(
+          CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
+                    AND octet_length(city_en) = char_length(city_en)
+               THEN city_en END,
+          COALESCE(NULLIF(country_en::text, ''), 'Unknown')
+      ) AS origin_city,
       country_en,
       avg(COALESCE(manual_latitude, latitude))   AS origin_lat,
       avg(COALESCE(manual_longitude, longitude)) AS origin_lon,
@@ -98,7 +103,12 @@ const MV_CITY_SQL = `
       AND institution_longitude IS NOT NULL
       AND institution_name IS NOT NULL
   GROUP BY
-      COALESCE(NULLIF(city_en::text, ''), COALESCE(NULLIF(country_en::text, ''), 'Unknown')),
+      COALESCE(
+          CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
+                    AND octet_length(city_en) = char_length(city_en)
+               THEN city_en END,
+          COALESCE(NULLIF(country_en::text, ''), 'Unknown')
+      ),
       country_en,
       institution_name
   WITH DATA;
