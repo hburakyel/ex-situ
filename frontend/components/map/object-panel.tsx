@@ -755,6 +755,7 @@ export default function ObjectPanel({
     const attrs = artifact.attributes as MuseumObject["attributes"] & {
       date?: string | null
       year?: string | number | null
+      object_date?: string | null
       time?: Array<{
         time_name?: string | null
         time_start?: string | null
@@ -772,13 +773,14 @@ export default function ObjectPanel({
       if (timeStart) return timeStart
       if (timeEnd) return timeEnd
     }
-    return String(attrs.date || attrs.year || "?").trim() || "?"
+    return String(attrs.object_date || attrs.date || attrs.year || "?").trim() || "?"
   }
 
   const hasRecordedArtifactDate = (artifact: MuseumObject) => {
     const attrs = artifact.attributes as MuseumObject["attributes"] & {
       date?: string | null
       year?: string | number | null
+      object_date?: string | null
       time?: Array<{
         time_name?: string | null
         time_start?: string | null
@@ -790,6 +792,7 @@ export default function ObjectPanel({
       primaryTime?.time_name,
       primaryTime?.time_start,
       primaryTime?.time_end,
+      attrs.object_date,
       attrs.date,
       attrs.year,
     ]
@@ -857,14 +860,18 @@ export default function ObjectPanel({
     try {
       const all = await fetchAllForExport(hasTerritoryExportScope ? EXPORT_ROW_CAP : undefined)
       const headers = [
-        "id", "title", "inventory_number", "place_name", "time", "city_en", "country_en",
+        "id", "title", "inventory_number", "place_name", "time", "object_date", "acquisition_year",
+        "city_en", "country_en",
         "institution_name", "institution_place", "institution_city_en",
         "longitude", "latitude", "institution_longitude", "institution_latitude",
         "source_url", "image_url",
       ].join(",")
 
       const csvRows = all.map((obj) => {
-        const a = obj.attributes
+        const a = obj.attributes as typeof obj.attributes & {
+          object_date?: string | null
+          acquisition_year?: number | null
+        }
         const esc = (v?: string | null) => `"${(v || "").replace(/"/g, '""')}"`
         return [
           obj.id,
@@ -872,6 +879,8 @@ export default function ObjectPanel({
           esc(a.inventory_number),
           esc(a.place_name),
           esc(getArtifactDate(obj)),
+          esc(a.object_date),
+          a.acquisition_year ?? "",
           esc(a.city_en),
           esc(a.country_en),
           esc(a.institution_name),
@@ -1099,12 +1108,17 @@ export default function ObjectPanel({
     try {
       const all = await fetchAllForExport(hasTerritoryExportScope ? EXPORT_ROW_CAP : undefined)
       const payload = all.map((obj) => {
-        const a = obj.attributes
+        const a = obj.attributes as typeof obj.attributes & {
+          object_date?: string | null
+          acquisition_year?: number | null
+        }
         return {
           id: obj.id,
           title: a.title,
           inventory_number: a.inventory_number,
           place_name: a.place_name,
+          object_date: a.object_date || null,
+          acquisition_year: a.acquisition_year || null,
           city_en: a.city_en,
           country_en: a.country_en,
           institution_name: a.institution_name,

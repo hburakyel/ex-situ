@@ -595,7 +595,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             (SELECT ol.link_display FROM museum_objects_components moc
              JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
              WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
-             ORDER BY moc."order" LIMIT 1) as object_link_display
+             ORDER BY moc."order" LIMIT 1) as object_link_display,
+            object_date,
+            acquisition_year
           FROM museum_objects
           ${whereClause}
           ORDER BY ${dedupKey}, id
@@ -640,6 +642,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             longitude: row.longitude ? parseFloat(row.longitude) : null,
             institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,
             institution_longitude: row.institution_longitude ? parseFloat(row.institution_longitude) : null,
+            object_date: row.object_date || null,
+            acquisition_year: row.acquisition_year || null,
           }
         })),
         meta: {
