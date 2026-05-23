@@ -11,17 +11,23 @@
 --   longitude is preserved unchanged.
 
 -- -----------------------------------------------------------------------
--- Part A: coordinate_precision column
+-- Part A: coordinate_precision column + manual override columns
 -- -----------------------------------------------------------------------
 ALTER TABLE museum_objects ADD COLUMN IF NOT EXISTS coordinate_precision TEXT
   CHECK (coordinate_precision IN ('exact', 'site', 'city', 'region', 'country'));
+
+-- Ensure manual override columns exist (Strapi schema sync may not have run yet
+-- on a fresh DB; declaring them here is safe — Strapi will no-op if they exist).
+ALTER TABLE museum_objects ADD COLUMN IF NOT EXISTS manual_latitude  DOUBLE PRECISION;
+ALTER TABLE museum_objects ADD COLUMN IF NOT EXISTS manual_longitude DOUBLE PRECISION;
 
 -- -----------------------------------------------------------------------
 -- Part B: Benin City coordinate override
 -- -----------------------------------------------------------------------
 -- Target: all records where place_name matches known Benin Kingdom origin terms.
--- manual_latitude / manual_longitude were added by the initial schema; this sets
--- the correct Benin City centroid (5.6037°N, 7.0568°E).
+-- manual_latitude / manual_longitude are set to the correct Benin City centroid
+-- (5.6037°N, 7.0568°E). COALESCE(manual_latitude, latitude) in the query layer
+-- uses these values while leaving the source latitude/longitude unchanged.
 --
 -- Records matched by this update:
 --   place_name ILIKE '%Court of Benin%'   — objects catalogued as from the royal court

@@ -108,6 +108,17 @@ def main():
             # Extract object links from fetched details
             object_links = object_details.get('object_links', [])
 
+            # acquisition_year: look for an acquisition event (event_type_id == 1
+            # in museum-digital = Herstellung/acquisition); fall back to None.
+            acquisition_year = None
+            for evt in object_events:
+                evt_type = str(evt.get('event_type_id', ''))
+                t = evt.get('time', {})
+                t_start = t.get('time_start', '')
+                if evt_type == '1' and t_start and str(t_start).isdigit():
+                    acquisition_year = int(str(t_start)[:4])
+                    break
+
             object_data = {
                 'object_id': obj['objekt_id'],
                 'title': obj['objekt_name'],
@@ -115,16 +126,17 @@ def main():
                 'latitude': place_latitude,
                 'longitude': place_longitude,
                 'institution_place': 'Berlin',
-                'date_captured': obj.get('objekt_erfasst_am', 'N/A'),
+                'object_date': time_name if time_name != 'N/A' else None,
+                'acquisition_year': acquisition_year,
                 'source_link': f"https://smb.museum-digital.de/object/{object_id}",
                 'institution_latitude': 52.519,
                 'institution_longitude': 13.398,
                 'institution_name': 'Antikensammlung',
                 'place_name': place_name,
                 'time': {
-                    'time_name': time_name,
-                    'time_start': time_start,
-                    'time_end': time_end
+                    'time_name': time_name if time_name != 'N/A' else None,
+                    'time_start': time_start if time_start != 'N/A' else None,
+                    'time_end': time_end if time_end != 'N/A' else None
                 },
                 'inventory_number': obj.get('objekt_inventarnr', 'N/A'),
                 'object_links': object_links

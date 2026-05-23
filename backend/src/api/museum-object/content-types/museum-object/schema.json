@@ -139,6 +139,12 @@
     },
     "inventory_number_normalized": {
       "type": "string"
+    },
+    "object_date": {
+      "type": "string"
+    },
+    "acquisition_year": {
+      "type": "integer"
     }
   }
 }

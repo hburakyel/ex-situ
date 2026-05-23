@@ -31,6 +31,8 @@ import sys
 import time
 from typing import Optional
 
+import re
+
 import psycopg2
 import psycopg2.extras
 import requests
@@ -159,6 +161,8 @@ INSERT INTO museum_objects (
     city_en,
     source_link,
     img_url,
+    object_date,
+    acquisition_year,
     place_name_normalized,
     published_at,
     created_at,
@@ -177,6 +181,8 @@ INSERT INTO museum_objects (
     %(city_en)s,
     %(source_link)s,
     %(img_url)s,
+    %(object_date)s,
+    %(acquisition_year)s,
     %(place_name_normalized)s,
     NOW(),
     NOW(),
@@ -212,8 +218,9 @@ def fetch_page(
         "page_size": page_size,
         "page": page,
         "fields": (
-            "systemNumber,accessionNumber,_primaryTitle,"
-            "_primaryPlace,_primaryDate,_primaryImageId,objectType"
+            "systemNumber,accessionNumber,_primaryTitle,title,"
+            "_primaryPlace,_primaryDate,dateText,date_text,"
+            "productionDates,_primaryImageId,objectType"
         ),
     }
     resp = session.get(VAM_SEARCH_URL, params=params, timeout=30)
@@ -243,6 +250,51 @@ def _image_url(image_id: str) -> Optional[str]:
     if not image_id:
         return None
     return f"{VAM_IMAGE_BASE}/{image_id}/full/!800,800/0/default.jpg"
+
+
+def _clean_text(value) -> Optional[str]:
+    if isinstance(value, str):
+        value = value.strip()
+        return value or None
+    return None
+
+
+def _extract_title(item: dict) -> Optional[str]:
+    return (
+        _clean_text(item.get("_primaryTitle"))
+        or _clean_text(item.get("title"))
+        or _clean_text(item.get("objectType"))
+    )
+
+
+def _extract_date(item: dict) -> Optional[str]:
+    production_dates = item.get("productionDates")
+    if isinstance(production_dates, list) and production_dates:
+        first_date = production_dates[0]
+        if isinstance(first_date, dict):
+            nested_text = first_date.get("date", {}).get("text")
+            if nested_text:
+                return _clean_text(nested_text)
+
+    return (
+        _clean_text(item.get("_primaryDate"))
+        or _clean_text(item.get("dateText"))
+        or _clean_text(item.get("date_text"))
+    )
+
+
+# Matches the trailing year in V&A accession numbers, e.g.:
+#   "459-1888", "M.1-1955", "Circ.123-1967", "T.5:1 to 3-2001"
+_ACCESSION_YEAR_RE = re.compile(r"-([12]\d{3})(?:[^\d]|$)")
+
+
+def _extract_acquisition_year(inventory_number: Optional[str]) -> Optional[int]:
+    if not inventory_number:
+        return None
+    m = _ACCESSION_YEAR_RE.search(inventory_number)
+    if m:
+        return int(m.group(1))
+    return None
 
 
 def map_record(
@@ -293,8 +345,9 @@ def map_record(
     accession_number = item.get("accessionNumber", "")
     inventory_number = accession_number or system_number
 
-    title      = (item.get("_primaryTitle") or "").strip() or None
-    object_date = (item.get("_primaryDate") or "").strip() or None
+    title = _extract_title(item)
+    object_date = _extract_date(item)
+    acquisition_year = _extract_acquisition_year(inventory_number)
     image_id   = item.get("_primaryImageId", "")
 
     country = geocode_country(place_name) or place_name
@@ -314,6 +367,8 @@ def map_record(
         "city_en":               city_en,
         "source_link":           f"{VAM_OBJECT_BASE}/{system_number}/",
         "img_url":               _image_url(image_id),
+        "object_date":           object_date,
+        "acquisition_year":      acquisition_year,
         "place_name_normalized": place_name,
     }
 

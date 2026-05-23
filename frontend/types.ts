@@ -12,6 +12,12 @@ export interface OriginalPlaceVariant {
   source?: string
 }
 
+export interface TimeInfo {
+  time_name?: string
+  time_start?: string
+  time_end?: string
+}
+
 export type GeocodingStatus = 'ok' | 'ambiguous' | 'disputed'
 export type ReviewStatus = 'pending' | 'verified' | 'rejected'
 export type OriginType = 'valid_location' | 'historical_toponym' | 'cultural_area' | 'archaeological_micro_location' | 'invalid'
@@ -41,6 +47,7 @@ export interface MuseumObject {
     institution_country_en?: string
     source_link?: string
     link_text?: string
+    time?: TimeInfo[] | null
     object_links?: ObjectLink[]
     original_place_variants?: OriginalPlaceVariant[]
     geocoded_country?: string

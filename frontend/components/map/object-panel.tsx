@@ -10,7 +10,14 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import ObjectGrid from "@/components/object-grid"
 import BlurhashImage from "@/components/blurhash-image"
 import type { MuseumObject } from "@/types"
@@ -19,6 +26,10 @@ import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
+const EXPORT_ROW_CAP = 5000
+const EXPORT_TOOLTIP = "Select a place or artifact to export."
+const exportCountFormatter = new Intl.NumberFormat("en-US")
+const REPORT_ISSUE_URL = "https://github.com/hburakyel/ex-situ/issues/new"
 
 export type ContainerSize = "default" | "expanded" | "minimized"
 
@@ -144,6 +155,16 @@ export default function ObjectPanel({
   const [showCollections, setShowCollections] = useState(true)
   const [showCopied, setShowCopied] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const hasSiteExportScope = Boolean(activeSite)
+  const hasTerritoryExportScope = Boolean(activeCountry) && !activeSite
+  const hasExportScope = hasSiteExportScope || hasTerritoryExportScope
+  const cappedExportCount = hasTerritoryExportScope ? Math.min(totalCount, EXPORT_ROW_CAP) : totalCount
+  const csvExportLabel = hasTerritoryExportScope
+    ? `Download CSV (${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)})`
+    : "Download CSV"
+  const jsonExportLabel = hasTerritoryExportScope
+    ? `Download JSON (${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)})`
+    : "Download JSON"
 
   const galleryObjects = useMemo(() => {
     return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
@@ -710,18 +731,73 @@ export default function ObjectPanel({
     return firstSegment || value.trim() || "Unknown"
   }
 
-  const isUncertainOrigin = (value?: string | null) => {
-    if (!value) return true
-    const normalized = value.trim().toLowerCase()
-    return !normalized || /unknown|uncertain|unidentified|unlocated|various|multiple/.test(normalized)
+  const normalizeComparableValue = (value?: string | number | null) => String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[?.,;:]+$/g, "")
+    .replace(/\s+/g, " ")
+
+  const hasCountryOnlyOrigin = (artifact: MuseumObject) => {
+    const attrs = artifact.attributes
+    const normalizedPlace = normalizeComparableValue(attrs.place_name)
+    const normalizedCity = normalizeComparableValue(attrs.city_en)
+    const normalizedCountry = normalizeComparableValue(attrs.country_en || attrs.country)
+
+    if (!normalizedCountry) return false
+
+    const hasSpecificPlace = Boolean(normalizedPlace && normalizedPlace !== normalizedCountry)
+    const hasSpecificCity = Boolean(normalizedCity && normalizedCity !== normalizedCountry)
+
+    return !hasSpecificPlace && !hasSpecificCity
   }
 
   const getArtifactDate = (artifact: MuseumObject) => {
     const attrs = artifact.attributes as MuseumObject["attributes"] & {
       date?: string | null
       year?: string | number | null
+      time?: Array<{
+        time_name?: string | null
+        time_start?: string | null
+        time_end?: string | null
+      }> | null
+    }
+    const primaryTime = attrs.time?.[0]
+    if (primaryTime) {
+      const timeName = primaryTime.time_name?.trim()
+      const timeStart = primaryTime.time_start?.trim()
+      const timeEnd = primaryTime.time_end?.trim()
+
+      if (timeName) return timeName
+      if (timeStart && timeEnd) return `${timeStart}-${timeEnd}`
+      if (timeStart) return timeStart
+      if (timeEnd) return timeEnd
     }
     return String(attrs.date || attrs.year || "?").trim() || "?"
+  }
+
+  const hasRecordedArtifactDate = (artifact: MuseumObject) => {
+    const attrs = artifact.attributes as MuseumObject["attributes"] & {
+      date?: string | null
+      year?: string | number | null
+      time?: Array<{
+        time_name?: string | null
+        time_start?: string | null
+        time_end?: string | null
+      }> | null
+    }
+    const primaryTime = attrs.time?.[0]
+    const candidateValues = [
+      primaryTime?.time_name,
+      primaryTime?.time_start,
+      primaryTime?.time_end,
+      attrs.date,
+      attrs.year,
+    ]
+
+    return candidateValues.some((value) => {
+      const normalized = normalizeComparableValue(value)
+      return Boolean(normalized) && !["?", "unknown", "undated", "n.d", "n.d."].includes(normalized)
+    })
   }
 
   const buildExportFilename = (ext: string) => {
@@ -735,9 +811,11 @@ export default function ObjectPanel({
   }
 
   /** Fetch every page of the current arc's objects via the by-country endpoint. */
-  const fetchAllForExport = useCallback(async () => {
+  const fetchAllForExport = useCallback(async (maxRows?: number) => {
     // No filter active — can't paginate all objects; return what's already loaded
-    if (!activeCountry && !activeInstitution) return objects
+    if (!activeCountry && !activeInstitution) {
+      return maxRows ? objects.slice(0, maxRows) : objects
+    }
 
     const PAGE_SIZE = 200
     const allObjects: import("@/types").MuseumObject[] = []
@@ -754,8 +832,8 @@ export default function ObjectPanel({
       allObjects.push(...result.objects)
       pageCount = result.pagination.pageCount
       page++
-    } while (page <= pageCount)
-    return allObjects
+    } while (page <= pageCount && (!maxRows || allObjects.length < maxRows))
+    return maxRows ? allObjects.slice(0, maxRows) : allObjects
   }, [activeCountry, activeSite, activeInstitution, objects])
 
   /** Trigger a browser download from a string payload. */
@@ -777,10 +855,10 @@ export default function ObjectPanel({
     if (isExporting) return
     setIsExporting(true)
     try {
-      const all = await fetchAllForExport()
+      const all = await fetchAllForExport(hasTerritoryExportScope ? EXPORT_ROW_CAP : undefined)
       const headers = [
-        "id", "title", "inventory_number", "place_name", "city_en", "country_en",
-        "institution_name", "institution_place", "institution_city_en", "institution_country_en",
+        "id", "title", "inventory_number", "place_name", "time", "city_en", "country_en",
+        "institution_name", "institution_place", "institution_city_en",
         "longitude", "latitude", "institution_longitude", "institution_latitude",
         "source_url", "image_url",
       ].join(",")
@@ -793,12 +871,12 @@ export default function ObjectPanel({
           esc(a.title),
           esc(a.inventory_number),
           esc(a.place_name),
+          esc(getArtifactDate(obj)),
           esc(a.city_en),
           esc(a.country_en),
           esc(a.institution_name),
           esc(a.institution_place),
           esc(a.institution_city_en),
-          esc(a.institution_country_en),
           a.longitude ?? "",
           a.latitude ?? "",
           a.institution_longitude ?? "",
@@ -864,11 +942,10 @@ export default function ObjectPanel({
           .filter((name): name is string => Boolean(name && name.trim()))
       )]
       const artifactSample = objects.slice(0, 20)
-      const uncertainCount = all.filter((obj) => {
-        const a = obj.attributes
-        return isUncertainOrigin(a.place_name || a.city_en)
-      }).length
-      const uncertainPct = total > 0 ? ((uncertainCount / total) * 100).toFixed(1) : "0.0"
+      const originSiteUncertaintyCount = all.filter((obj) => hasCountryOnlyOrigin(obj)).length
+      const originSiteUncertaintyPct = total > 0 ? ((originSiteUncertaintyCount / total) * 100).toFixed(1) : "0.0"
+      const missingDateCount = all.filter((obj) => !hasRecordedArtifactDate(obj)).length
+      const missingDatePct = total > 0 ? ((missingDateCount / total) * 100).toFixed(1) : "0.0"
 
       // YAML frontmatter
       const frontmatter = [
@@ -955,8 +1032,13 @@ export default function ObjectPanel({
         "collector priorities?",
         "",
         "4. DOCUMENTATION QUALITY",
-        `What percentage have uncertain origin (marked with ?)? ${uncertainPct}%.`,
-        "What does this reveal about institutional documentation?",
+        `Origin site uncertainty: ${originSiteUncertaintyPct}% of artifacts have`,
+        "unspecified origin beyond territory level (labeled only as country name without specific site).",
+        "",
+        `Date uncertainty: ${missingDatePct}% of artifacts have no`,
+        "acquisition or creation date recorded.",
+        "",
+        "Note: these are distinct documentation gaps.",
         "",
         "5. UNESCO 1970 THRESHOLD",
         "Were the majority of these artifacts acquired before or",
@@ -998,6 +1080,10 @@ export default function ObjectPanel({
         "## Research Prompt",
         "",
         researchPrompt,
+        "",
+        "---",
+        "*Provenance reports are generated from Ex Situ spatial index data. Historical claims should be verified against primary institutional sources.*  ",
+        `*[Report a data issue](${REPORT_ISSUE_URL})*`,
       ].filter((l) => l !== null).join("\n")
 
       triggerDownload(md, buildExportFilename("md"), "text/markdown")
@@ -1011,7 +1097,7 @@ export default function ObjectPanel({
     if (isExporting) return
     setIsExporting(true)
     try {
-      const all = await fetchAllForExport()
+      const all = await fetchAllForExport(hasTerritoryExportScope ? EXPORT_ROW_CAP : undefined)
       const payload = all.map((obj) => {
         const a = obj.attributes
         return {
@@ -1024,7 +1110,6 @@ export default function ObjectPanel({
           institution_name: a.institution_name,
           institution_place: a.institution_place,
           institution_city_en: a.institution_city_en,
-          institution_country_en: a.institution_country_en,
           longitude: a.longitude,
           latitude: a.latitude,
           institution_longitude: a.institution_longitude,
@@ -1038,6 +1123,56 @@ export default function ObjectPanel({
       setIsExporting(false)
     }
   }
+
+  const handleReportIssue = () => {
+    if (typeof window === "undefined") return
+    window.open(REPORT_ISSUE_URL, "_blank", "noopener,noreferrer")
+  }
+
+  const renderExportMenuItem = ({
+    label,
+    onClick,
+    disabled,
+    icon,
+  }: {
+    label: string
+    onClick: () => void
+    disabled: boolean
+    icon: React.ReactNode
+  }) => {
+    const item = (
+      <DropdownMenuItem onClick={onClick} disabled={disabled} className="gap-2 cursor-pointer">
+        {icon}
+        {label}
+      </DropdownMenuItem>
+    )
+
+    if (!disabled || hasExportScope || isExporting) return item
+
+    return (
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="block w-full">{item}</span>
+          </TooltipTrigger>
+          <TooltipContent side="left">{EXPORT_TOOLTIP}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  const reportIssueMenuItem = (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        onClick={handleReportIssue}
+        className="gap-2 cursor-pointer text-[12px] text-gray-400 focus:text-gray-500"
+      >
+        <span className="h-4 w-4 text-center leading-4">↗</span>
+        Report a data issue
+      </DropdownMenuItem>
+    </>
+  )
 
   const containerStyle = getContainerStyle()
 
@@ -1138,18 +1273,25 @@ export default function ObjectPanel({
                         {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4 text-gray-500" />}
                         {showCopied ? "Link copied!" : "Share link"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={downloadObjectsAsCSV} disabled={isExporting} className="gap-2 cursor-pointer">
-                        <IconDownloadCsv className="h-4 w-4 text-gray-500" />
-                        Download CSV
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={exportAsMarkdown} disabled={isExporting} className="gap-2 cursor-pointer">
-                        <FileText className="h-4 w-4 text-gray-500" />
-                        Export MD
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={exportAsJSON} disabled={isExporting} className="gap-2 cursor-pointer">
-                        <FileJson className="h-4 w-4 text-gray-500" />
-                        Download JSON
-                      </DropdownMenuItem>
+                      {renderExportMenuItem({
+                        label: csvExportLabel,
+                        onClick: downloadObjectsAsCSV,
+                        disabled: isExporting || !hasExportScope,
+                        icon: <IconDownloadCsv className="h-4 w-4 text-gray-500" />,
+                      })}
+                      {renderExportMenuItem({
+                        label: "Export MD",
+                        onClick: exportAsMarkdown,
+                        disabled: isExporting || !hasExportScope,
+                        icon: <FileText className="h-4 w-4 text-gray-500" />,
+                      })}
+                      {renderExportMenuItem({
+                        label: jsonExportLabel,
+                        onClick: exportAsJSON,
+                        disabled: isExporting || !hasExportScope,
+                        icon: <FileJson className="h-4 w-4 text-gray-500" />,
+                      })}
+                      {reportIssueMenuItem}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : undefined}
@@ -1219,18 +1361,25 @@ export default function ObjectPanel({
                       {showCopied ? <Check className="h-5 w-5 text-green-500" /> : <IconShare className="h-5 w-5" />}
                       {showCopied ? "Link copied!" : "Share link"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={downloadObjectsAsCSV} disabled={isExporting} className="gap-2 cursor-pointer">
-                      <IconDownloadCsv className="h-5 w-5" />
-                      Download CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportAsMarkdown} disabled={isExporting} className="gap-2 cursor-pointer">
-                      <FileText className="h-5 w-5" />
-                      Export MD
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportAsJSON} disabled={isExporting} className="gap-2 cursor-pointer">
-                      <FileJson className="h-5 w-5" />
-                      Download JSON
-                    </DropdownMenuItem>
+                    {renderExportMenuItem({
+                      label: csvExportLabel,
+                      onClick: downloadObjectsAsCSV,
+                      disabled: isExporting || !hasExportScope,
+                      icon: <IconDownloadCsv className="h-5 w-5" />,
+                    })}
+                    {renderExportMenuItem({
+                      label: "Export MD",
+                      onClick: exportAsMarkdown,
+                      disabled: isExporting || !hasExportScope,
+                      icon: <FileText className="h-5 w-5" />,
+                    })}
+                    {renderExportMenuItem({
+                      label: jsonExportLabel,
+                      onClick: exportAsJSON,
+                      disabled: isExporting || !hasExportScope,
+                      icon: <FileJson className="h-5 w-5" />,
+                    })}
+                    {reportIssueMenuItem}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

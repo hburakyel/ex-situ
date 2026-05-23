@@ -572,6 +572,18 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             institution_city_en,
             inventory_number,
             source_link,
+            (SELECT ti.time_name FROM museum_objects_components moc
+             JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
+             WHERE moc.entity_id = museum_objects.id AND moc.field = 'time'
+             ORDER BY moc."order" LIMIT 1) as time_name,
+            (SELECT ti.time_start FROM museum_objects_components moc
+             JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
+             WHERE moc.entity_id = museum_objects.id AND moc.field = 'time'
+             ORDER BY moc."order" LIMIT 1) as time_start,
+            (SELECT ti.time_end FROM museum_objects_components moc
+             JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
+             WHERE moc.entity_id = museum_objects.id AND moc.field = 'time'
+             ORDER BY moc."order" LIMIT 1) as time_end,
             ${latExpr} as latitude,
             ${lonExpr} as longitude,
             institution_latitude,
@@ -618,6 +630,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             institution_city_en: row.institution_city_en || null,
             inventory_number: row.inventory_number,
             source_link: row.object_link_url || row.source_link,
+            time: row.time_name || row.time_start || row.time_end ? [{
+              time_name: row.time_name || null,
+              time_start: row.time_start || null,
+              time_end: row.time_end || null,
+            }] : null,
             object_links: row.object_link_url ? [{ link_text: row.object_link_url, link_display: row.object_link_display }] : null,
             latitude: row.latitude ? parseFloat(row.latitude) : null,
             longitude: row.longitude ? parseFloat(row.longitude) : null,

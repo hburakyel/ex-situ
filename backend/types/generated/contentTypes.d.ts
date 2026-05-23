@@ -407,6 +407,7 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
     draftAndPublish: true;
   };
   attributes: {
+    acquisition_year: Attribute.Integer;
     city_en: Attribute.String;
     city_native: Attribute.String;
     country_en: Attribute.String;
@@ -442,6 +443,7 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
     manual_latitude: Attribute.Float;
     manual_longitude: Attribute.Float;
     normalized_origin: Attribute.String;
+    object_date: Attribute.String;
     object_id: Attribute.BigInteger;
     object_links: Attribute.Component<'object-links.object-link-info', true>;
     origin_type: Attribute.Enumeration<
