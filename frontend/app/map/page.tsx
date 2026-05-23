@@ -1149,6 +1149,7 @@ function MapContent() {
             groupedSites={groupedSites}
             drillInstitutions={institutions}
             activeSite={activeSite}
+            activeCountry={activeCountry}
             activeInstitution={activeInstitution}
             onToggleSite={handleToggleSite}
             onToggleInstitution={handleToggleInstitution}

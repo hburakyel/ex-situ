@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
-import { ChevronDown, ChevronUp, Check, MoreHorizontal } from "lucide-react"
+import { ChevronDown, ChevronUp, Check, MoreHorizontal, FileText, FileJson, Loader2 } from "lucide-react"
 import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconPanelOpen, IconPanelClosed } from "@/components/icons"
+import { fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -142,6 +143,7 @@ export default function ObjectPanel({
   const [showSites, setShowSites] = useState(false)
   const [showCollections, setShowCollections] = useState(true)
   const [showCopied, setShowCopied] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const galleryObjects = useMemo(() => {
     return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
@@ -697,44 +699,270 @@ export default function ObjectPanel({
     }
   }
 
-  // Download CSV
-  const downloadObjectsAsCSV = () => {
-    const headers = [
-      "ID", "Title", "Inventory Number", "From Place", "From City", "From Country",
-      "To Institution", "To Place", "To City", "To Country",
-      "Longitude", "Latitude", "Institution Longitude", "Institution Latitude",
-    ].join(",")
+  // ── Export helpers ────────────────────────────────────────────────
 
-    const csvRows = objects.map((obj) => {
-      const attrs = obj.attributes
-      return [
-        obj.id,
-        `"${(attrs.title || "").replace(/"/g, '""')}"`,
-        `"${(attrs.inventory_number || "").replace(/"/g, '""')}"`,
-        `"${(attrs.place_name || "").replace(/"/g, '""')}"`,
-        `"${(attrs.city_en || "").replace(/"/g, '""')}"`,
-        `"${(attrs.country_en || "").replace(/"/g, '""')}"`,
-        `"${(attrs.institution_name || "").replace(/"/g, '""')}"`,
-        `"${(attrs.institution_place || "").replace(/"/g, '""')}"`,
-        `"${(attrs.institution_city_en || "").replace(/"/g, '""')}"`,
-        `"${(attrs.institution_country_en || "").replace(/"/g, '""')}"`,
-        attrs.longitude || "",
-        attrs.latitude || "",
-        attrs.institution_longitude || "",
-        attrs.institution_latitude || "",
-      ].join(",")
-    })
+  const getMostSpecificPlaceName = (value?: string | null) => {
+    if (!value) return "Unknown"
+    const firstSegment = value
+      .split(",")
+      .map((part) => part.trim())
+      .find(Boolean)
+    return firstSegment || value.trim() || "Unknown"
+  }
 
-    const csvContent = [headers, ...csvRows].join("\n")
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+  const isUncertainOrigin = (value?: string | null) => {
+    if (!value) return true
+    const normalized = value.trim().toLowerCase()
+    return !normalized || /unknown|uncertain|unidentified|unlocated|various|multiple/.test(normalized)
+  }
+
+  const buildExportFilename = (ext: string) => {
+    const date = new Date().toISOString().split("T")[0]
+    const country = (activeCountry || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "all"
+    const site = (activeSite || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+    const parts = ["exsitu", country]
+    if (site) parts.push(site)
+    parts.push(date)
+    return `${parts.join("-")}.${ext}`
+  }
+
+  /** Fetch every page of the current arc's objects via the by-country endpoint. */
+  const fetchAllForExport = useCallback(async () => {
+    // No filter active — can't paginate all objects; return what's already loaded
+    if (!activeCountry && !activeInstitution) return objects
+
+    const PAGE_SIZE = 200
+    const allObjects: import("@/types").MuseumObject[] = []
+    let page = 1
+    let pageCount = 1
+    do {
+      const result = await fetchObjectsByCountry(
+        activeCountry ?? null,
+        page,
+        PAGE_SIZE,
+        activeSite ?? undefined,
+        activeInstitution ?? undefined,
+      )
+      allObjects.push(...result.objects)
+      pageCount = result.pagination.pageCount
+      page++
+    } while (page <= pageCount)
+    return allObjects
+  }, [activeCountry, activeSite, activeInstitution, objects])
+
+  /** Trigger a browser download from a string payload. */
+  const triggerDownload = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
-    link.setAttribute("href", url)
-    link.setAttribute("download", `ex-situ-objects-${new Date().toISOString().split("T")[0]}.csv`)
+    link.href = url
+    link.download = filename
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  // Download CSV — fetches ALL objects for current arc
+  const downloadObjectsAsCSV = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    try {
+      const all = await fetchAllForExport()
+      const headers = [
+        "id", "title", "inventory_number", "place_name", "city_en", "country_en",
+        "institution_name", "institution_place", "institution_city_en", "institution_country_en",
+        "longitude", "latitude", "institution_longitude", "institution_latitude",
+        "source_url", "image_url",
+      ].join(",")
+
+      const csvRows = all.map((obj) => {
+        const a = obj.attributes
+        const esc = (v?: string | null) => `"${(v || "").replace(/"/g, '""')}"`
+        return [
+          obj.id,
+          esc(a.title),
+          esc(a.inventory_number),
+          esc(a.place_name),
+          esc(a.city_en),
+          esc(a.country_en),
+          esc(a.institution_name),
+          esc(a.institution_place),
+          esc(a.institution_city_en),
+          esc(a.institution_country_en),
+          a.longitude ?? "",
+          a.latitude ?? "",
+          a.institution_longitude ?? "",
+          a.institution_latitude ?? "",
+          esc(a.source_link),
+          esc(a.img_url),
+        ].join(",")
+      })
+
+      triggerDownload([headers, ...csvRows].join("\n"), buildExportFilename("csv"), "text/csv")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // Export Markdown provenance report
+  const exportAsMarkdown = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    try {
+      const all = await fetchAllForExport()
+      const exportDate = new Date().toISOString().split("T")[0]
+
+      // Build origin sites table
+      const siteMap = new Map<string, { count: number; lat: number; lng: number; sample?: string; displayName: string }>()
+      for (const obj of all) {
+        const a = obj.attributes
+        const rawPlace = a.place_name || a.city_en || "Unknown"
+        const key = getMostSpecificPlaceName(rawPlace)
+        const existing = siteMap.get(key)
+        if (existing) {
+          existing.count++
+          if (!existing.sample && a.img_url) existing.sample = a.img_url
+        } else {
+          siteMap.set(key, {
+            count: 1,
+            lat: a.latitude ?? 0,
+            lng: a.longitude ?? 0,
+            sample: a.img_url || undefined,
+            displayName: key,
+          })
+        }
+      }
+
+      const sortedSites = [...siteMap.entries()].sort((a, b) => b[1].count - a[1].count)
+      const total = all.length
+      const topSite = sortedSites[0]
+      const topSiteName = topSite?.[1].displayName || "Unknown"
+      const topSitePct = total > 0 && topSite ? ((topSite[1].count / total) * 100).toFixed(1) : "0.0"
+      const top3SiteDistribution = sortedSites
+        .slice(0, 3)
+        .map(([_, data]) => `${data.displayName} (${data.count})`)
+        .join(", ") || "None"
+      const uncertainCount = all.filter((obj) => {
+        const a = obj.attributes
+        return isUncertainOrigin(a.place_name || a.city_en)
+      }).length
+      const uncertainPct = total > 0 ? ((uncertainCount / total) * 100).toFixed(1) : "0.0"
+
+      // YAML frontmatter
+      const frontmatter = [
+        "---",
+        `filters:`,
+        `  country: ${activeCountry || "all"}`,
+        `  site: ${activeSite || "all"}`,
+        `  institution: ${activeInstitution || "all"}`,
+        `export_date: "${exportDate}"`,
+        `total_count: ${total}`,
+        "---",
+      ].join("\n")
+
+      // Origin sites table
+      const tableHeader = "| Place | Lat | Lon | Objects | Sample Image |"
+      const tableSep   = "|-------|-----|-----|---------|--------------|"
+      const tableRows = sortedSites.slice(0, 50).map(([_, d]) =>
+        `| ${d.displayName} | ${d.lat.toFixed(4)} | ${d.lng.toFixed(4)} | ${d.count} | ${d.sample ? `![](${d.sample})` : ""} |`
+      )
+
+      // Spatial distribution (top 10 + %)
+      const distLines = sortedSites.slice(0, 10).map(([_, d]) => {
+        const pct = ((d.count / total) * 100).toFixed(1)
+        return `- **${d.displayName}**: ${d.count} objects (${pct}%)`
+      })
+
+      // Research prompt
+      const researchPrompt = [
+        "```",
+        "Analyze this provenance cluster from Ex Situ spatial index:",
+        "",
+        `Origin territory: ${activeCountry || "Unknown"}`,
+        `Primary site: ${topSiteName}`,
+        `Total objects: ${total}`,
+        `Site distribution: ${top3SiteDistribution}`,
+        "",
+        "Based on documented history, cover in 4 short paragraphs:",
+        "1. Dominant acquisition mechanism for this territory",
+        "   (expedition, colonial law, trade, military) —",
+        "   name specific actors and dates where known",
+        `2. Why is ${topSiteName} dominant at ${topSitePct}%?`,
+        "   What does this spatial concentration reveal?",
+        `3. Documentation quality — what ${uncertainPct}% have uncertain origin?`,
+        `4. UNESCO 1970 threshold — pre or post?`,
+        `   Active restitution claims from ${activeCountry || "this territory"}?`,
+        "",
+        "Plain prose only. No speculation.",
+        "Cite only documented facts.",
+        "```",
+      ].join("\n")
+
+      const md = [
+        frontmatter,
+        "",
+        `# Ex Situ — Provenance Report`,
+        "",
+        `**Export date:** ${exportDate}  `,
+        `**Total objects:** ${total}  `,
+        `**Country filter:** ${activeCountry || "all"}  `,
+        activeSite ? `**Site filter:** ${activeSite}  ` : null,
+        activeInstitution ? `**Institution filter:** ${activeInstitution}  ` : null,
+        "",
+        "## Origin Sites",
+        "",
+        tableHeader,
+        tableSep,
+        ...tableRows,
+        "",
+        "## Spatial Distribution",
+        "",
+        ...distLines,
+        "",
+        "## Research Prompt",
+        "",
+        researchPrompt,
+      ].filter((l) => l !== null).join("\n")
+
+      triggerDownload(md, buildExportFilename("md"), "text/markdown")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // Export JSON
+  const exportAsJSON = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    try {
+      const all = await fetchAllForExport()
+      const payload = all.map((obj) => {
+        const a = obj.attributes
+        return {
+          id: obj.id,
+          title: a.title,
+          inventory_number: a.inventory_number,
+          place_name: a.place_name,
+          city_en: a.city_en,
+          country_en: a.country_en,
+          institution_name: a.institution_name,
+          institution_place: a.institution_place,
+          institution_city_en: a.institution_city_en,
+          institution_country_en: a.institution_country_en,
+          longitude: a.longitude,
+          latitude: a.latitude,
+          institution_longitude: a.institution_longitude,
+          institution_latitude: a.institution_latitude,
+          source_url: a.source_link,
+          image_url: a.img_url,
+        }
+      })
+      triggerDownload(JSON.stringify(payload, null, 2), buildExportFilename("json"), "application/json")
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   const containerStyle = getContainerStyle()
@@ -828,7 +1056,7 @@ export default function ObjectPanel({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8" title="More options">
-                        <MoreHorizontal className="h-5 w-5 text-gray-500" />
+                        {isExporting ? <Loader2 className="h-5 w-5 animate-spin text-gray-400" /> : <MoreHorizontal className="h-5 w-5 text-gray-500" />}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-[160px]">
@@ -836,9 +1064,17 @@ export default function ObjectPanel({
                         {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4 text-gray-500" />}
                         {showCopied ? "Link copied!" : "Share link"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={downloadObjectsAsCSV} className="gap-2 cursor-pointer">
+                      <DropdownMenuItem onClick={downloadObjectsAsCSV} disabled={isExporting} className="gap-2 cursor-pointer">
                         <IconDownloadCsv className="h-4 w-4 text-gray-500" />
                         Download CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportAsMarkdown} disabled={isExporting} className="gap-2 cursor-pointer">
+                        <FileText className="h-4 w-4 text-gray-500" />
+                        Export MD
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportAsJSON} disabled={isExporting} className="gap-2 cursor-pointer">
+                        <FileJson className="h-4 w-4 text-gray-500" />
+                        Download JSON
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -901,7 +1137,7 @@ export default function ObjectPanel({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8" title="More options">
-                      <MoreHorizontal className="h-5 w-5 text-gray-500" />
+                      {isExporting ? <Loader2 className="h-5 w-5 animate-spin text-gray-400" /> : <MoreHorizontal className="h-5 w-5 text-gray-500" />}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-[160px]">
@@ -909,9 +1145,17 @@ export default function ObjectPanel({
                       {showCopied ? <Check className="h-5 w-5 text-green-500" /> : <IconShare className="h-5 w-5" />}
                       {showCopied ? "Link copied!" : "Share link"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={downloadObjectsAsCSV} className="gap-2 cursor-pointer">
+                    <DropdownMenuItem onClick={downloadObjectsAsCSV} disabled={isExporting} className="gap-2 cursor-pointer">
                       <IconDownloadCsv className="h-5 w-5" />
                       Download CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportAsMarkdown} disabled={isExporting} className="gap-2 cursor-pointer">
+                      <FileText className="h-5 w-5" />
+                      Export MD
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportAsJSON} disabled={isExporting} className="gap-2 cursor-pointer">
+                      <FileJson className="h-5 w-5" />
+                      Download JSON
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
