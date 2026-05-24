@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(cachedResponse.data, {
       headers: {
         "Cache-Control": zoomNum < 7
-          ? "public, max-age=1800, stale-while-revalidate=3600"  // 30min fresh + 1h stale
-          : "public, max-age=60, stale-while-revalidate=300",
+          ? "private, max-age=1800"
+          : "private, max-age=60",
         "X-Cache": "HIT",
       },
     })
@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data, {
         headers: {
           "Cache-Control": zoomNum < 7
-            ? "public, max-age=1800, stale-while-revalidate=3600"
-            : "public, max-age=60, stale-while-revalidate=300",
+            ? "private, max-age=1800"
+            : "private, max-age=60",
           "X-Cache": "DEDUP",
         },
       })
@@ -129,8 +129,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, {
       headers: {
         "Cache-Control": zoomNum < 7
-          ? "public, max-age=1800, stale-while-revalidate=3600"
-          : "public, max-age=60, stale-while-revalidate=300",
+          ? "private, max-age=1800"
+          : "private, max-age=60",
         "X-Cache": "MISS",
       },
     })
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
     if (cachedResponse) {
       return NextResponse.json(cachedResponse.data, {
         headers: {
-          "Cache-Control": "public, max-age=30",
+          "Cache-Control": "private, max-age=0",
           "X-Cache": "STALE",
         },
       })

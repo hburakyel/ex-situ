@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const cached = responseCache.get(cacheKey)
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return NextResponse.json(cached.data, {
-      headers: { "Cache-Control": "public, max-age=300", "X-Cache": "HIT" },
+      headers: { "Cache-Control": "private, max-age=0", "X-Cache": "HIT" },
     })
   }
 
@@ -73,7 +73,7 @@ try {
     }
 
     return NextResponse.json(data, {
-      headers: { "Cache-Control": "public, max-age=300", "X-Cache": "MISS" },
+      headers: { "Cache-Control": "private, max-age=0", "X-Cache": "MISS" },
     })
   } catch (error) {
     console.error("[by-country proxy] Fetch error:", error)

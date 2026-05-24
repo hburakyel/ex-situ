@@ -8,7 +8,7 @@ import { useMediaQuery } from "../hooks/use-media-query"
 import { IconSource } from "@/components/icons"
 import BlurhashImage from "@/components/blurhash-image"
 import { Badge } from "@/components/ui/badge"
-import { COLLECTION_LABELS } from "@/hooks/use-unified-search"
+import { COLLECTION_LABELS, INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 
 interface ObjectListProps {
   objects: MuseumObject[]
@@ -294,7 +294,7 @@ export default function ObjectList({
                   )}
                   <div className="text-xs">
                     <span className="text-gray-500">To: </span>
-                    <span className="truncate">{object.attributes.institution_place || "Unknown"}</span>
+                    <span className="truncate">{object.attributes.institution_city_en || INSTITUTION_CITIES[object.attributes.institution_name || ""] || object.attributes.institution_place || "Unknown"}</span>
                   </div>
                   <div className="text-xs">
                     <span className="text-gray-500">Collection: </span>

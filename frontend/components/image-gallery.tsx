@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
 import BlurhashImage from "@/components/blurhash-image"
 import { Check, Link2 } from "lucide-react"
-import { COLLECTION_LABELS } from "@/hooks/use-unified-search"
+import { COLLECTION_LABELS, INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 
@@ -251,7 +251,7 @@ export default function ImageGallery({
             </div>
             <div>
               <span style={{ color: "var(--panel-text-muted, #666)" }}>To: </span>
-              <span>{currentObject.attributes.institution_city_en || currentObject.attributes.institution_place || "Unknown"}</span>
+              <span>{currentObject.attributes.institution_city_en || INSTITUTION_CITIES[currentObject.attributes.institution_name || ""] || currentObject.attributes.institution_place || "Unknown"}</span>
             </div>
             <div>
               <span style={{ color: "var(--panel-text-muted, #666)" }}>Collection: </span>

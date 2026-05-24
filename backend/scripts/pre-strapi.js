@@ -40,7 +40,10 @@ async function main() {
     await client.connect();
 
     // Drop all objects that reference manual_latitude / manual_longitude
+    // Also drop stale geom trigger (removed 2025-05 — geom col not in Strapi schema)
     await client.query(`
+      DROP TRIGGER IF EXISTS museum_objects_geom_trigger ON museum_objects;
+      DROP FUNCTION IF EXISTS update_geom_from_lat_lon() CASCADE;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_lat;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_lon;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_coords;

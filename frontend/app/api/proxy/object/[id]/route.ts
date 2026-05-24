@@ -26,7 +26,7 @@ export async function GET(
     console.log("Using cached response for object:", id)
     return NextResponse.json(cachedResponse.data, {
       headers: {
-        "Cache-Control": "public, max-age=600", // Cache for 10 minutes
+        "Cache-Control": "private, max-age=0",
         "X-Cache": "HIT",
       },
     })
@@ -82,7 +82,7 @@ export async function GET(
 
     return NextResponse.json(data, {
       headers: {
-        "Cache-Control": "public, max-age=600",
+        "Cache-Control": "private, max-age=0",
         "X-Cache": "MISS",
       },
     })

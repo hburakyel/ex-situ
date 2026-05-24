@@ -38,14 +38,26 @@ export interface PlaceResult {
 // Collection short labels
 export const COLLECTION_LABELS: Record<string, string> = {
   "Ethnologisches Museum": "Ethnological Museum",
-  "Victoria and Albert Museum": "V&A",
-  "The Metropolitan Museum of Art": "The Met",
   "Museum für Islamische Kunst": "Museum of Islamic Art",
-  "Ägyptisches Museum und Papyrussammlung": "Egyptian Museum",
+  "Ägyptisches Museum und Papyrussammlung": "Egyptian Museum and Papyrus Collection",
   "Antikensammlung": "Antiquities Collection",
   "Museum für Asiatische Kunst": "Museum of Asian Art",
   "Vorderasiatisches Museum": "Museum of the Ancient Near East",
   "Wikipedia": "Wikipedia",
+}
+
+// Maps institution name → city where that institution is located.
+// Used as a fallback when institution_city_en / institution_place
+// is missing or incorrectly populated with the institution name.
+export const INSTITUTION_CITIES: Record<string, string> = {
+  "Ethnologisches Museum": "Berlin",
+  "Museum für Islamische Kunst": "Berlin",
+  "Ägyptisches Museum und Papyrussammlung": "Berlin",
+  "Antikensammlung": "Berlin",
+  "Museum für Asiatische Kunst": "Berlin",
+  "Vorderasiatisches Museum": "Berlin",
+  "Victoria and Albert Museum": "London",
+  "The Metropolitan Museum of Art": "New York",
 }
 
 export const WIKIPEDIA_COLLECTION = "Wikipedia"
