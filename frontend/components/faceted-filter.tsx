@@ -40,14 +40,7 @@ interface FacetedFilterProps {
 }
 
 // Static collections with short labels
-const COLLECTION_LABELS: Record<string, string> = {
-  "Ethnologisches Museum": "Ethnological Museum",
-  "Museum für Islamische Kunst": "Museum of Islamic Art",
-  "Ägyptisches Museum und Papyrussammlung": "Egyptian Museum and Papyrus Collection",
-  "Antikensammlung": "Antiquities Collection",
-  "Museum für Asiatische Kunst": "Museum of Asian Art",
-  "Vorderasiatisches Museum": "Museum of the Ancient Near East",
-}
+const COLLECTION_LABELS: Record<string, string> = {}
 
 // The special institution name used for spatial_documents content
 export const WIKIPEDIA_COLLECTION = "Wikipedia"

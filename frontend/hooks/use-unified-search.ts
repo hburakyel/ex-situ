@@ -36,15 +36,7 @@ export interface PlaceResult {
 }
 
 // Collection short labels
-export const COLLECTION_LABELS: Record<string, string> = {
-  "Ethnologisches Museum": "Ethnological Museum",
-  "Museum für Islamische Kunst": "Museum of Islamic Art",
-  "Ägyptisches Museum und Papyrussammlung": "Egyptian Museum and Papyrus Collection",
-  "Antikensammlung": "Antiquities Collection",
-  "Museum für Asiatische Kunst": "Museum of Asian Art",
-  "Vorderasiatisches Museum": "Museum of the Ancient Near East",
-  "Wikipedia": "Wikipedia",
-}
+export const COLLECTION_LABELS: Record<string, string> = {}
 
 // Maps institution name → city where that institution is located.
 // Used as a fallback when institution_city_en / institution_place
