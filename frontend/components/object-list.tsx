@@ -8,6 +8,7 @@ import { useMediaQuery } from "../hooks/use-media-query"
 import { IconSource } from "@/components/icons"
 import BlurhashImage from "@/components/blurhash-image"
 import { Badge } from "@/components/ui/badge"
+import { COLLECTION_LABELS } from "@/hooks/use-unified-search"
 
 interface ObjectListProps {
   objects: MuseumObject[]
@@ -207,7 +208,7 @@ export default function ObjectList({
                 )}
               </div>
               <div className="text-sm truncate">{object.attributes.institution_place || "Unknown"}</div>
-              <div className="text-sm truncate">{object.attributes.institution_name || "Unknown"}</div>
+              <div className="text-sm truncate">{COLLECTION_LABELS[object.attributes.institution_name || ""] || object.attributes.institution_name || "Unknown"}</div>
               <div className="flex flex-col gap-1">
                 <Badge
                   variant={getGeocodeStatusVariant(object.attributes.geocoding_status)}
@@ -297,7 +298,7 @@ export default function ObjectList({
                   </div>
                   <div className="text-xs">
                     <span className="text-gray-500">Collection: </span>
-                    <span className="truncate">{object.attributes.institution_name || "Unknown"}</span>
+                    <span className="truncate">{COLLECTION_LABELS[object.attributes.institution_name || ""] || object.attributes.institution_name || "Unknown"}</span>
                   </div>
                   <div className="text-xs col-span-2 flex items-center gap-2">
                     <span className="text-gray-500">Geocode:</span>

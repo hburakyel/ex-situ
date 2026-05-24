@@ -24,6 +24,7 @@ import type { MuseumObject } from "@/types"
 import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
+import { COLLECTION_LABELS } from "@/hooks/use-unified-search"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const EXPORT_ROW_CAP = 5000
@@ -991,7 +992,7 @@ export default function ObjectPanel({
           attrs.title || "Untitled",
           getMostSpecificPlaceName(attrs.place_name || attrs.city_en),
           getArtifactDate(artifact),
-          attrs.institution_name || "Unknown",
+          COLLECTION_LABELS[attrs.institution_name || ""] || attrs.institution_name || "Unknown",
           sourceLink,
         ].map((value) => String(value).replace(/\|/g, "\\|")).join(" | ")
       }).map((row) => `| ${row} |`)

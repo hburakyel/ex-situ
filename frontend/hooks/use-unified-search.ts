@@ -37,14 +37,14 @@ export interface PlaceResult {
 
 // Collection short labels
 export const COLLECTION_LABELS: Record<string, string> = {
-  "Ethnologisches Museum": "Ethnologisches Museum",
+  "Ethnologisches Museum": "Ethnological Museum",
   "Victoria and Albert Museum": "V&A",
   "The Metropolitan Museum of Art": "The Met",
-  "Museum für Islamische Kunst": "Museum für Islamische Kunst",
-  "Ägyptisches Museum und Papyrussammlung": "Ägyptisches Museum",
-  "Antikensammlung": "Antikensammlung",
-  "Museum für Asiatische Kunst": "Museum für Asiatische Kunst",
-  "Vorderasiatisches Museum": "Vorderasiatisches Museum",
+  "Museum für Islamische Kunst": "Museum of Islamic Art",
+  "Ägyptisches Museum und Papyrussammlung": "Egyptian Museum",
+  "Antikensammlung": "Antiquities Collection",
+  "Museum für Asiatische Kunst": "Museum of Asian Art",
+  "Vorderasiatisches Museum": "Museum of the Ancient Near East",
   "Wikipedia": "Wikipedia",
 }
 
