@@ -81,6 +81,15 @@ interface FlatObjectAttrs {
   coordinate_precision?: string
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────
+
+/** Returns true when the origin place is unknown/unresolved and should not produce an arc. */
+function isUnknownOrigin(placeName: string | undefined | null): boolean {
+  if (!placeName) return true
+  const n = placeName.trim().toLowerCase()
+  return n === "unknown" || n === "unknown origin" || n === ""
+}
+
 // ── Cancellation flag ───────────────────────────────────────────────
 
 let cancelled = false
@@ -130,6 +139,8 @@ function processStatisticsOrClusters(
     ) {
       continue
     }
+
+    if (isUnknownOrigin(arc.place_name)) continue
 
     const fromName = arc.place_name || "Unknown Origin"
     const toName =
@@ -204,6 +215,7 @@ function processObjects(data: any[]): ProcessedArcsResult {
       Math.abs(obj.latitude - obj.institution_latitude) < 0.001
     )
       continue
+    if (isUnknownOrigin(obj.place_name)) continue
 
     const key = `${obj.longitude.toFixed(3)},${obj.latitude.toFixed(3)}-${obj.institution_longitude.toFixed(3)},${obj.institution_latitude.toFixed(3)}`
 
@@ -295,6 +307,7 @@ function processFallbackObjects(
     if (fromLng == null || fromLat == null || toLng == null || toLat == null) continue
     if (isNaN(fromLng) || isNaN(fromLat) || isNaN(toLng) || isNaN(toLat)) continue
     if (Math.abs(fromLng - toLng) < 0.001 && Math.abs(fromLat - toLat) < 0.001) continue
+    if (isUnknownOrigin(obj.place_name)) continue
 
     const layerKey = `${fromLng.toFixed(4)},${fromLat.toFixed(4)}-${toLng.toFixed(4)},${toLat.toFixed(4)}`
     if (!arcGroups.has(layerKey)) {
