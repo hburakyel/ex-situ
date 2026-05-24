@@ -475,6 +475,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           place_name: row.place_name,
           place_name_normalized: row.place_name_normalized,
           source_link: row.object_link_url || row.source_link,
+          institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,
           institution_longitude: row.institution_longitude ? parseFloat(row.institution_longitude) : null,
           country_en: row.country_en || null,
           city_en: row.city_en || null,
