@@ -24,7 +24,6 @@ import type { MuseumObject } from "@/types"
 import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
-import { COLLECTION_LABELS } from "@/hooks/use-unified-search"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const EXPORT_ROW_CAP = 5000
@@ -148,9 +147,20 @@ export default function ObjectPanel({
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [galleryArtifact, setGalleryArtifact] = useState<MuseumObject | null>(null)
+  const closeGallery = () => {
+    gallerySnapshot.current = []
+    setGalleryArtifact(null)
+    setSelectedIndex(0)
+    setGalleryOpen(false)
+  }
   // Snapshot of gallery objects taken at click time so the gallery stays open
   // while the background drill-down empties and refills containerObjects.
   const gallerySnapshot = useRef<MuseumObject[]>([])
+  const previousGalleryScopeRef = useRef({
+    activeCountry,
+    activeSite,
+    activeInstitution,
+  })
   const [showOrigins, setShowOrigins] = useState(false)
   const [showSites, setShowSites] = useState(false)
   const [showCollections, setShowCollections] = useState(true)
@@ -167,9 +177,7 @@ export default function ObjectPanel({
     ? `Download JSON (${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)})`
     : "Download JSON"
 
-  const galleryObjects = useMemo(() => {
-    return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
-  }, [objects])
+  const galleryObjects = useMemo(() => objects, [objects])
 
   // ── Mobile bottom-sheet drag-to-resize ──
   const containerSizeRef = useRef<ContainerSize>(containerSize)
@@ -627,6 +635,24 @@ export default function ObjectPanel({
     }
   }, [galleryObjects, galleryArtifact, galleryOpen])
 
+  useEffect(() => {
+    const previousScope = previousGalleryScopeRef.current
+    const scopeChanged =
+      previousScope.activeCountry !== activeCountry ||
+      previousScope.activeSite !== activeSite ||
+      previousScope.activeInstitution !== activeInstitution
+
+    previousGalleryScopeRef.current = {
+      activeCountry,
+      activeSite,
+      activeInstitution,
+    }
+
+    if (isMobile || !galleryOpen || !scopeChanged) return
+
+    closeGallery()
+  }, [activeCountry, activeSite, activeInstitution, galleryOpen, isMobile])
+
   const getContainerStyle = (): React.CSSProperties => {
     if (isMobile) {
       const shadow = "0 -2px 20px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07)"
@@ -804,12 +830,32 @@ export default function ObjectPanel({
     })
   }
 
-  const buildExportFilename = (ext: string) => {
+  const getInventorySeriesPrefix = (inventoryNumber?: string | null) => {
+    const firstSegment = String(inventoryNumber || "")
+      .split("/")[0]
+      ?.trim()
+
+    if (!firstSegment) return null
+
+    return firstSegment || null
+  }
+
+  const escapeMarkdownCell = (value?: string | number | null) => String(value ?? "—")
+    .replace(/\|/g, "\\|")
+    .replace(/\n/g, " ")
+    .trim() || "—"
+
+  const formatCoordinate = (value?: number | null) => {
+    if (typeof value !== "number" || Number.isNaN(value)) return "—"
+    return value.toFixed(4)
+  }
+
+  const buildExportFilename = (ext: string, options?: { includeSite?: boolean }) => {
     const date = new Date().toISOString().split("T")[0]
     const country = (activeCountry || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "all"
-    const site = (activeSite || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+    const site = (activeSite || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "all"
     const parts = ["exsitu", country]
-    if (site) parts.push(site)
+    if (options?.includeSite || site !== "all") parts.push(site)
     parts.push(date)
     return `${parts.join("-")}.${ext}`
   }
@@ -903,200 +949,130 @@ export default function ObjectPanel({
   }
 
   // Export Markdown provenance report
-  const exportAsMarkdown = async () => {
+  const downloadProvenanceReport = async () => {
     if (isExporting) return
     setIsExporting(true)
     try {
       const all = await fetchAllForExport()
       const exportDate = new Date().toISOString().split("T")[0]
+      const originTerritory = activeCountry || "all"
+      const originSite = activeSite || "all"
+      const institution = activeInstitution || "all"
+      const total = all.length
 
-      // Build origin sites table
-      const siteMap = new Map<string, { count: number; lat: number; lng: number; sample?: string; displayName: string }>()
+      const siteMap = new Map<string, { count: number; lat?: number | null; lng?: number | null; displayName: string }>()
       for (const obj of all) {
         const a = obj.attributes
-        const rawPlace = a.place_name || a.city_en || "Unknown"
+        const rawPlace = a.place_name || a.city_en || a.country_en || a.country || "Unknown"
         const key = getMostSpecificPlaceName(rawPlace)
         const existing = siteMap.get(key)
         if (existing) {
           existing.count++
-          if (!existing.sample && a.img_url) existing.sample = a.img_url
+          if ((existing.lat === null || existing.lat === undefined) && typeof a.latitude === "number") {
+            existing.lat = a.latitude
+          }
+          if ((existing.lng === null || existing.lng === undefined) && typeof a.longitude === "number") {
+            existing.lng = a.longitude
+          }
         } else {
           siteMap.set(key, {
             count: 1,
-            lat: a.latitude ?? 0,
-            lng: a.longitude ?? 0,
-            sample: a.img_url || undefined,
+            lat: a.latitude ?? null,
+            lng: a.longitude ?? null,
             displayName: key,
           })
         }
       }
 
       const sortedSites = [...siteMap.entries()].sort((a, b) => b[1].count - a[1].count)
-      const total = all.length
-      const topSite = sortedSites[0]
-      const topSiteName = topSite?.[1].displayName || "Unknown"
-      const topSitePct = total > 0 && topSite ? ((topSite[1].count / total) * 100).toFixed(1) : "0.0"
-      const top3SiteDistribution = sortedSites
-        .slice(0, 3)
-        .map(([_, data]) => `${data.displayName} (${data.count})`)
-        .join(", ") || "None"
-      const siteDistributionLines = sortedSites
-        .slice(0, 5)
-        .map(([_, data]) => {
-          const pct = total > 0 ? ((data.count / total) * 100).toFixed(1) : "0.0"
-          return `- ${data.displayName}: ${data.count} artifacts (${pct}%)`
-        })
-      const institutionList = [...new Set(
+      const recordedDateCount = all.filter(hasRecordedArtifactDate).length
+      const missingDateCount = total - recordedDateCount
+      const missingDatePct = total > 0 ? Math.round((missingDateCount / total) * 100) : 0
+      const countryOnlyOriginCount = all.filter(hasCountryOnlyOrigin).length
+      const sitePrecision = total === 0
+        ? "not detected"
+        : countryOnlyOriginCount === total
+          ? "country-level"
+          : countryOnlyOriginCount === 0
+            ? "city-level"
+            : "mixed country/city-level"
+      const inventorySeries = [...new Set(
         all
-          .map((obj) => obj.attributes.institution_name)
-          .filter((name): name is string => Boolean(name && name.trim()))
+          .map((artifact) => getInventorySeriesPrefix(artifact.attributes.inventory_number))
+          .filter((value): value is string => Boolean(value))
       )]
-      const artifactSample = objects.slice(0, 20)
-      const originSiteUncertaintyCount = all.filter((obj) => hasCountryOnlyOrigin(obj)).length
-      const originSiteUncertaintyPct = total > 0 ? ((originSiteUncertaintyCount / total) * 100).toFixed(1) : "0.0"
-      const missingDateCount = all.filter((obj) => !hasRecordedArtifactDate(obj)).length
-      const missingDatePct = total > 0 ? ((missingDateCount / total) * 100).toFixed(1) : "0.0"
-
-      // YAML frontmatter
-      const frontmatter = [
-        "---",
-        `filters:`,
-        `  country: ${activeCountry || "all"}`,
-        `  site: ${activeSite || "all"}`,
-        `  institution: ${activeInstitution || "all"}`,
-        `export_date: "${exportDate}"`,
-        `total_count: ${total}`,
-        "---",
-      ].join("\n")
-
-      // Origin sites table
-      const tableHeader = "| Place | Lat | Lon | Objects | Sample Image |"
-      const tableSep   = "|-------|-----|-----|---------|--------------|"
-      const tableRows = sortedSites.slice(0, 50).map(([_, d]) =>
-        `| ${d.displayName} | ${d.lat.toFixed(4)} | ${d.lng.toFixed(4)} | ${d.count} | ${d.sample ? `![](${d.sample})` : ""} |`
-      )
-
-      // Spatial distribution (top 10 + %)
-      const distLines = sortedSites.slice(0, 10).map(([_, d]) => {
-        const pct = ((d.count / total) * 100).toFixed(1)
-        return `- **${d.displayName}**: ${d.count} artifacts (${pct}%)`
-      })
-
-      const artifactTableHeader = "| Inventory | Title | Origin Site | Date | Institution | Source |"
-      const artifactTableSep = "|-----------|-------|-------------|------|-------------|--------|"
-      const artifactTableRows = artifactSample.map((artifact) => {
-        const attrs = artifact.attributes
-        const sourceLink = attrs.source_link ? `[link](${attrs.source_link})` : ""
-        return [
-          attrs.inventory_number || "?",
-          attrs.title || "Untitled",
-          getMostSpecificPlaceName(attrs.place_name || attrs.city_en),
-          getArtifactDate(artifact),
-          COLLECTION_LABELS[attrs.institution_name || ""] || attrs.institution_name || "Unknown",
-          sourceLink,
-        ].map((value) => String(value).replace(/\|/g, "\\|")).join(" | ")
-      }).map((row) => `| ${row} |`)
-
-      // Research prompt
-      const researchPrompt = [
-        "---",
-        "This provenance report was generated by Ex Situ (exsitu.app) —",
-        "an open-source federated spatial index of displaced cultural artifacts.",
-        "API: https://exsitu.app/api/museum-objects/geospatial",
-        "GitHub: https://github.com/hburakyel/ex-situ",
-        "",
-        "The index tracks only the geographic displacement vector between",
-        "an artifact's origin site and its current holding institution.",
-        "",
-        "Analyze this provenance cluster:",
-        "",
-        `Origin territory: ${activeCountry || "Unknown"}`,
-        `Primary site: ${topSiteName}  `,
-        `Destination institution(s): ${institutionList.join(", ") || "Unknown"}`,
-        `Total artifacts indexed: ${total}`,
-        `Unique origin sites: ${siteMap.size}`,
-        "",
-        "Site distribution:",
-        ...(siteDistributionLines.length > 0 ? siteDistributionLines : ["- None"]),
-        "",
-        "Sample artifacts (from institutional sources):",
-        artifactTableHeader,
-        artifactTableSep,
-        ...(artifactTableRows.length > 0 ? artifactTableRows : ["| ? | ? | ? | ? | ? | |"]),
-        "",
-        "Based strictly on documented historical facts, provide:",
-        "",
-        "1. ACQUISITION CONTEXT",
-        "What were the dominant mechanisms — expedition, colonial law,",
-        "military campaign, trade — through which artifacts from this",
-        "territory entered these institutions? Name specific actors,",
-        "dates, treaties where documented.",
-        "",
-        "2. SPATIAL PATTERN",
-        `Why is ${topSiteName} dominant at ${topSitePct}%? What does this concentration`,
-        "reveal about acquisition logistics and priorities?",
-        "",
-        "3. ARTIFACT TYPOLOGY",
-        "Based on the sample titles and dates, what categories of",
-        "artifacts dominate? What does this selection reveal about",
-        "collector priorities?",
-        "",
-        "4. DOCUMENTATION QUALITY",
-        `Origin site uncertainty: ${originSiteUncertaintyPct}% of artifacts have`,
-        "unspecified origin beyond territory level (labeled only as country name without specific site).",
-        "",
-        `Date uncertainty: ${missingDatePct}% of artifacts have no`,
-        "acquisition or creation date recorded.",
-        "",
-        "Note: these are distinct documentation gaps.",
-        "",
-        "5. UNESCO 1970 THRESHOLD",
-        "Were the majority of these artifacts acquired before or",
-        "after 1970? What are the implications for restitution claims?",
-        "",
-        "Plain academic prose. Four paragraphs maximum per section.",
-        "No speculation. Cite only documented facts.",
-        "If uncertain, state explicitly.",
-        "---",
-      ].join("\n")
+      const artifactSample = all.slice(0, 50)
+      const firstInstitutionalSource = all[0]?.attributes.source_link?.trim() || "—"
+      const originSiteRows = sortedSites.length > 0
+        ? sortedSites.map(([_, data]) => (
+            `| ${escapeMarkdownCell(data.displayName)} | ${formatCoordinate(data.lat)} | ${formatCoordinate(data.lng)} | ${data.count} |`
+          ))
+        : ["| — | — | — | 0 |"]
+      const artifactRows = artifactSample.length > 0
+        ? artifactSample.map((artifact) => {
+            const attrs = artifact.attributes
+            return [
+              escapeMarkdownCell(attrs.inventory_number || "—"),
+              escapeMarkdownCell(attrs.title || "—"),
+              escapeMarkdownCell(getMostSpecificPlaceName(attrs.place_name || attrs.city_en || attrs.country_en || attrs.country || "—")),
+              escapeMarkdownCell(hasRecordedArtifactDate(artifact) ? getArtifactDate(artifact) : "—"),
+              escapeMarkdownCell(attrs.institution_name || "—"),
+              escapeMarkdownCell(attrs.source_link || "—"),
+            ].join(" | ")
+          }).map((row) => `| ${row} |`)
+        : ["| — | — | — | — | — | — |"]
 
       const md = [
-        frontmatter,
+        "---",
+        "source: Ex Situ (exsitu.app)",
+        `export_date: ${exportDate}`,
+        `origin_territory: ${originTerritory}`,
+        `origin_site: ${originSite}`,
+        `institution: ${institution}`,
+        `total_artifacts: ${total}`,
+        "---",
         "",
-        `# Ex Situ — Provenance Report`,
+        `# ${originSite} → ${institution}`,
         "",
-        `**Export date:** ${exportDate}  `,
-        `**Total artifacts:** ${total}  `,
-        `**Country filter:** ${activeCountry || "all"}  `,
-        activeSite ? `**Site filter:** ${activeSite}  ` : null,
-        activeInstitution ? `**Institution filter:** ${activeInstitution}  ` : null,
+        "## Index Data",
+        "",
+        "| | |",
+        "|---|---|",
+        `| Origin territory | ${escapeMarkdownCell(originTerritory)} |`,
+        `| Origin site | ${escapeMarkdownCell(originSite)} |`,
+        `| Holding institution | ${escapeMarkdownCell(institution)} |`,
+        `| artifacts indexed | ${total} |`,
+        `| Unique origin sites | ${sortedSites.length} |`,
+        `| Inventory series | ${escapeMarkdownCell(inventorySeries.length > 0 ? inventorySeries.join(", ") : "—")} |`,
+        `| Dates recorded | ${recordedDateCount} / ${total} |`,
+        `| Export date | ${exportDate} |`,
         "",
         "## Origin Sites",
         "",
-        tableHeader,
-        tableSep,
-        ...tableRows,
+        "| Place | Lat | Lon | artifacts |",
+        "|-------|-----|-----|---------|",
+        ...originSiteRows,
         "",
-        "## Spatial Distribution",
+        "## artifacts (sample, first 50)",
         "",
-        ...distLines,
+        "| Inventory | Title | Origin | Date | Institution | Source |",
+        "|-----------|-------|--------|------|-------------|--------|",
+        ...artifactRows,
         "",
-        `## Artifacts (sample, ${artifactSample.length} of ${total})`,
+        "## Data Notes",
         "",
-        artifactTableHeader,
-        artifactTableSep,
-        ...(artifactTableRows.length > 0 ? artifactTableRows : ["| ? | ? | ? | ? | ? | |"]),
+        `- Site precision: ${sitePrecision}`,
+        `- Date coverage: ${missingDatePct}% of artifacts have no date recorded`,
         "",
-        "## Research Prompt",
+        "## Source",
         "",
-        researchPrompt,
-        "",
-        "---",
-        "*Provenance reports are generated from Ex Situ spatial index data. Historical claims should be verified against primary institutional sources.*  ",
-        `*[Report a data issue](${REPORT_ISSUE_URL})*`,
+        "- Platform: https://exsitu.app",
+        "- API: https://exsitu.app/api/museum-artifacts/geospatial",
+        "- GitHub: https://github.com/hburakyel/ex-situ",
+        `- Institutional source: ${escapeMarkdownCell(firstInstitutionalSource)}`,
       ].filter((l) => l !== null).join("\n")
 
-      triggerDownload(md, buildExportFilename("md"), "text/markdown")
+      triggerDownload(md, buildExportFilename("md", { includeSite: true }), "text/markdown")
     } finally {
       setIsExporting(false)
     }
@@ -1296,7 +1272,7 @@ export default function ObjectPanel({
                       })}
                       {renderExportMenuItem({
                         label: "Export MD",
-                        onClick: exportAsMarkdown,
+                        onClick: downloadProvenanceReport,
                         disabled: isExporting || !hasExportScope,
                         icon: <FileText className="h-4 w-4 text-gray-500" />,
                       })}
@@ -1384,7 +1360,7 @@ export default function ObjectPanel({
                     })}
                     {renderExportMenuItem({
                       label: "Export MD",
-                      onClick: exportAsMarkdown,
+                      onClick: downloadProvenanceReport,
                       disabled: isExporting || !hasExportScope,
                       icon: <FileText className="h-5 w-5" />,
                     })}
@@ -1534,7 +1510,7 @@ export default function ObjectPanel({
             key={galleryKey}
             objects={galleryArtifact ? [galleryArtifact] : (gallerySnapshot.current.length > 0 ? gallerySnapshot.current : galleryObjects)}
             initialIndex={galleryArtifact ? 0 : selectedIndex}
-            onClose={() => { gallerySnapshot.current = []; setGalleryArtifact(null); setGalleryOpen(false) }}
+            onClose={closeGallery}
             isFullscreen={containerSize === "expanded"}
             isMobile={isMobile}
           />

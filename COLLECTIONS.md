@@ -1,6 +1,6 @@
 # Ex Situ — Collection Roadmap
 
-Current: **111,497 objects · 8 collections · 177 territories · 961 origin sites**
+Current: **111,497 artifacts · 8 collections · 177 territories · 961 origin sites**
 
 This document tracks indexed collections, planned integrations, and contribution priorities.
 
@@ -8,7 +8,7 @@ This document tracks indexed collections, planned integrations, and contribution
 
 ## Indexed Collections
 
-| # | Institution | Location | Objects | Method | Status |
+| # | Institution | Location | Artifacts | Method | Status |
 |---|-------------|----------|---------|--------|--------|
 | 1 | Ethnologisches Museum | Berlin | 57,384 | SMB API | ✅ Live |
 | 2 | Victoria and Albert Museum | London | 21,465 | REST API | ✅ Live |
@@ -25,7 +25,7 @@ This document tracks indexed collections, planned integrations, and contribution
 
 Easy to integrate. API key required where noted.
 
-| # | Institution | Location | Est. Objects | Access | Notes |
+| # | Institution | Location | Est. Artifacts | Access | Notes |
 |---|-------------|----------|-------------|--------|-------|
 | 9 | Smithsonian NMNH | Washington | ~500k filtered | REST API, key needed | Single key covers 19 Smithsonian museums |
 | 10 | Smithsonian NMAI | Washington | ~800k | Same API | Native American collections |
@@ -40,7 +40,7 @@ Easy to integrate. API key required where noted.
 
 ## Planned — Tier 2 (SPARQL / Linked Open Data)
 
-| # | Institution | Location | Est. Objects | Access | Notes |
+| # | Institution | Location | Est. Artifacts | Access | Notes |
 |---|-------------|----------|-------------|--------|-------|
 | 17 | British Museum | London | ~100k filtered | SPARQL | Endpoint unreliable — scraper in progress |
 | 18 | Europeana | Pan-European | Millions filtered | REST API, key needed | Aggregator — covers 3000+ institutions in one integration |
@@ -53,7 +53,7 @@ Easy to integrate. API key required where noted.
 
 No public API. Requires Playwright or requests-based scraper.
 
-| # | Institution | Location | Est. Objects | Priority | Notes |
+| # | Institution | Location | Est. Artifacts | Priority | Notes |
 |---|-------------|----------|-------------|----------|-------|
 | 21 | Musée du quai Branly | Paris | ~300k | 🔴 High | Africa, Americas, Asia, Oceania — most politically relevant after Ethnologisches |
 | 22 | RMCA Tervuren | Belgium | ~180k | 🔴 High | Central Africa focus |
@@ -70,7 +70,7 @@ No public API. Requires Playwright or requests-based scraper.
 | 33 | Rautenstrauch-Joest Köln | Cologne | ~65k | 🟡 Medium | Already part of IIP project |
 | 34 | Übersee-Museum Bremen | Bremen | ~300k | 🟡 Medium | Non-European scope |
 | 35 | Weltmuseum Frankfurt | Frankfurt | ~40k | 🟡 Medium | — |
-| 36 | Peabody Essex Museum | Salem | ~35k | 🟢 Low | Maritime trade objects, Asia heavy |
+| 36 | Peabody Essex Museum | Salem | ~35k | 🟢 Low | Maritime trade artifacts, Asia heavy |
 | 37 | Denver Art Museum | Denver | ~25k | 🟢 Low | Native American focus |
 | 38 | Musée de l'Homme | Paris | ~600k | 🟢 Low | Overlap with quai Branly |
 | 39 | Musée Bargoin | Clermont-Ferrand | ~40k | 🟢 Low | Archaeological, underindexed |
@@ -84,17 +84,17 @@ One integration covering many institutions.
 | # | Platform | Coverage | Method | Notes |
 |---|----------|----------|--------|-------|
 | 40 | Smithsonian Open Access | 19 US museums | REST API | Single key — highest ROI integration |
-| 41 | Europeana | 3000+ European institutions | REST API | Filter non-European origin objects |
-| 42 | Museum Data Service (UK) | 100M+ UK objects | API | Covers Pitt Rivers, Horniman, and more |
+| 41 | Europeana | 3000+ European institutions | REST API | Filter non-European origin artifacts |
+| 42 | Museum Data Service (UK) | 100M+ UK artifacts | API | Covers Pitt Rivers, Horniman, and more |
 | 43 | DPLA | US institutions | REST API | Digital Public Library of America |
 
 ---
 
 ## Scope
 
-Ex Situ indexes objects that have been displaced from their origin territories — regardless of region or period. This includes objects from Africa, Asia, the Americas, Oceania, the Middle East, and the Mediterranean. The editorial filter is displacement, not geography.
+Ex Situ indexes artifacts that have been displaced from their origin territories — regardless of region or period. This includes artifacts from Africa, Asia, the Americas, Oceania, the Middle East, and the Mediterranean. The editorial filter is displacement, not geography.
 
-Objects are indexed by origin site, not by cultural category. European museums' own classification systems (art, ethnographic, archaeological) are preserved in source labels but do not determine inclusion.
+Artifacts are indexed by origin site, not by cultural category. European museums' own classification systems (art, ethnographic, archaeological) are preserved in source labels but do not determine inclusion.
 
 ---
 
@@ -110,7 +110,7 @@ Open an issue before starting work to avoid duplication.
 
 ## Release History
 
-| Version | Date | Collections | Objects |
+| Version | Date | Collections | Artifacts |
 |---------|------|-------------|---------|
 | v0.1.0 | May 2026 | 8 | 111,497 |
 

@@ -556,7 +556,6 @@ function MapContent() {
         activeCountry || null, page, 60,
         activeSite || undefined,
         effectiveInstitution,
-        true,
       )
       if (append) {
         setArcObjects((prev) => {
@@ -571,6 +570,9 @@ function MapContent() {
       setArcObjectsPage(page)
     } catch (err) {
       console.error("[DrillObjects] fetch failed:", err)
+      // Stop the infinite-scroll loop: if all retries are exhausted mark hasMore
+      // as false so the IntersectionObserver stops firing onLoadMore.
+      setArcObjectsHasMore(false)
     } finally {
       setArcObjectsLoading(false)
     }
@@ -680,7 +682,7 @@ function MapContent() {
       // (direct call avoids useEffect timing race where arcObjectsLoading isn't set yet)
       if (next) {
         setArcObjectsLoading(true)
-        fetchObjectsByCountry(null, 1, 60, undefined, next, true)
+        fetchObjectsByCountry(null, 1, 60, undefined, next)
           .then(result => {
             setArcObjects(result.objects)
             setArcObjectsTotal(result.pagination?.total || 0)

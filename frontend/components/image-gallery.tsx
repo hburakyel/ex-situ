@@ -11,6 +11,7 @@ import { Check, Link2 } from "lucide-react"
 import { COLLECTION_LABELS, INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
+const MOBILE_CLOSE_SWIPE_THRESHOLD = 48
 
 interface ImageGalleryProps {
   objects: MuseumObject[]
@@ -27,12 +28,14 @@ export default function ImageGallery({
   isFullscreen = false,
   isMobile = false,
 }: ImageGalleryProps) {
-  const galleryObjects = objects.filter((object) => hasImageUrl(object.attributes?.img_url))
+  const galleryObjects = objects
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageError, setImageError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [linkCopied, setLinkCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
 
   // Clamp currentIndex when objects array changes (e.g. filters, navigation)
   useEffect(() => {
@@ -101,6 +104,35 @@ export default function ImageGallery({
 
   const handleImageLoad = () => {
     setIsLoading(false)
+  }
+
+  const handleImageTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!isMobile) return
+    touchStartX.current = event.touches[0]?.clientX ?? null
+    touchStartY.current = event.touches[0]?.clientY ?? null
+  }
+
+  const handleImageTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!isMobile || touchStartX.current === null || touchStartY.current === null) {
+      return
+    }
+
+    const endX = event.changedTouches[0]?.clientX ?? touchStartX.current
+    const endY = event.changedTouches[0]?.clientY ?? touchStartY.current
+    const deltaX = endX - touchStartX.current
+    const deltaY = endY - touchStartY.current
+
+    touchStartX.current = null
+    touchStartY.current = null
+
+    if (deltaY > MOBILE_CLOSE_SWIPE_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
+      onClose()
+    }
+  }
+
+  const handleImageTouchCancel = () => {
+    touchStartX.current = null
+    touchStartY.current = null
   }
 
   // Early return if no valid objects or current object (transient state during re-renders)
@@ -184,10 +216,24 @@ export default function ImageGallery({
             )}
           </div>
           <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            <Button variant="ghost" size="icon" onClick={handlePrevious} className="h-8 w-8" disabled={galleryObjects.length <= 1}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePrevious}
+              className="h-8 w-8"
+              disabled={galleryObjects.length <= 1}
+              aria-label="Previous image"
+            >
               <ChevronLeftIcon className="h-5 w-5 text-gray-500" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8" disabled={galleryObjects.length <= 1}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNext}
+              className="h-8 w-8"
+              disabled={galleryObjects.length <= 1}
+              aria-label="Next image"
+            >
               <ChevronRightIcon className="h-5 w-5 text-gray-500" />
             </Button>
             {(() => {
@@ -229,7 +275,7 @@ export default function ImageGallery({
                 <IconSource className="h-5 w-5 text-gray-500" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" aria-label="Close gallery">
               <IconClose className="h-5 w-5 text-gray-500" />
             </Button>
           </div>
@@ -272,7 +318,31 @@ export default function ImageGallery({
             minHeight: "0",
             backgroundColor: "white",
           }}
+          onTouchStart={handleImageTouchStart}
+          onTouchEnd={handleImageTouchEnd}
+          onTouchCancel={handleImageTouchCancel}
         >
+          {isMobile && galleryObjects.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Previous image"
+                onClick={handlePrevious}
+                className="absolute inset-y-0 left-0 z-10 w-1/2 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-inset"
+              >
+                <span className="sr-only">Previous image</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Next image"
+                onClick={handleNext}
+                className="absolute inset-y-0 right-0 z-10 w-1/2 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-inset"
+              >
+                <span className="sr-only">Next image</span>
+              </button>
+            </>
+          )}
+
           {isLoading && !imageError && (
             <div
               style={{

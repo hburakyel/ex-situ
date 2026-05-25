@@ -73,6 +73,14 @@ async function fetchWithRateLimit(
         }
       }
 
+      // Retry on 5xx server errors with exponential backoff
+      if (response.status >= 500 && retries > 0) {
+        const backoff = Math.pow(2, 3 - retries) * 1000
+        console.log(`Server error ${response.status}. Retrying after ${backoff}ms. Retries left: ${retries - 1}`)
+        await wait(backoff)
+        return fetchWithRateLimit(url, options, retries - 1, cacheKey)
+      }
+
       const errorText = await response.text()
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
     }

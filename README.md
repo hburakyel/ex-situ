@@ -13,21 +13,21 @@
 
 ---
 
-Museums across Europe and North America hold hundreds of thousands of objects whose provenance — where they came from, under what circumstances — remains buried in institutional databases, invisible to researchers and the public.
+Museums across Europe and North America hold hundreds of thousands of artifacts whose provenance — where they came from, under what circumstances — remains buried in institutional databases, invisible to researchers and the public.
 
 Ex Situ makes this visible: not by duplicating institutional data, but by indexing the relationships between origin sites and destination collections as a spatial commons — connective tissue between archives that were never designed to speak to each other.
 
-**132,854+ objects · 8 collections · 177 territories · 961 origin sites**
+**132,854+ artifacts · 8 collections · 177 territories · 961 origin sites**
 
 ---
 
 ## How It Works
 
-Ex Situ is a Relational Spatial Index — an indexer, not a hoster. Every object stays linked to its institutional source. No content is copied or mirrored.
+Ex Situ is a Relational Spatial Index — an indexer, not a hoster. Every artifact stays linked to its institutional source. No content is copied or mirrored.
 
 | Concept | Description |
 |---------|-------------|
-| **Artifact** | Object record with resolved origin coordinates |
+| **Artifact** | Artifact record with resolved origin coordinates |
 | **Arc** | Directional provenance connection: origin site → destination institution |
 | **Resolver** | ETL pipeline that ingests and gelocates collection data |
 
@@ -37,7 +37,7 @@ The map renders arcs at three zoom levels:
 |------|------|-----------|
 | 0–4 | Global | Territory → Institution |
 | 5–9 | Regional | City/Site → Institution |
-| 10+ | Object | Precise coordinates |
+| 10+ | Artifact | Precise coordinates |
 
 ---
 
@@ -72,7 +72,7 @@ GET https://exsitu.app/api/museum-objects/geospatial
 | `country` | string | — | Filter by origin territory |
 | `city` | string | — | Filter by origin city |
 
-Example — all Egyptian objects in the Antikensammlung:
+Example — all Egyptian artifacts in the Antikensammlung:
 ```
 GET https://exsitu.app/api/museum-objects/geospatial?zoom=4&country=Egypt&institution=Antikensammlung
 ```
@@ -132,7 +132,7 @@ cd frontend && pnpm install && pnpm dev
 ex-situ/
 ├── frontend/               # Next.js app
 │   ├── app/                # App Router pages + API proxy routes
-│   ├── components/         # Map, object grid, search palette
+│   ├── components/         # Map, artifact grid, search palette
 │   ├── hooks/              # Data fetching, arc worker, URL state
 │   ├── workers/            # Web Worker for arc processing
 │   └── lib/                # API client, design system, Protomaps style

@@ -52,29 +52,50 @@ export default function ObjectGrid({
   // Use virtualization for better performance with large lists
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 })
   const containerRef = useRef<HTMLDivElement>(null)
-
-  // Reset broken-image tracker when the object set changes (e.g. navigation
-  // between places) to avoid accumulating IDs from previous views.
-  const objectIdsFingerprint = objects.length > 0 ? `${objects[0]?.id}-${objects.length}` : ""
-  useEffect(() => {
-    setBrokenImages({})
-    setLoadedImages({})
-  }, [objectIdsFingerprint])
+  const wasInViewRef = useRef(false)
 
   const imageObjects = useMemo(() => {
     return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
   }, [objects])
 
-  // Calculate visible objects based on current range
+  // Objects sorted so image-bearing items come first; imageless ones go to the end
+  const sortedObjects = useMemo(() => {
+    const withImages = objects.filter((o) => hasImageUrl(o.attributes?.img_url))
+    const withoutImages = objects.filter((o) => !hasImageUrl(o.attributes?.img_url))
+    return [...withImages, ...withoutImages]
+  }, [objects])
+
+  // Drop state for images that are no longer present, but keep already-loaded
+  // entries when new pages append to the current result set.
+  useEffect(() => {
+    const currentIds = new Set(imageObjects.map((object) => object.id))
+
+    setBrokenImages((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => currentIds.has(id))
+      )
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next
+    })
+
+    setLoadedImages((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => currentIds.has(id))
+      )
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next
+    })
+  }, [imageObjects])
+
+  // Calculate visible objects based on current range — images first, then imageless
   const visibleObjects = useMemo(() => {
-    return imageObjects.slice(visibleRange.start, visibleRange.end)
-  }, [imageObjects, visibleRange])
+    return sortedObjects.slice(visibleRange.start, visibleRange.end)
+  }, [sortedObjects, visibleRange])
 
   // Load more when reaching the end of the list
   useEffect(() => {
-    if (inView && hasMore && !isLoading) {
+    if (inView && !wasInViewRef.current && hasMore && !isLoading) {
       onLoadMore()
     }
+    wasInViewRef.current = inView
   }, [inView, hasMore, isLoading, onLoadMore])
 
   // Handle scroll to load more visible items + trigger API fetch
@@ -85,15 +106,15 @@ export default function ObjectGrid({
     const scrollPosition = scrollTop + clientHeight
 
     // If we're near the bottom of our current range, load more items into view
-    if (scrollPosition > scrollHeight - 200 && visibleRange.end < imageObjects.length) {
+    if (scrollPosition > scrollHeight - 200 && visibleRange.end < objects.length) {
       setVisibleRange((prev) => ({
         start: prev.start,
-        end: Math.min(prev.end + 40, imageObjects.length),
+        end: Math.min(prev.end + 40, objects.length),
       }))
     }
 
     // If near bottom AND we've shown all loaded objects, fetch next page
-    if (scrollPosition > scrollHeight - 400 && visibleRange.end >= imageObjects.length - 5 && hasMore && !isLoading) {
+    if (scrollPosition > scrollHeight - 400 && visibleRange.end >= objects.length - 5 && hasMore && !isLoading) {
       onLoadMore()
     }
 
@@ -142,24 +163,23 @@ export default function ObjectGrid({
 
   // When new objects are appended, expand visible range to include them
   useEffect(() => {
-    if (imageObjects.length === 0) {
+    if (objects.length === 0) {
       setVisibleRange({ start: 0, end: 50 })
     } else {
       setVisibleRange((prev) => ({
         start: prev.start,
-        end: Math.max(prev.end, Math.min(imageObjects.length, prev.end + 40)),
+        end: Math.max(prev.end, Math.min(objects.length, prev.end + 40)),
       }))
     }
-  }, [imageObjects.length])
+  }, [objects.length])
 
   const handleImageClick = (index: number) => {
     const object = visibleObjects[index]
     if (!object) return
     const lng = object.attributes.longitude || 0
     const lat = object.attributes.latitude || 0
-    const imageIndex = imageObjects.findIndex((candidate) => candidate.id === object.id)
-    if (imageIndex === -1) return
-    onObjectClick(lng, lat, imageIndex, object)
+    const objectIndex = objects.findIndex((candidate) => candidate.id === object.id)
+    onObjectClick(lng, lat, objectIndex, object)
   }
 
   const handleImageError = (id: string) => {
@@ -181,7 +201,7 @@ export default function ObjectGrid({
     return null
   }
 
-  if (imageObjects.length === 0 && !isLoading) {
+  if (objects.length === 0 && !isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
         <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
@@ -195,8 +215,8 @@ return (
     <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
       <div className={`grid ${gridClass} gap-3`}>
       {visibleObjects.map((object, index) => {
-        if (brokenImages[object.id]) return null
         const isSelected = object.id === selectedImageId
+        const hasImage = hasImageUrl(object.attributes?.img_url) && !brokenImages[object.id]
 
 return (
   <div
@@ -206,8 +226,8 @@ return (
     onMouseEnter={() => setSelectedImageId(object.id)}
     onMouseLeave={() => setSelectedImageId(null)}
   >
-    {/* Inventory number shown as placeholder while image loads */}
-    {object.attributes.inventory_number && !loadedImages[object.id] && (
+    {/* For image tiles: inventory number as absolute overlay while image is loading */}
+    {hasImage && object.attributes.inventory_number && !loadedImages[object.id] && (
       <span className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
         <span className="text-[10px] text-gray-300 font-mono text-center px-2 break-all leading-tight max-w-full">
           {object.attributes.inventory_number}
@@ -215,13 +235,12 @@ return (
       </span>
     )}
     <div
-      className={
-        [
-          "relative inline-flex overflow-hidden bg-white rounded-[4px]",
-          loadedImages[object.id] && isSelected ? "ring-2 ring-blue-500" : "",
-          loadedImages[object.id] ? "group-hover:ring-2 group-hover:ring-blue-500" : ""
-        ].join(" ")
-      }
+      className={[
+        "relative overflow-hidden bg-white rounded-[4px]",
+        hasImage ? "inline-flex" : "w-full h-full flex items-center justify-center",
+        isSelected ? "ring-2 ring-blue-500" : "",
+        "group-hover:ring-2 group-hover:ring-blue-500",
+      ].join(" ")}
     >
       {(object.attributes.geocoding_status && object.attributes.geocoding_status !== "ok") && (
         <span
@@ -255,15 +274,21 @@ return (
           ~
         </span>
       )}
-      <BlurhashImage
-        src={object.attributes.img_url!}
-        alt={object.attributes?.title || "Museum object"}
-        className="block"
-        imgClassName="block max-h-44 w-auto bg-white"
-        onLoad={() => handleImageLoad(object.id)}
-        onError={() => handleImageError(object.id)}
-        loading="lazy"
-      />
+      {hasImage ? (
+        <BlurhashImage
+          src={object.attributes.img_url!}
+          alt={object.attributes?.title || "Museum object"}
+          className="block"
+          imgClassName="block max-h-44 w-auto bg-white"
+          onLoad={() => handleImageLoad(object.id)}
+          onError={() => handleImageError(object.id)}
+          loading="lazy"
+        />
+      ) : (
+        <span className="text-[10px] text-gray-400 font-mono text-center px-2 break-all leading-tight max-w-full">
+          {object.attributes.inventory_number || "—"}
+        </span>
+      )}
     </div>
   </div>
 )
@@ -284,9 +309,9 @@ return (
         </div>
       )}
 
-      {!hasMore && imageObjects.length > 0 && (
+      {!hasMore && objects.length > 0 && (
         <div className="text-center py-4 text-[10px] text-gray-300">
-          {imageObjects.length} artifact{imageObjects.length !== 1 ? "s" : ""} with images
+          {objects.length} artifact{objects.length !== 1 ? "s" : ""}
         </div>
       )}
     </div>

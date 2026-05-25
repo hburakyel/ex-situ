@@ -95,8 +95,8 @@ export default function BlurhashImage({
     }
 
     const cached = blurhashCache.get(src)
-    if (cached) {
-      setBlurhashDataUrl(cached)
+    if (cached !== undefined) {
+      setBlurhashDataUrl(cached || null)
       return
     }
 
@@ -107,7 +107,10 @@ export default function BlurhashImage({
         const response = await fetch(`/api/generate-blurhash?url=${encodeURIComponent(src)}`, {
           signal: controller.signal,
         })
-        if (!response.ok) return
+        if (!response.ok) {
+          if (isActive) blurhashCacheSet(src, "")
+          return
+        }
 
         const data = await response.json()
         if (!data?.blurhash || !isActive) return
