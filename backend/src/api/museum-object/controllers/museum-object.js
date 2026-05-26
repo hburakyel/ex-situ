@@ -304,6 +304,44 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
     }
   },
 
+  async lookup(ctx) {
+    try {
+      const { place_name, institution } = ctx.query;
+      if (!place_name) return ctx.badRequest('place_name is required');
+      const data = await strapi
+        .service('api::museum-object.museum-object')
+        .lookupByPlaceName(String(place_name).slice(0, 255), institution ? String(institution).slice(0, 255) : null);
+      ctx.send(data);
+    } catch (error) {
+      strapi.log.error('lookup endpoint error:', error.message);
+      ctx.internalServerError('Query failed');
+    }
+  },
+
+  async bulkGeocode(ctx) {
+    try {
+      const { place_name, institution_name, updates } = ctx.request.body || {};
+      if (!place_name) return ctx.badRequest('place_name is required');
+      if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+        return ctx.badRequest('updates must be an object');
+      }
+      const data = await strapi
+        .service('api::museum-object.museum-object')
+        .bulkGeocode(
+          String(place_name).slice(0, 255),
+          institution_name ? String(institution_name).slice(0, 255) : null,
+          updates
+        );
+      ctx.send({ success: true, ...data });
+    } catch (error) {
+      strapi.log.error('bulkGeocode endpoint error:', error.message);
+      if (error.message.startsWith('Invalid') || error.message === 'No fields to update') {
+        return ctx.badRequest(error.message);
+      }
+      ctx.internalServerError('Bulk update failed');
+    }
+  },
+
   /**
    * Synonyms table endpoint — returns all alias→canonical mappings
    * GET /api/museum-objects/synonyms

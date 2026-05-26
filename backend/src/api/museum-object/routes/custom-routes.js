@@ -103,6 +103,26 @@ module.exports = {
         policies: [],
         middlewares: [],
       },
-    }
+    },
+    {
+      method: 'GET',
+      path: '/museum-objects/lookup',
+      handler: 'museum-object.lookup',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'PUT',
+      path: '/museum-objects/bulk-geocode',
+      handler: 'museum-object.bulkGeocode',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
   ]
 };

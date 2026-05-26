@@ -1336,6 +1336,87 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     }
   },
 
+  async lookupByPlaceName(placeName, institutionName) {
+    const db = strapi.db.connection;
+    const bindings = {};
+    let where = 'WHERE published_at IS NOT NULL';
+    if (placeName) {
+      where += ' AND place_name = :place_name';
+      bindings.place_name = placeName;
+    }
+    if (institutionName) {
+      where += ' AND institution_name = :institution_name';
+      bindings.institution_name = institutionName;
+    }
+    const countResult = await db.raw(`SELECT COUNT(*)::integer AS total FROM museum_objects ${where}`, bindings);
+    const sampleResult = await db.raw(`
+      SELECT id, title, place_name, institution_name, city_en, country_en, latitude, longitude, geocoding_notes
+      FROM museum_objects ${where}
+      ORDER BY id LIMIT 5
+    `, bindings);
+    return {
+      total: this.getRows(countResult)[0]?.total || 0,
+      sample: this.getRows(sampleResult),
+    };
+  },
+
+  async bulkGeocode(placeName, institutionName, updates) {
+    const db = strapi.db.connection;
+    const { place_name_normalized, city_en, country_en, latitude, longitude, geocoding_notes } = updates;
+    const setClauses = [];
+    const bindings = {};
+
+    if (place_name_normalized) {
+      setClauses.push('place_name_normalized = :place_name_normalized');
+      bindings.place_name_normalized = String(place_name_normalized).slice(0, 255);
+    }
+    if (city_en) {
+      setClauses.push('city_en = :city_en');
+      bindings.city_en = String(city_en).slice(0, 255);
+    }
+    if (country_en) {
+      setClauses.push('country_en = :country_en');
+      bindings.country_en = String(country_en).slice(0, 100);
+    }
+    if (latitude !== undefined && latitude !== '') {
+      const lat = parseFloat(latitude);
+      if (!isFinite(lat) || lat < -90 || lat > 90) throw new Error('Invalid latitude: must be between -90 and 90');
+      setClauses.push('latitude = :latitude');
+      bindings.latitude = lat;
+    }
+    if (longitude !== undefined && longitude !== '') {
+      const lon = parseFloat(longitude);
+      if (!isFinite(lon) || lon < -180 || lon > 180) throw new Error('Invalid longitude: must be between -180 and 180');
+      setClauses.push('longitude = :longitude');
+      bindings.longitude = lon;
+    }
+    if (geocoding_notes) {
+      setClauses.push('geocoding_notes = :geocoding_notes');
+      bindings.geocoding_notes = String(geocoding_notes).slice(0, 1000);
+    }
+
+    if (setClauses.length === 0) throw new Error('No fields to update');
+
+    setClauses.push(`review_status = 'verified'`);
+    setClauses.push('updated_at = NOW()');
+
+    let where = 'WHERE published_at IS NOT NULL';
+    if (placeName) {
+      where += ' AND place_name = :place_name';
+      bindings.place_name = placeName;
+    }
+    if (institutionName) {
+      where += ' AND institution_name = :institution_name';
+      bindings.institution_name = institutionName;
+    }
+
+    const result = await db.raw(`UPDATE museum_objects SET ${setClauses.join(', ')} ${where}`, bindings);
+    const updatedCount = result.rowCount || 0;
+    await this.refreshGeospatialViews();
+    strapi.log.info(`bulkGeocode: place_name=${placeName} institution=${institutionName} updated=${updatedCount}`);
+    return { updatedCount };
+  },
+
   /**
    * Return all rows from the place_name_synonyms table so the frontend can
    * cache them and replace the hardcoded COUNTRY_ALIASES map.
