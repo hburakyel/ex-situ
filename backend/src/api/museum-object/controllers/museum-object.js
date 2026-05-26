@@ -304,6 +304,18 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
     }
   },
 
+  async refreshViews(ctx) {
+    try {
+      await strapi
+        .service('api::museum-object.museum-object')
+        .refreshGeospatialViews();
+      ctx.send({ success: true, message: 'Materialized views refreshed' });
+    } catch (error) {
+      strapi.log.error('refreshViews endpoint error:', error.message);
+      ctx.internalServerError('Refresh failed');
+    }
+  },
+
   async lookup(ctx) {
     try {
       const { place_name, institution } = ctx.query;

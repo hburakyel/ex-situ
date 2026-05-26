@@ -105,6 +105,16 @@ module.exports = {
       },
     },
     {
+      method: 'PUT',
+      path: '/museum-objects/refresh-views',
+      handler: 'museum-object.refreshViews',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
       method: 'GET',
       path: '/museum-objects/lookup',
       handler: 'museum-object.lookup',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -18,6 +18,99 @@ import {
 } from '@strapi/design-system';
 import { useFetchClient, useNotification } from '@strapi/helper-plugin';
 
+// ── Autocomplete place-name input ────────────────────────────────────────────
+function PlaceAutocomplete({ value, onChange, onSelect }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const { get } = useFetchClient();
+  const debounce = useRef(null);
+  const wrapperRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    clearTimeout(debounce.current);
+    if (val.trim().length >= 2) {
+      debounce.current = setTimeout(async () => {
+        try {
+          const { data } = await get(`/api/museum-objects/suggest?q=${encodeURIComponent(val.trim())}&limit=10`);
+          setSuggestions(data.data || []);
+          setOpen(true);
+        } catch {
+          setSuggestions([]);
+        }
+      }, 250);
+    } else {
+      setSuggestions([]);
+      setOpen(false);
+    }
+  };
+
+  const handleSelect = (s) => {
+    onSelect(s.place_name);
+    setSuggestions([]);
+    setOpen(false);
+  };
+
+  return (
+    <Box ref={wrapperRef} style={{ position: 'relative' }}>
+      <TextInput
+        label="Place name"
+        value={value}
+        onChange={handleChange}
+        placeholder="Type to search…"
+        name="place_name"
+      />
+      {open && suggestions.length > 0 && (
+        <Box
+          background="neutral0"
+          shadow="tableShadow"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            maxHeight: '260px',
+            overflowY: 'auto',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+          }}
+        >
+          {suggestions.map((s) => (
+            <Box
+              key={s.place_name}
+              padding={3}
+              style={{ cursor: 'pointer' }}
+              onMouseDown={() => handleSelect(s)}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#f6f6f9')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Typography variant="omega" fontWeight="bold">{s.place_name}</Typography>
+              {' '}
+              <Typography variant="pi" textColor="neutral500">
+                {[s.city_en, s.country_en].filter(Boolean).join(', ')} · {s.object_count} artifacts
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
 export default function GeoCorrection() {
   const [filter, setFilter] = useState({ place_name: '', institution_name: '' });
   const [form, setForm] = useState({
@@ -30,6 +123,7 @@ export default function GeoCorrection() {
   });
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [result, setResult] = useState(null);
 
   const { get, put } = useFetchClient();
@@ -37,7 +131,7 @@ export default function GeoCorrection() {
 
   const handlePreview = async () => {
     if (!filter.place_name.trim()) {
-      toggleNotification({ type: 'warning', message: 'Enter a place name to search' });
+      toggleNotification({ type: 'warning', message: 'Select or type a place name first' });
       return;
     }
     setLoading(true);
@@ -78,19 +172,42 @@ export default function GeoCorrection() {
     }
   };
 
+  const handleRefreshViews = async () => {
+    setRefreshing(true);
+    try {
+      await put('/api/museum-objects/refresh-views', {});
+      toggleNotification({ type: 'success', message: 'Map data refreshed — arcs will update on next map load' });
+    } catch {
+      toggleNotification({ type: 'warning', message: 'Refresh failed — check the console' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const setField = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
-  const setFilter_ = (field) => (e) => setFilter(f => ({ ...f, [field]: e.target.value }));
 
   return (
     <Box padding={8} background="neutral100">
       <Stack spacing={6}>
-        <Box>
-          <Typography variant="alpha">Geo Correction</Typography>
-          <Box paddingTop={2}>
-            <Typography variant="epsilon" textColor="neutral600">
-              Search by place name and apply bulk geocoding corrections to all matching records.
-            </Typography>
+
+        {/* Header */}
+        <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box>
+            <Typography variant="alpha">Geo Correction</Typography>
+            <Box paddingTop={2}>
+              <Typography variant="epsilon" textColor="neutral600">
+                Find records by place name and apply bulk geocoding corrections.
+              </Typography>
+            </Box>
           </Box>
+          <Button
+            onClick={handleRefreshViews}
+            loading={refreshing}
+            variant="secondary"
+            size="S"
+          >
+            Refresh map data
+          </Button>
         </Box>
 
         {/* Step 1 */}
@@ -99,19 +216,17 @@ export default function GeoCorrection() {
             <Typography variant="delta">Step 1 — Find records</Typography>
             <Grid gap={4}>
               <GridItem col={6} s={12}>
-                <TextInput
-                  label="Place name (exact match)"
+                <PlaceAutocomplete
                   value={filter.place_name}
-                  onChange={setFilter_('place_name')}
-                  placeholder="e.g. Londin"
-                  name="place_name"
+                  onChange={(val) => setFilter(f => ({ ...f, place_name: val }))}
+                  onSelect={(val) => setFilter(f => ({ ...f, place_name: val }))}
                 />
               </GridItem>
               <GridItem col={6} s={12}>
                 <TextInput
                   label="Institution (optional)"
                   value={filter.institution_name}
-                  onChange={setFilter_('institution_name')}
+                  onChange={(e) => setFilter(f => ({ ...f, institution_name: e.target.value }))}
                   placeholder="e.g. Ethnologisches Museum"
                   name="institution_name"
                 />
@@ -130,7 +245,9 @@ export default function GeoCorrection() {
           <Box padding={6} background="neutral0" shadow="filterShadow" borderRadius="4px">
             <Stack spacing={4}>
               <Typography variant="delta">
-                {preview.total === 0 ? 'No records found' : `${preview.total} record${preview.total === 1 ? '' : 's'} found`}
+                {preview.total === 0
+                  ? 'No records found'
+                  : `${preview.total} record${preview.total === 1 ? '' : 's'} found`}
               </Typography>
               {preview.sample.length > 0 && (
                 <>
@@ -226,7 +343,7 @@ export default function GeoCorrection() {
                     label="Geocoding notes"
                     value={form.geocoding_notes}
                     onChange={setField('geocoding_notes')}
-                    placeholder="Describe the correction and source..."
+                    placeholder="Describe the correction and source…"
                     name="geocoding_notes"
                   />
                 </GridItem>
@@ -252,7 +369,8 @@ export default function GeoCorrection() {
             closeLabel="Close"
             onClose={() => setResult(null)}
           >
-            {result.updatedCount} record{result.updatedCount === 1 ? '' : 's'} updated successfully.
+            {result.updatedCount} record{result.updatedCount === 1 ? '' : 's'} updated.
+            {' '}Click <strong>Refresh map data</strong> (top right) to update arcs on the map.
           </Alert>
         )}
       </Stack>
