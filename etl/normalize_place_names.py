@@ -190,7 +190,6 @@ _LOOKUP_RAW: dict[str, str] = {
     "asia minor": "Asia Minor",   # identity (already canonical)
     "anatolia": "Turkey",
     "nubia": "Sudan",
-    "abyssinia": "Ethiopia",
 
     # ── Null sentinels — institutional placeholders, not place names ────────
     "n/a": None,
