@@ -94,7 +94,7 @@ class PostGISGeocoder:
             "port": port or int(os.environ.get("DATABASE_PORT", 5432)),
             "dbname": dbname or os.environ.get("DATABASE_NAME", "museum_db"),
             "user": user or os.environ.get("DATABASE_USERNAME", "museum_user"),
-            "password": password or os.environ.get("DATABASE_PASSWORD", "museum_pass"),
+            "password": password or os.environ.get("DATABASE_PASSWORD", ""),
         }
         self._conn: Optional[psycopg2.extensions.connection] = None
         self._stats = {"queries": 0, "hits": 0, "misses": 0}

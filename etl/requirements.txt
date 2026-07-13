@@ -3,3 +3,5 @@ requests>=2.31
 python-dotenv>=1.0
 rapidfuzz>=3.0
 langdetect>=1.0.9
+aiohttp>=3.9
+geopy>=2.4

@@ -23,8 +23,6 @@ module.exports = [
         process.env.PUBLIC_URL || 'http://localhost:1337',
         'https://exsitu.app',
         'https://www.exsitu.app',
-        'http://localhost:3000',
-        'http://localhost:1337',
       ],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
       headers: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With'],

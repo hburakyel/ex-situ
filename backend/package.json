@@ -10,8 +10,7 @@
     "start": "node scripts/pre-strapi.js && strapi start",
     "build": "strapi build",
     "strapi": "strapi",
-    "delete-entries": "node ./scripts/deleteAllEntries.js",
-    "publish-entries": "node ./scripts/publishAllEntries.js",
+    "publish-entries": "node ./scripts/publishEntries.js",
     "setup-postgis": "node ./scripts/setupPostGIS.js"
   },
   "devDependencies": {

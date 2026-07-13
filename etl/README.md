@@ -61,6 +61,21 @@ python scrape_met_api.py
 
 **Victoria and Albert Museum**
 
+> `scrape_vam.py` imports `geocode_cache.py` and `institution_coords.py` from this
+> directory. Both are intentionally excluded from git (see `.gitignore`) and are
+> not part of this repo — you need to provide your own local versions before this
+> script will run. At minimum they must expose:
+> - `geocode_cache.geocode(place_name: str) -> Optional[tuple[float, float]]`
+> - `geocode_cache.geocode_country(place_name: str) -> Optional[str]`
+> - `geocode_cache.is_european(lat: float, lon: float, place_name: str) -> bool`
+> - `geocode_cache._load_cache()` / `geocode_cache._cache` (dict, for `--skip-geocode`)
+> - `institution_coords.INSTITUTION_COORDS` — a dict mapping institution name to
+>   `{"lat": float, "lon": float}` (or equivalent, see usage at line ~481)
+>
+> `postgis_geocoder.py`'s `PostGISGeocoder` class covers the same geocode/is_european
+> surface against the project's own PostGIS gazetteer and is a reasonable starting
+> point if you're writing your own.
+
 ```bash
 # All non-European collections
 python scrape_vam.py
