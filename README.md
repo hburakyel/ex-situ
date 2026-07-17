@@ -198,7 +198,7 @@ See [COLLECTIONS.md](COLLECTIONS.md) for the full collection roadmap.
 - [Nominatim](https://nominatim.org) — geocoding
 - [Natural Earth](https://naturalearthdata.com) — public domain geodata
 
-**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum.
+**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum, Art Institute of Chicago (CC0).
 
 ---
 
