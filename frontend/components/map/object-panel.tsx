@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
-import { ChevronDown, ChevronUp, Check, MoreHorizontal, FileText, FileJson, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Check, FileText, FileJson, Loader2 } from "lucide-react"
 import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconPanelOpen, IconPanelClosed } from "@/components/icons"
 import { fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -72,6 +72,7 @@ interface ObjectPanelProps {
   totalCount: number
   isLoading: boolean
   onObjectClick: (longitude: number, latitude: number, object?: MuseumObject) => void
+  onObjectHover?: (placeName: string | null) => void
   isMobile?: boolean
   viewMode: "grid" | "list"
   setViewMode: (mode: "grid" | "list") => void
@@ -112,6 +113,7 @@ export default function ObjectPanel({
   totalCount,
   isLoading,
   onObjectClick,
+  onObjectHover,
   isMobile = false,
   viewMode,
   setViewMode,
@@ -161,6 +163,11 @@ export default function ObjectPanel({
     activeSite,
     activeInstitution,
   })
+  // A gallery-triggered click changes activeCountry/Site/Institution in the
+  // same tick it opens the gallery — set right before that so the
+  // close-on-scope-change effect below skips its very next run instead of
+  // closing the gallery before it ever paints.
+  const suppressCloseOnScopeChangeRef = useRef(false)
   const [showOrigins, setShowOrigins] = useState(false)
   const [showSites, setShowSites] = useState(false)
   const [showCollections, setShowCollections] = useState(true)
@@ -170,12 +177,9 @@ export default function ObjectPanel({
   const hasTerritoryExportScope = Boolean(activeCountry) && !activeSite
   const hasExportScope = hasSiteExportScope || hasTerritoryExportScope
   const cappedExportCount = hasTerritoryExportScope ? Math.min(totalCount, EXPORT_ROW_CAP) : totalCount
-  const csvExportLabel = hasTerritoryExportScope
-    ? `Download CSV (${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)})`
-    : "Download CSV"
-  const jsonExportLabel = hasTerritoryExportScope
-    ? `Download JSON (${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)})`
-    : "Download JSON"
+  const exportCapNote = hasTerritoryExportScope
+    ? `${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)}`
+    : undefined
 
   const galleryObjects = useMemo(() => objects, [objects])
 
@@ -650,6 +654,11 @@ export default function ObjectPanel({
 
     if (isMobile || !galleryOpen || !scopeChanged) return
 
+    if (suppressCloseOnScopeChangeRef.current) {
+      suppressCloseOnScopeChangeRef.current = false
+      return
+    }
+
     closeGallery()
   }, [activeCountry, activeSite, activeInstitution, galleryOpen, isMobile])
 
@@ -725,7 +734,12 @@ export default function ObjectPanel({
   }
 
   const handleObjectClick = (longitude: number, latitude: number, index: number, object?: MuseumObject) => {
-    const obj = index >= 0 ? galleryObjects[index] : null
+    // Resolve by id, not the passed index — the grid can re-sort/refetch
+    // between render and click, making a positional index stale. `object` is
+    // always the literal clicked item, so match on that first.
+    const obj = object
+      ? galleryObjects.find((o) => o.id === object.id) ?? object
+      : index >= 0 ? galleryObjects[index] : null
     const selectedObject = obj || object
     if (!obj) {
       onObjectClick(longitude, latitude, selectedObject)
@@ -739,9 +753,11 @@ export default function ObjectPanel({
     // Pass obj so the parent zooms to the right location and starts the
     // drill-down in the background. The snapshot keeps the gallery open
     // during the transition — when the user closes it the new objects are ready.
+    const resolvedIndex = galleryObjects.findIndex((o) => o.id === obj.id)
     gallerySnapshot.current = [...galleryObjects]
+    suppressCloseOnScopeChangeRef.current = true
     onObjectClick(longitude, latitude, obj)
-    setSelectedIndex(index)
+    setSelectedIndex(resolvedIndex >= 0 ? resolvedIndex : 0)
     if (galleryObjects.length > 0) {
       setGalleryOpen(true)
     }
@@ -1122,11 +1138,13 @@ export default function ObjectPanel({
 
   const renderExportMenuItem = ({
     label,
+    sublabel,
     onClick,
     disabled,
     icon,
   }: {
     label: string
+    sublabel?: string
     onClick: () => void
     disabled: boolean
     icon: React.ReactNode
@@ -1134,7 +1152,10 @@ export default function ObjectPanel({
     const item = (
       <DropdownMenuItem onClick={onClick} disabled={disabled} className="gap-2 cursor-pointer">
         {icon}
-        {label}
+        <span className="flex flex-col leading-tight">
+          <span>{label}</span>
+          {sublabel && <span className="text-[10px] text-gray-400">{sublabel} (capped)</span>}
+        </span>
       </DropdownMenuItem>
     )
 
@@ -1255,8 +1276,8 @@ export default function ObjectPanel({
                 actionSlot={objects.length > 0 ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" title="More options">
-                        {isExporting ? <Loader2 className="h-5 w-5 animate-spin text-gray-400" /> : <MoreHorizontal className="h-5 w-5 text-gray-500" />}
+                      <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
+                        {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-[160px]">
@@ -1265,22 +1286,24 @@ export default function ObjectPanel({
                         {showCopied ? "Link copied!" : "Share link"}
                       </DropdownMenuItem>
                       {renderExportMenuItem({
-                        label: csvExportLabel,
+                        label: "Download as CSV",
+                        sublabel: exportCapNote,
                         onClick: downloadObjectsAsCSV,
                         disabled: isExporting || !hasExportScope,
                         icon: <IconDownloadCsv className="h-4 w-4 text-gray-500" />,
                       })}
                       {renderExportMenuItem({
-                        label: "Export MD",
-                        onClick: downloadProvenanceReport,
-                        disabled: isExporting || !hasExportScope,
-                        icon: <FileText className="h-4 w-4 text-gray-500" />,
-                      })}
-                      {renderExportMenuItem({
-                        label: jsonExportLabel,
+                        label: "Download as JSON",
+                        sublabel: exportCapNote,
                         onClick: exportAsJSON,
                         disabled: isExporting || !hasExportScope,
                         icon: <FileJson className="h-4 w-4 text-gray-500" />,
+                      })}
+                      {renderExportMenuItem({
+                        label: "Download as MD",
+                        onClick: downloadProvenanceReport,
+                        disabled: isExporting || !hasExportScope,
+                        icon: <FileText className="h-4 w-4 text-gray-500" />,
                       })}
                       {reportIssueMenuItem}
                     </DropdownMenuContent>
@@ -1343,8 +1366,8 @@ export default function ObjectPanel({
               {objects.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title="More options">
-                      {isExporting ? <Loader2 className="h-5 w-5 animate-spin text-gray-400" /> : <MoreHorizontal className="h-5 w-5 text-gray-500" />}
+                    <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
+                      {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-[160px]">
@@ -1353,29 +1376,38 @@ export default function ObjectPanel({
                       {showCopied ? "Link copied!" : "Share link"}
                     </DropdownMenuItem>
                     {renderExportMenuItem({
-                      label: csvExportLabel,
+                      label: "Download as CSV",
+                      sublabel: exportCapNote,
                       onClick: downloadObjectsAsCSV,
                       disabled: isExporting || !hasExportScope,
                       icon: <IconDownloadCsv className="h-5 w-5" />,
                     })}
                     {renderExportMenuItem({
-                      label: "Export MD",
-                      onClick: downloadProvenanceReport,
-                      disabled: isExporting || !hasExportScope,
-                      icon: <FileText className="h-5 w-5" />,
-                    })}
-                    {renderExportMenuItem({
-                      label: jsonExportLabel,
+                      label: "Download as JSON",
+                      sublabel: exportCapNote,
                       onClick: exportAsJSON,
                       disabled: isExporting || !hasExportScope,
                       icon: <FileJson className="h-5 w-5" />,
+                    })}
+                    {renderExportMenuItem({
+                      label: "Download as MD",
+                      onClick: downloadProvenanceReport,
+                      disabled: isExporting || !hasExportScope,
+                      icon: <FileText className="h-5 w-5" />,
                     })}
                     {reportIssueMenuItem}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
               {/* Expand/minimize — desktop only */}
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSize}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleSize}
+                title={containerSize === "expanded" ? "Minimize panel" : "Expand panel"}
+                aria-label={containerSize === "expanded" ? "Minimize panel" : "Expand panel"}
+              >
                 {containerSize === "expanded" ? <IconMinimize className="h-5 w-5 text-gray-500" /> : <IconExpand className="h-5 w-5 text-gray-500" />}
               </Button>
             </div>
@@ -1392,6 +1424,7 @@ export default function ObjectPanel({
             totalCount={totalCount}
             isLoading={isLoading}
             onObjectClick={(longitude, latitude, index, object) => handleObjectClick(longitude, latitude, index, object)}
+            onObjectHover={onObjectHover}
             isFullscreen={containerSize === "expanded"}
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}

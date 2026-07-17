@@ -199,6 +199,9 @@ function MapContent() {
   useEffect(() => { activeCountryRef.current = activeCountry }, [activeCountry])
   const [activeSite, setActiveSite] = useState<string | null>(urlSite || null)
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
+  // Transient hover-only highlight — mirrors an object card's origin onto the
+  // matching map arc without triggering the navigation/fetch side effects of setActiveSite.
+  const [hoveredObjectPlace, setHoveredObjectPlace] = useState<string | null>(null)
   const [subArcs, setSubArcs] = useState<SubArc[]>([])
   const [isLoadingSubArcs, setIsLoadingSubArcs] = useState(false)
 
@@ -1124,6 +1127,7 @@ function MapContent() {
           onToggleInstitution={handleToggleInstitution}
           isLoadingSubArcs={isLoadingSubArcs}
           drillArcs={filteredSubArcs}
+          hoveredObjectPlace={hoveredObjectPlace}
         />
 
         {/* Floating object container — images only (+ header on mobile) */}
@@ -1135,6 +1139,7 @@ function MapContent() {
             totalCount={containerTotalCount}
             isLoading={isGlobalInstitutionDrill || drillLevel !== "global" ? arcObjectsLoading : isLoading}
             onObjectClick={handleObjectClick}
+            onObjectHover={setHoveredObjectPlace}
             isMobile={isMobile}
             viewMode={viewMode}
             setViewMode={setViewMode}

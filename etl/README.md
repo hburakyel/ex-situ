@@ -84,14 +84,22 @@ Common flags available on all resolvers:
 
 ## Geocoding pipeline
 
-`postgis_geocoder.py` resolves `place_name` strings to coordinates using Nominatim, then writes `latitude`, `longitude`, and geometry into `museum_objects`.
+`postgis_geocoder.py` resolves place names to coordinates by calling the `geocode_place()` / `reverse_geocode()` SQL functions against the local `gazetteer_places` table (fast, no rate limits, no external calls). Resolvers that don't wire up a `PostGISGeocoder` fall back to Nominatim instead.
+
+Before first use, apply `backend/database/migrations/013_add_gazetteer_geocoding.sql` and populate the gazetteer:
 
 ```bash
-# Geocode all un-geocoded rows
-python postgis_geocoder.py
+./import_gazetteer.sh
+```
 
-# Dry-run — print what would be resolved
-python postgis_geocoder.py --dry-run
+This downloads GeoNames' `cities500` extract plus country/admin1 reference tables and loads them into `gazetteer_places`. Skip this and `gazetteer_places` stays empty — every resolver will silently fall back to Nominatim (slow, rate-limited) with no error.
+
+`postgis_geocoder.py` reads DB credentials from `DATABASE_HOST` / `DATABASE_PORT` / `DATABASE_NAME` / `DATABASE_USERNAME` / `DATABASE_PASSWORD` (not the `DB_*` vars above).
+
+```bash
+# One-off lookup / smoke test
+python postgis_geocoder.py "Istanbul"
+python postgis_geocoder.py --reverse 41.0082 28.9784
 ```
 
 ---

@@ -15,6 +15,7 @@ interface ObjectGridProps {
   totalCount: number
   isLoading: boolean
   onObjectClick?: (longitude: number, latitude: number, index: number, object?: MuseumObject) => void
+  onObjectHover?: (placeName: string | null) => void
   isFullscreen?: boolean
   panelSize?: number
   mobileColumns?: number
@@ -35,6 +36,7 @@ export default function ObjectGrid({
   totalCount,
   isLoading,
   onObjectClick = () => {},
+  onObjectHover = () => {},
   isFullscreen = false,
   panelSize = 50,
   mobileColumns = 2,
@@ -48,6 +50,13 @@ export default function ObjectGrid({
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
   const [gridClass, setGridClass] = useState("")
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
+  // Any card's img_url can die (museum CDN outage, hotlink block, etc). When it
+  // does, ask the server to find and HEAD-validate a working replacement from
+  // the same institution — the browser only ever receives a URL already
+  // confirmed reachable, so a dead link degrades to another real photo from
+  // the same collection instead of a blank tile.
+  const [fallbackImageUrls, setFallbackImageUrls] = useState<Record<string, string>>({})
+  const attemptedFallbackRef = useRef<Set<string>>(new Set())
 
   // Use virtualization for better performance with large lists
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 })
@@ -182,8 +191,33 @@ export default function ObjectGrid({
     onObjectClick(lng, lat, objectIndex, object)
   }
 
-  const handleImageError = (id: string) => {
+  const handleImageError = (object: MuseumObject) => {
+    const id = object.id
     console.log(`Image failed to load for object ${id}`)
+
+    const institutionName = object.attributes.institution_name
+
+    if (institutionName && !attemptedFallbackRef.current.has(id)) {
+      attemptedFallbackRef.current.add(id)
+      const brokenUrl = fallbackImageUrls[id] || object.attributes.img_url || ""
+
+      // The server HEAD-validates candidates before responding, so whatever
+      // comes back is already confirmed reachable — no client-side retry loop.
+      fetch(`/api/proxy/institution-image?institution=${encodeURIComponent(institutionName)}&exclude=${encodeURIComponent(brokenUrl)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => {
+          if (json?.img_url) {
+            setFallbackImageUrls((prev) => ({ ...prev, [id]: json.img_url }))
+          } else {
+            setBrokenImages((prev) => ({ ...prev, [id]: true }))
+          }
+        })
+        .catch(() => {
+          setBrokenImages((prev) => ({ ...prev, [id]: true }))
+        })
+      return
+    }
+
     setBrokenImages((prev) => ({
       ...prev,
       [id]: true,
@@ -218,18 +252,26 @@ return (
         const isSelected = object.id === selectedImageId
         const hasImage = hasImageUrl(object.attributes?.img_url) && !brokenImages[object.id]
 
+const isPending = hasImage && !loadedImages[object.id]
+
 return (
   <div
     key={object.id}
     className="group relative cursor-pointer transition-all duration-200 bg-white p-1 h-44 flex items-center justify-center"
     onClick={() => handleImageClick(index)}
-    onMouseEnter={() => setSelectedImageId(object.id)}
-    onMouseLeave={() => setSelectedImageId(null)}
+    onMouseEnter={() => {
+      setSelectedImageId(object.id)
+      onObjectHover(object.attributes.place_name || null)
+    }}
+    onMouseLeave={() => {
+      setSelectedImageId(null)
+      onObjectHover(null)
+    }}
   >
     {/* For image tiles: inventory number as absolute overlay while image is loading */}
-    {hasImage && object.attributes.inventory_number && !loadedImages[object.id] && (
+    {isPending && object.attributes.inventory_number && (
       <span className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
-        <span className="text-[10px] text-gray-300 font-mono text-center px-2 break-all leading-tight max-w-full">
+        <span className="text-[10px] text-gray-300 font-mono text-center px-2 break-words leading-tight max-w-full">
           {object.attributes.inventory_number}
         </span>
       </span>
@@ -276,16 +318,16 @@ return (
       )}
       {hasImage ? (
         <BlurhashImage
-          src={object.attributes.img_url!}
+          src={fallbackImageUrls[object.id] || object.attributes.img_url!}
           alt={object.attributes?.title || "Museum object"}
           className="block"
           imgClassName="block max-h-44 w-auto bg-white"
           onLoad={() => handleImageLoad(object.id)}
-          onError={() => handleImageError(object.id)}
+          onError={() => handleImageError(object)}
           loading="lazy"
         />
       ) : (
-        <span className="text-[10px] text-gray-400 font-mono text-center px-2 break-all leading-tight max-w-full">
+        <span className="text-[10px] text-gray-400 font-mono text-center break-words leading-tight max-w-full px-2">
           {object.attributes.inventory_number || "—"}
         </span>
       )}

@@ -12,6 +12,7 @@ import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
 import { IconSearch, IconPanelOpen, IconPanelClosed, iconSvgStrings } from "@/components/icons"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ArcLayer, ScatterplotLayer } from "@deck.gl/layers"
 import { Spinner } from "@/components/ui/spinner"
 import { useGeospatialData, type GeospatialFilters as FilterState } from "@/hooks/use-geospatial-data"
@@ -163,6 +164,9 @@ interface MapViewProps {
   drillInstitutions?: InstitutionItem[]
   activeSite?: string | null
   activeInstitution?: string | null
+  // Transient hover-only place name (from an object card in the grid) — highlights
+  // the matching arc without the navigation/fetch side effects of activeSite.
+  hoveredObjectPlace?: string | null
   onToggleSite?: (site: string, lat?: number, lng?: number) => void
   onToggleInstitution?: (inst: string) => void
   isLoadingSubArcs?: boolean
@@ -213,6 +217,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       drillInstitutions = [],
       activeSite = null,
       activeInstitution = null,
+      hoveredObjectPlace = null,
       onToggleSite,
       onToggleInstitution,
       isLoadingSubArcs = false,
@@ -711,6 +716,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Arc layer construction
 
+    // Below zoom 4 (global view) hundreds of arcs overplot into a solid mass —
+    // dim and thin unhighlighted arcs so overlap reads as density rather than a flat blob.
+    // Bucketed to a boolean (not raw currentZoom) so this only recomputes the layer
+    // when crossing the threshold, not on every zoom-gesture frame.
+    const isLowZoomArcView = currentZoom < 4
+
     // ArcLayer: görsel ve etkileşim bir arada, mobilde hover/tıklama sırasında geçici olarak genişler
     const arcLayer = useMemo(() => {
       if (!isMapReady || processedArcs.arcLayerData.length === 0) return null
@@ -738,6 +749,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         return matchesSelectedArc || (
           normalizePlaceKey(activeSite).length > 0 && normalizePlaceKey(activeSite) === datumFrom
+        ) || (
+          normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === datumFrom
         )
       }
 
@@ -748,11 +761,15 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         getTargetPosition: (d) => d.targetPosition,
         getSourceColor: (d): [number, number, number, number] => {
           const highlighted = isHighlightedArc(d)
-          return highlighted ? [59, 130, 246, 255] : [...sourceColor, 255] as [number, number, number, number]
+          if (highlighted) return [59, 130, 246, 255]
+          const alpha = isLowZoomArcView ? 130 : 255
+          return [...sourceColor, alpha] as [number, number, number, number]
         },
         getTargetColor: (d): [number, number, number, number] => {
           const highlighted = isHighlightedArc(d)
-          return highlighted ? [147, 51, 234, 255] : [...targetColor, 255] as [number, number, number, number]
+          if (highlighted) return [147, 51, 234, 255]
+          const alpha = isLowZoomArcView ? 130 : 255
+          return [...targetColor, alpha] as [number, number, number, number]
         },
         getWidth: (d) => {
           const highlighted = isHighlightedArc(d)
@@ -762,7 +779,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             : Math.max(2, Math.min(6, 2 + Math.log(d.count + 1) * 0.9))
           // Mobilde ve hover/seçili ise geçici olarak genişlet
           if (isMobile && (isHovered || highlighted)) return Math.max(baseWidth, 16)
-          return highlighted ? baseWidth * 2.5 : baseWidth
+          if (highlighted) return baseWidth * 2.5
+          // Thin unhighlighted arcs further at global zoom so overlap reads as
+          // density rather than a solid overplotted mass.
+          return isLowZoomArcView ? baseWidth * 0.7 : baseWidth
         },
         widthMinPixels: isMobile ? 2.5 : 1.5,
         pickable: true,
@@ -770,7 +790,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         highlightColor: [59, 130, 246],
         transitions: { getSourceColor: { duration: 300 }, getTargetColor: { duration: 300 }, getWidth: { duration: 300 } },
         updateTriggers: {
-          getSourceColor: [selectedArc?.key, activeSite], getTargetColor: [selectedArc?.key, activeSite], getWidth: [selectedArc?.key, activeSite, hoveredArc, isMobile],
+          getSourceColor: [selectedArc?.key, activeSite, hoveredObjectPlace, isLowZoomArcView], getTargetColor: [selectedArc?.key, activeSite, hoveredObjectPlace, isLowZoomArcView], getWidth: [selectedArc?.key, activeSite, hoveredObjectPlace, hoveredArc, isMobile, isLowZoomArcView],
         },
         onHover: (info: any) => {
           if (info.object) {
@@ -804,7 +824,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           }
         },
       })
-    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredArc])
+    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArc, isLowZoomArcView])
 
     // ── Drill arc layer: persistent city-cluster arcs ──
     // Shown at city zoom (< 7) always. At zoom 7+, shown only when arcLayer has
@@ -822,25 +842,28 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         hasValidCoordinates(a.institution_latitude, a.institution_longitude)
       )
       if (validArcs.length === 0) return null
+      const isHighlightedDrillArc = (d: any) =>
+        normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ||
+        (normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.place_name))
       return new ArcLayer({
         id: "arc-layer-drill",
         data: validArcs,
         getSourcePosition: (d: any) => [d.longitude, d.latitude],
         getTargetPosition: (d: any) => [d.institution_longitude, d.institution_latitude],
         getSourceColor: (d: any): [number, number, number, number] =>
-          normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ? [59, 130, 246, 255] : [239, 95, 0, 200],
+          isHighlightedDrillArc(d) ? [59, 130, 246, 255] : [239, 95, 0, 200],
         getTargetColor: (d: any): [number, number, number, number] =>
-          normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ? [147, 51, 234, 255] : [239, 95, 0, 200],
+          isHighlightedDrillArc(d) ? [147, 51, 234, 255] : [239, 95, 0, 200],
         getWidth: (d: any) =>
-          normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
+          isHighlightedDrillArc(d) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
         widthMinPixels: isMobile ? 2.5 : 1.5,
         pickable: true,
         autoHighlight: true,
         highlightColor: [59, 130, 246],
         updateTriggers: {
-          getSourceColor: [activeSite],
-          getTargetColor: [activeSite],
-          getWidth: [activeSite],
+          getSourceColor: [activeSite, hoveredObjectPlace],
+          getTargetColor: [activeSite, hoveredObjectPlace],
+          getWidth: [activeSite, hoveredObjectPlace],
         },
         onHover: (info: any) => {
           if (info.object) {
@@ -871,7 +894,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 900 })
         },
       })
-    }, [isMapReady, drillLevel, drillArcs, activeSite, isMobile, currentZoom, processedArcs.dataSource, processedArcs.arcLayerData.length])
+    }, [isMapReady, drillLevel, drillArcs, activeSite, hoveredObjectPlace, isMobile, currentZoom, processedArcs.dataSource, processedArcs.arcLayerData.length])
 
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({
@@ -926,6 +949,14 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           ref={mapContainer}
           className="h-full w-full"
           suppressHydrationWarning
+          onMouseLeave={() => {
+            // deck.gl's ArcLayer onHover only clears hover state when it picks
+            // "nothing" inside the canvas — if the pointer leaves the canvas
+            // directly (e.g. onto the object panel), that pick never fires and
+            // the tooltip stays stuck. Clear it explicitly on leave.
+            setHoveredArc(null)
+            setHoveredDoc(null)
+          }}
           style={{
             backgroundColor: "#111", // Protomaps dark bg ile uyumlu
             WebkitBackdropFilter: "none",
@@ -1121,6 +1152,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             </div>
           )}
 
+          <TooltipProvider delayDuration={150}>
           <div className="px-4 pb-3 text-sm">
             {/* ── Places Section (drill-down) ── */}
             {drillLevel === "global" && groupedOrigins.length > 0 && (
@@ -1132,6 +1164,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   </span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowArcs(!showArcs)}
+                    title={showArcs ? "Collapse Places" : "Expand Places"}
+                    aria-label={showArcs ? "Collapse Places" : "Expand Places"}
                   >
                     {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
@@ -1144,7 +1178,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
-                            <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate max-w-[70%]">{origin.country}</span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">{origin.country}</TooltipContent>
+                            </Tooltip>
                             <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
                           </div>
                       ))}
@@ -1164,6 +1203,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   </span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowArcs(!showArcs)}
+                    title={showArcs ? "Collapse Sites" : "Expand Sites"}
+                    aria-label={showArcs ? "Collapse Sites" : "Expand Sites"}
                   >
                     {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
@@ -1177,7 +1218,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                         >
-                          <span className="truncate max-w-[70%]" title={site.name}>{site.name}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate max-w-[70%]">{site.name}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{site.name}</TooltipContent>
+                          </Tooltip>
                           <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
                         </div>
                       ))}
@@ -1197,6 +1243,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   </span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowCollections(!showCollections)}
+                    title={showCollections ? "Collapse Collections" : "Expand Collections"}
+                    aria-label={showCollections ? "Collapse Collections" : "Expand Collections"}
                   >
                     {showCollections ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
@@ -1209,7 +1257,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleInstitution?.(inst.name)}
                         >
-                          <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate max-w-[70%]">{inst.name}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{inst.name}</TooltipContent>
+                          </Tooltip>
                           <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
                         </div>
                       ))}
@@ -1221,6 +1274,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
 
           </div>
+          </TooltipProvider>
         </div>
         </div>
         )}

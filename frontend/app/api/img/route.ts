@@ -10,6 +10,7 @@ const MAX_WIDTH = 800
 const BLURHASH_SIZE = 32
 
 // Allowed image source domains — NO localhost/127.0.0.1 (SSRF prevention)
+// Kept in sync with generate-blurhash/route.ts's allowlist.
 const ALLOWED_IMAGE_DOMAINS = new Set([
   "images.metmuseum.org",
   "collectionapi.metmuseum.org",
@@ -18,6 +19,9 @@ const ALLOWED_IMAGE_DOMAINS = new Set([
   "upload.wikimedia.org",
   "commons.wikimedia.org",
   "id.smb.museum",
+  "framemark.vam.ac.uk",
+  "smb.museum-digital.de",
+  "asset.museum-digital.org",
 ])
 
 // Block private/internal IP ranges and hostnames to prevent SSRF
@@ -101,10 +105,26 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  // Fetch original image
+  // Fetch original image. Some museum CDNs (e.g. id.smb.museum) hotlink-block
+  // headerless requests, so spoof the same User-Agent/Referer as generate-blurhash/route.ts.
   let response: Response
   try {
-    response = await fetch(url, { next: { revalidate: 86400 } })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10_000)
+    try {
+      response = await fetch(url, {
+        next: { revalidate: 86400 },
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; ExSitu/1.0; +https://ex-situ.eu)",
+          "Accept": "image/webp,image/jpeg,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.5",
+          "Referer": new URL(url).origin + "/",
+        },
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
   } catch {
     return NextResponse.json({ error: "Failed to fetch image" }, { status: 502 })
   }

@@ -430,6 +430,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           WHERE published_at IS NOT NULL
             AND ${latFilter}
             AND ${lonFilter}
+            AND institution_latitude IS NOT NULL
+            AND institution_longitude IS NOT NULL
             AND ${latExpr} BETWEEN :minLat AND :maxLat
             AND ${lonExpr} BETWEEN :minLon AND :maxLon
             ${institutionFilter.clause}

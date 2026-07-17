@@ -47,6 +47,11 @@ the Ex Situ dark palette (background `#1a1a1a`, water `#0d1117`).
 
 ## Geocoding
 
-Place search uses the **self-hosted PostGIS gazetteer** via `/api/geocode`.
-The `geocode_place()` function queries `gazetteer_places` with trigram similarity
-and full-text search. No external API tokens required.
+Place search goes through `/api/geocode` ([route.ts](app/api/geocode/route.ts)), which currently proxies
+**Nominatim** (`nominatim.openstreetmap.org`) directly — no external API token required, but
+subject to Nominatim's rate limits.
+
+A self-hosted PostGIS gazetteer (`gazetteer_places` table, `geocode_place()` / `reverse_geocode()`
+SQL functions — see `backend/database/migrations/013_add_gazetteer_geocoding.sql` and
+`etl/import_gazetteer.sh`) exists for the ETL pipeline's local geocoding, but the frontend route
+does not use it yet.

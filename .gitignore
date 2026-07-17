@@ -94,6 +94,7 @@ pnpm-debug.log*
 # ETL scratch / sensitive data
 etl/coordinates.json
 temp_geo_data/
+etl/data/gazetteer/
 
 # Dev notes
 memory.md
@@ -103,3 +104,10 @@ backend/scripts/*.csv
 backend/scripts/*.log
 backend/scripts/*.json
 !backend/scripts/pre-strapi.js
+
+# Local Claude Code tooling state
+.claude/
+
+# Scrape data dumps — not source, not committed
+etl/aic_museum_objects.json
+data/

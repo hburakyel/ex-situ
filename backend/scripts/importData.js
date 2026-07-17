@@ -18,15 +18,21 @@ const importData = async () => {
   // Iterate over the JSON data and insert into Strapi
   for (let item of data) {
     try {
-      // Idempotency check — skip if object_id already exists
+      // Idempotency check — skip if this institution already has this object_id.
+      // object_id alone is not globally unique: it's each source's own numbering
+      // scheme, so e.g. AIC object_id 26516 and Ethnologisches Museum object_id
+      // 26516 are unrelated objects that happen to share a number.
       const existing = await strapi.entityService.findMany('api::museum-object.museum-object', {
-        filters: { object_id: { $eq: item.object_id } },
+        filters: {
+          object_id: { $eq: item.object_id },
+          institution_name: { $eq: item.institution_name },
+        },
         fields: ['id'],
         limit: 1,
       });
 
       if (existing && existing.length > 0) {
-        console.log(`⚠️ Skipping object_id ${item.object_id}: already exists (id=${existing[0].id}).`);
+        console.log(`⚠️ Skipping ${item.institution_name} object_id ${item.object_id}: already exists (id=${existing[0].id}).`);
         skipped++;
         continue;
       }
@@ -50,11 +56,14 @@ const importData = async () => {
           institution_longitude: item.institution_longitude,
           institution_name: item.institution_name,
           place_name: item.place_name,
-          time: item.time ? {
-            time_name: item.time.time_name,
-            time_start: item.time.time_start,
-            time_end: item.time.time_end,
-          } : null,
+          // `time` is a repeatable component — Strapi expects an array, not a
+          // bare object. time_start/time_end are declared as string fields
+          // in the component schema, so coerce non-null numbers explicitly.
+          time: item.time && (item.time.time_name || item.time.time_start != null || item.time.time_end != null) ? [{
+            time_name: item.time.time_name != null ? String(item.time.time_name) : null,
+            time_start: item.time.time_start != null ? String(item.time.time_start) : null,
+            time_end: item.time.time_end != null ? String(item.time.time_end) : null,
+          }] : [],
           inventory_number: item.inventory_number,
           object_links: item.object_links.length > 0 ? item.object_links.map(link => ({
             link_text: link.link_text.replace(/^"|"$/g, ''),
