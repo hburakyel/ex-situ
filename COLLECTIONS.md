@@ -1,6 +1,6 @@
 # Ex Situ — Collection Roadmap
 
-Current: **111,497 artifacts · 8 collections · 177 territories · 961 origin sites**
+Current: **200,552 artifacts · 9 collections · 194 territories · 6,679 origin sites**
 
 This document tracks indexed collections, planned integrations, and contribution priorities.
 
@@ -10,14 +10,15 @@ This document tracks indexed collections, planned integrations, and contribution
 
 | # | Institution | Location | Artifacts | Method | Status |
 |---|-------------|----------|---------|--------|--------|
-| 1 | Ethnologisches Museum | Berlin | 57,384 | SMB API | ✅ Live |
-| 2 | Victoria and Albert Museum | London | 21,465 | REST API | ✅ Live |
-| 3 | The Metropolitan Museum of Art | New York | 18,309 | REST API (CC0) | ✅ Live |
-| 4 | Ägyptisches Museum und Papyrussammlung | Berlin | 5,517 | SMB API | ✅ Live |
-| 5 | Museum für Islamische Kunst | Berlin | 3,219 | SMB API | ✅ Live |
-| 6 | Antikensammlung | Berlin | 2,418 | SMB API | ✅ Live |
-| 7 | Museum für Asiatische Kunst | Berlin | 2,396 | SMB API | ✅ Live |
-| 8 | Vorderasiatisches Museum | Berlin | 789 | SMB API | ✅ Live |
+| 1 | Ethnologisches Museum | Berlin | 76,990 | SMB API | ✅ Live |
+| 2 | Victoria and Albert Museum | London | 41,981 | REST API | ✅ Live |
+| 3 | The Metropolitan Museum of Art | New York | 19,587 | REST API (CC0) | ✅ Live |
+| 4 | Ägyptisches Museum und Papyrussammlung | Berlin | 6,328 | SMB API | ✅ Live |
+| 5 | Museum für Islamische Kunst | Berlin | 12,409 | SMB API | ✅ Live |
+| 6 | Antikensammlung | Berlin | 5,613 | SMB API | ✅ Live |
+| 7 | Museum für Asiatische Kunst | Berlin | 2,693 | SMB API | ✅ Live |
+| 8 | Vorderasiatisches Museum | Berlin | 1,061 | SMB API | ✅ Live |
+| 9 | Art Institute of Chicago | Chicago | 33,890 | REST API (CC0) | ✅ Live |
 
 ---
 
@@ -31,7 +32,6 @@ Easy to integrate. API key required where noted.
 | 10 | Smithsonian NMAI | Washington | ~800k | Same API | Native American collections |
 | 11 | Smithsonian Freer/Sackler | Washington | ~40k | Same API | Asian + Islamic art |
 | 12 | Rijksmuseum | Amsterdam | ~15k filtered | REST API, key needed | Filter by non-European origin |
-| 13 | Art Institute Chicago | Chicago | ~50k filtered | REST API (CC0) | — |
 | 14 | Cleveland Museum of Art | Cleveland | ~30k filtered | REST API (CC0) | — |
 | 15 | Harvard Art Museums | Cambridge | ~250k filtered | REST API, key needed | — |
 | 16 | Cooper Hewitt | New York | ~50k | REST API (CC0) | — |
@@ -113,6 +113,7 @@ Open an issue before starting work to avoid duplication.
 | Version | Date | Collections | Artifacts |
 |---------|------|-------------|---------|
 | v0.1.0 | May 2026 | 8 | 111,497 |
+| v1.1.0 | July 2026 | 9 | 200,552 |
 
 ---
 

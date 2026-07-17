@@ -736,7 +736,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       const isCountryLevel = dataSource === 'geospatial-country'
       const maxCount = arcLayerData.reduce((m, d) => Math.max(m, d.count), 1)
 
-      const isHighlightedArc = (d: ArcDatum) => {
+      // Selection / drill-down state: gets the emphasized blue→purple gradient + thicker width.
+      const isSelectedOrActiveArc = (d: ArcDatum) => {
         const selectedFrom = normalizePlaceKey(selectedArcRef.current?.from)
         const selectedTo = normalizePlaceKey(selectedArcRef.current?.to)
         const datumFrom = normalizePlaceKey(d.fromName)
@@ -749,10 +750,13 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         return matchesSelectedArc || (
           normalizePlaceKey(activeSite).length > 0 && normalizePlaceKey(activeSite) === datumFrom
-        ) || (
-          normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === datumFrom
         )
       }
+
+      // Hovering an image in the panel: match the same flat-tint style deck.gl's
+      // autoHighlight uses when hovering an arc directly on the map (no gradient, no width boost).
+      const isPanelHoveredArc = (d: ArcDatum) =>
+        normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.fromName)
 
       return new ArcLayer<ArcDatum>({
         id: layerId,
@@ -760,26 +764,25 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         getSourcePosition: (d) => d.sourcePosition,
         getTargetPosition: (d) => d.targetPosition,
         getSourceColor: (d): [number, number, number, number] => {
-          const highlighted = isHighlightedArc(d)
-          if (highlighted) return [59, 130, 246, 255]
+          if (isSelectedOrActiveArc(d) || isPanelHoveredArc(d)) return [59, 130, 246, 255]
           const alpha = isLowZoomArcView ? 130 : 255
           return [...sourceColor, alpha] as [number, number, number, number]
         },
         getTargetColor: (d): [number, number, number, number] => {
-          const highlighted = isHighlightedArc(d)
-          if (highlighted) return [147, 51, 234, 255]
+          if (isSelectedOrActiveArc(d)) return [147, 51, 234, 255]
+          if (isPanelHoveredArc(d)) return [59, 130, 246, 255]
           const alpha = isLowZoomArcView ? 130 : 255
           return [...targetColor, alpha] as [number, number, number, number]
         },
         getWidth: (d) => {
-          const highlighted = isHighlightedArc(d)
+          const selectedOrActive = isSelectedOrActiveArc(d)
           const isHovered = hoveredArc && hoveredArc.fromName === d.fromName && hoveredArc.toName === d.toName
           const baseWidth = dataSource === 'geospatial-country' || dataSource === 'geospatial-city'
             ? Math.max(0.5, Math.min(3, 0.5 + Math.log(d.count + 1) * 0.45))
             : Math.max(2, Math.min(6, 2 + Math.log(d.count + 1) * 0.9))
           // Mobilde ve hover/seçili ise geçici olarak genişlet
-          if (isMobile && (isHovered || highlighted)) return Math.max(baseWidth, 16)
-          if (highlighted) return baseWidth * 2.5
+          if (isMobile && (isHovered || selectedOrActive || isPanelHoveredArc(d))) return Math.max(baseWidth, 16)
+          if (selectedOrActive) return baseWidth * 2.5
           // Thin unhighlighted arcs further at global zoom so overlap reads as
           // density rather than a solid overplotted mass.
           return isLowZoomArcView ? baseWidth * 0.7 : baseWidth
@@ -842,20 +845,22 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         hasValidCoordinates(a.institution_latitude, a.institution_longitude)
       )
       if (validArcs.length === 0) return null
-      const isHighlightedDrillArc = (d: any) =>
-        normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name) ||
-        (normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.place_name))
+      // Drill-down selection: emphasized blue→purple gradient + thicker width.
+      const isActiveSiteDrillArc = (d: any) => normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name)
+      // Hovering an image in the panel: match the flat-tint style used when hovering an arc directly on the map.
+      const isPanelHoveredDrillArc = (d: any) =>
+        normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.place_name)
       return new ArcLayer({
         id: "arc-layer-drill",
         data: validArcs,
         getSourcePosition: (d: any) => [d.longitude, d.latitude],
         getTargetPosition: (d: any) => [d.institution_longitude, d.institution_latitude],
         getSourceColor: (d: any): [number, number, number, number] =>
-          isHighlightedDrillArc(d) ? [59, 130, 246, 255] : [239, 95, 0, 200],
+          (isActiveSiteDrillArc(d) || isPanelHoveredDrillArc(d)) ? [59, 130, 246, 255] : [239, 95, 0, 200],
         getTargetColor: (d: any): [number, number, number, number] =>
-          isHighlightedDrillArc(d) ? [147, 51, 234, 255] : [239, 95, 0, 200],
+          isActiveSiteDrillArc(d) ? [147, 51, 234, 255] : (isPanelHoveredDrillArc(d) ? [59, 130, 246, 255] : [239, 95, 0, 200]),
         getWidth: (d: any) =>
-          isHighlightedDrillArc(d) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
+          isActiveSiteDrillArc(d) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
         widthMinPixels: isMobile ? 2.5 : 1.5,
         pickable: true,
         autoHighlight: true,

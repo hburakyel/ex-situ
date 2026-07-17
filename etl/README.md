@@ -11,7 +11,9 @@ etl/
 ├── scrape_smb_am_api.py       # Staatliche Museen zu Berlin — Antikensammlung resolver
 ├── scrape_met_api.py          # Metropolitan Museum of Art resolver
 ├── scrape_vam.py              # Victoria and Albert Museum resolver
+├── scrape_aic_api.py          # Art Institute of Chicago resolver
 ├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
+├── import_gazetteer.sh        # Loads a GeoNames extract into gazetteer_places
 ├── normalize_place_names.py   # Place name normalization + deduplication
 └── requirements.txt           # Python dependencies
 ```
@@ -86,7 +88,9 @@ Common flags available on all resolvers:
 
 `postgis_geocoder.py` resolves place names to coordinates by calling the `geocode_place()` / `reverse_geocode()` SQL functions against the local `gazetteer_places` table (fast, no rate limits, no external calls). Resolvers that don't wire up a `PostGISGeocoder` fall back to Nominatim instead.
 
-Before first use, apply `backend/database/migrations/013_add_gazetteer_geocoding.sql` and populate the gazetteer:
+> **Status (2026-07-17):** `013_add_gazetteer_geocoding.sql` is currently **disabled** (`.sql.disabled`) in production. Production already has its own `geocode_place()` / `reverse_geocode()` functions and a different schema for them, created directly against the DB at some point outside of any tracked migration — 013's `CREATE OR REPLACE FUNCTION` conflicts with those (different return columns) and crash-loops Strapi on boot if applied as-is. Do not re-enable 013 without first reconciling it against whatever prod's untracked functions actually do. Locally this isn't an issue if your dev DB never had those legacy functions — check `\df geocode_place` before applying.
+
+Before first use (local only, see status note above), apply `backend/database/migrations/013_add_gazetteer_geocoding.sql` and populate the gazetteer:
 
 ```bash
 ./import_gazetteer.sh

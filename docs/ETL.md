@@ -1,7 +1,7 @@
 # Ex Situ — ETL Pipeline Documentation
 
-**Last updated:** May 2026  
-**Dataset size:** ~132,854 records (as of May 2026 audit)
+**Last updated:** July 2026  
+**Dataset size:** ~215,980 records (as of July 2026, incl. Art Institute of Chicago)
 
 ---
 
@@ -46,7 +46,9 @@ psql "$DATABASE_URL" -f database/migrations/012_add_search_fulltext.sql
 
 All migrations use `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` and are safe to re-run.
 
-**Expected runtime:** < 5 minutes for a fresh DB; migration 012 (tsvector backfill on 132k rows) may take 1–2 minutes.
+**Expected runtime:** < 5 minutes for a fresh DB; migration 012 (tsvector backfill) may take 1–2 minutes on a large table.
+
+**013 (`013_add_gazetteer_geocoding.sql`) is not in this list** — it's currently disabled (`.sql.disabled`) because it conflicts with `geocode_place()`/`reverse_geocode()` functions already present in production under a different, untracked schema (see `etl/README.md`'s Geocoding pipeline section for details). Don't apply it to a new environment without checking for those functions first.
 
 ### Step 2 — Start Strapi
 
@@ -129,17 +131,27 @@ Two materialized views power the arc performance at low zoom levels:
 
 | View | Refresh trigger |
 |---|---|
-| `mv_country_institution_stats` | Auto-refreshed via Strapi lifecycle hooks (5 s debounce after any write) |
+| `mv_country_institution_stats` | **Manual only** — no lifecycle hook exists. Call after any bulk import/update. |
 | `mv_city_institution_stats` | Same as above |
 
-Manual refresh (if needed):
+> **Corrected 2026-07-17:** this table previously (and incorrectly) said these views auto-refresh via a Strapi lifecycle hook. No such hook exists in the codebase — `refreshGeospatialViews()` in `museum-object.js` ("Call after data imports") must be invoked explicitly, either via `SELECT refresh_geospatial_views();` or an admin action that calls it. Believing it was automatic is exactly what let a bulk import go unreflected on the live map until someone noticed and it was traced back to this.
+
+Preferred: call the maintained function, which refreshes both views together —
+
+```sql
+SELECT refresh_geospatial_views();
+```
+
+Manual fallback (equivalent to what that function does):
 
 ```sql
 REFRESH MATERIALIZED VIEW CONCURRENTLY mv_country_institution_stats;
 REFRESH MATERIALIZED VIEW CONCURRENTLY mv_city_institution_stats;
 ```
 
-**Expected refresh time:** < 5 seconds against 132k records.
+`CONCURRENTLY` requires a unique index on each view (`mv_country_institution_stats_uniq` on `(origin_country, institution_name)`, `mv_city_institution_stats_uniq` on `(origin_city, country_en, institution_name)`). Production was missing both until 2026-07-17 — `refresh_geospatial_views()` was silently failing on every call (the error was swallowed by a try/catch), so prod served a stale snapshot regardless of DB fixes underneath it. Confirm both indexes exist (`\d mv_country_institution_stats`) before relying on this in a new environment.
+
+**Expected refresh time:** < 5 seconds against ~200k records.
 
 ---
 
