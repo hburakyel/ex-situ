@@ -27,7 +27,10 @@ async function isImageReachable(url: string): Promise<boolean> {
         "Referer": new URL(url).origin + "/",
       },
     })
-    return res.ok
+    // res.ok alone isn't enough: some CDN hosts now 301-redirect stale image
+    // URLs to an HTML homepage that itself returns 200, which fetch()'s
+    // default redirect-follow reports as "ok" despite not being an image.
+    return res.ok && (res.headers.get("content-type") || "").startsWith("image/")
   } catch {
     return false
   } finally {

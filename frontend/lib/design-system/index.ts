@@ -42,7 +42,7 @@ export type {
   PathStep,
   ObjectGridProps,
   ImageGalleryProps,
-  BlurhashImageProps,
+  ObjectImageProps,
   SpinnerProps,
   FacetedFilterProps,
 } from "./components"

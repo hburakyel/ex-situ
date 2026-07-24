@@ -5,6 +5,7 @@
  */
 
 const { createCoreService } = require('@strapi/strapi').factories;
+const { buildPublicDateFields } = require('./date-display');
 
 let manualCoordsCache = null;
 
@@ -610,7 +611,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
              WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
              ORDER BY moc."order" LIMIT 1) as object_link_display,
             object_date,
-            acquisition_year
+            acquisition_year,
+            object_date_earliest,
+            object_date_latest,
+            object_date_precision,
+            object_date_display,
+            acquisition_year_earliest,
+            acquisition_date_confidence
           FROM museum_objects
           ${whereClause}
           ORDER BY ${dedupKey}, id
@@ -629,7 +636,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const pageCount = Math.ceil(total / pageSize);
 
       return {
-        data: rows.map(row => ({
+        data: rows.map(row => {
+          const { object_date, acquisition_year } = buildPublicDateFields(row);
+          return {
           id: row.id,
           attributes: {
             object_id: row.object_id,
@@ -655,10 +664,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             longitude: row.longitude ? parseFloat(row.longitude) : null,
             institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,
             institution_longitude: row.institution_longitude ? parseFloat(row.institution_longitude) : null,
-            object_date: row.object_date || null,
-            acquisition_year: row.acquisition_year || null,
+            object_date,
+            acquisition_year,
           }
-        })),
+          };
+        }),
         meta: {
           pagination: {
             page: page,

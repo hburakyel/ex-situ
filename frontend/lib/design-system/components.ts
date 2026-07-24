@@ -436,7 +436,7 @@ export interface PathStep {
  *       div.relative.inline-flex.overflow-hidden.bg-white.rounded-[10px]
  *         Badge (geocoding_status)                       ← conditional
  *         Badge (review_status)                          ← conditional
- *         BlurhashImage | "Image unavailable" placeholder
+ *         ObjectImage | "Image unavailable" placeholder
  *   div (infinite-scroll sentinel)                       ← conditional
  *     Spinner + "Loading more artifacts…"
  *   div "{n} of {total} artifacts"                       ← end of list
@@ -494,7 +494,7 @@ export interface ObjectGridProps {
  *   Header: index/total + inventory + nav buttons (prev/next/info/source/close)
  *   Subheader: From / To / Collection metadata
  *   Main image container (flex, centered)
- *     BlurhashImage | "No image available" placeholder
+ *     ObjectImage | "No image available" placeholder
  * ```
  *
  * ### Tokens Used
@@ -526,18 +526,22 @@ export interface ImageGalleryProps {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7. BLURHASH IMAGE
+// 7. OBJECT IMAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * **File:** components/blurhash-image.tsx
+ * **File:** components/object-image.tsx
  *
- * Progressive image loader: fetches a blurhash placeholder via API,
- * decodes it to a canvas data URL, then fades in the real image.
+ * Lazy-loading image with a text placeholder (typically the inventory
+ * number) shown while the image loads or if it fails, then fades in the
+ * real image. No longer generates a blurhash placeholder — that endpoint
+ * (`/api/generate-blurhash`) triggered native sharp/libvips crashes and
+ * the header it produced (`X-Blurhash`) was unused, so both were removed.
  *
  * ### Anatomy
  * ```
- * div.relative.overflow-hidden.bg-white [backgroundImage: blurhash data URL]
+ * div.relative.overflow-hidden.bg-white
+ *   div.absolute.inset-0 [fallbackText, e.g. inventory number]  ← conditional
  *   img [opacity: 0 → 1 via transition-opacity duration-500 ease-out]
  * ```
  *
@@ -546,16 +550,16 @@ export interface ImageGalleryProps {
  * - `motion.imageFade` (transition-opacity duration-500 ease-out)
  *
  * ### States
- * - **loading** — blurhash background visible, img opacity-0
+ * - **loading** — fallbackText visible (if provided), img opacity-0
  * - **loaded** — img opacity-100
- * - **error** — calls onError callback; can use fallbackSrc
+ * - **error** — calls onError callback; uses fallbackSrc if provided, else fallbackText
  *
  * ### Accessibility
  * - `alt` prop passed through to `<img>`
  * - `loading` attribute ("lazy" | "eager")
  * - `decoding="async"` for non-blocking decode
  */
-export interface BlurhashImageProps {
+export interface ObjectImageProps {
   src: string
   alt: string
   className?: string
@@ -566,7 +570,7 @@ export interface BlurhashImageProps {
   onLoad?: () => void
   onError?: () => void
   fallbackSrc?: string
-  decodeSize?: number
+  fallbackText?: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

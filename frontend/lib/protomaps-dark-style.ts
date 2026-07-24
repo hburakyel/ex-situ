@@ -13,7 +13,7 @@
  * Tile source: Protomaps CDN (requires NEXT_PUBLIC_PROTOMAPS_KEY) or
  * self-hosted PMTiles file at /basemap.pmtiles.
  */
-import type { StyleSpecification } from "maplibre-gl"
+import type { LayerSpecification, StyleSpecification } from "maplibre-gl"
 import { layers, DARK, namedFlavor, type Flavor } from "@protomaps/basemaps"
 
 /** Ex Situ dark flavor — based on DARK with muted cartographic colors. */
@@ -145,11 +145,8 @@ export function protomapsCustomStyle(): StyleSpecification {
 
 // ── Black flavor style ──────────────────────────────────────────────
 
-const blackLayers = layers("protomaps", namedFlavor("black"), { lang: "en" })
-  .filter((l) => !SUPPRESSED_LAYERS.has(l.id))
-
-const blackFinalLayers = blackLayers.map((layer) =>
-  layer.type === "symbol"
+function applyBlackTextStyle(layer: LayerSpecification): LayerSpecification {
+  return layer.type === "symbol"
     ? {
         ...layer,
         layout: {
@@ -164,25 +161,53 @@ const blackFinalLayers = blackLayers.map((layer) =>
         },
       }
     : layer
-)
+}
+
+const blackFinalLayers = layers("protomaps", namedFlavor("black"), { lang: "en" })
+  .filter((l) => !SUPPRESSED_LAYERS.has(l.id))
+  .map(applyBlackTextStyle)
+
+// Protomaps' hosted tile API intermittently returns 504s for the low-zoom
+// "whole world" tiles (z0 and most of z1), which leaves visible gaps in the
+// basemap at the global map view. Those tiles are trivial in size — a local
+// cutout of the same planet build covering z0–5 is ~15MB (see
+// `pmtiles extract <planet-build-url> --maxzoom=5`) — so self-host that range
+// and let the CDN keep serving the detailed zooms where it doesn't 504.
+const LOCAL_LOW_ZOOM_MAXZOOM = 5
+const LOCAL_LOW_ZOOM_PMTILES_URL = "pmtiles:///basemap-global.pmtiles"
+
+const localLowZoomLayers = layers("protomaps-local", namedFlavor("black"), { lang: "en" })
+  .filter((l) => !SUPPRESSED_LAYERS.has(l.id))
+  .map(applyBlackTextStyle)
+  .map((l) => ({ ...l, id: `local-${l.id}`, maxzoom: LOCAL_LOW_ZOOM_MAXZOOM + 1 }))
+
+const cdnLayersAboveLowZoom = blackFinalLayers.map((l) => ({
+  ...l,
+  minzoom: Math.max(l.minzoom ?? 0, LOCAL_LOW_ZOOM_MAXZOOM + 1),
+}))
 
 export function protomapsBlackStyle(): StyleSpecification {
   const tileSource = getTileSource()
   const isCDN = tileSource.startsWith("https://")
 
-  const protomapsSource = isCDN
-    ? {
-        type: "vector" as const,
-        tiles: [tileSource],
-        minzoom: 0,
-        maxzoom: 15,
-        attribution: "© Protomaps © OpenStreetMap",
-      }
-    : {
-        type: "vector" as const,
-        url: tileSource,
-        attribution: "© Protomaps © OpenStreetMap",
-      }
+  if (!isCDN) {
+    // Self-hosted full planet PMTiles — a single local source already covers
+    // every zoom level, so it isn't affected by the CDN's low-zoom gaps.
+    return {
+      version: 8,
+      name: "Ex Situ Black",
+      glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
+      sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/black",
+      sources: {
+        protomaps: {
+          type: "vector",
+          url: tileSource,
+          attribution: "© Protomaps © OpenStreetMap",
+        },
+      },
+      layers: blackFinalLayers,
+    } as StyleSpecification
+  }
 
   return {
     version: 8,
@@ -191,8 +216,23 @@ export function protomapsBlackStyle(): StyleSpecification {
       "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
     sprite:
       "https://protomaps.github.io/basemaps-assets/sprites/v4/black",
-    sources: { protomaps: protomapsSource },
-    layers: blackFinalLayers,
+    sources: {
+      "protomaps-local": {
+        type: "vector",
+        url: LOCAL_LOW_ZOOM_PMTILES_URL,
+        minzoom: 0,
+        maxzoom: LOCAL_LOW_ZOOM_MAXZOOM,
+        attribution: "© Protomaps © OpenStreetMap",
+      },
+      protomaps: {
+        type: "vector",
+        tiles: [tileSource],
+        minzoom: LOCAL_LOW_ZOOM_MAXZOOM + 1,
+        maxzoom: 15,
+        attribution: "© Protomaps © OpenStreetMap",
+      },
+    },
+    layers: [...localLowZoomLayers, ...cdnLayersAboveLowZoom],
   } as StyleSpecification
 }
 

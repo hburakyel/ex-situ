@@ -145,6 +145,33 @@
     },
     "acquisition_year": {
       "type": "integer"
+    },
+    "object_date_earliest": {
+      "type": "integer"
+    },
+    "object_date_latest": {
+      "type": "integer"
+    },
+    "object_date_precision": {
+      "type": "enumeration",
+      "enum": ["exact", "circa", "range", "before", "after", "unknown"]
+    },
+    "object_date_display": {
+      "type": "text"
+    },
+    "acquisition_year_earliest": {
+      "type": "integer"
+    },
+    "acquisition_year_latest": {
+      "type": "integer"
+    },
+    "acquisition_date_precision": {
+      "type": "enumeration",
+      "enum": ["exact", "range", "unknown"]
+    },
+    "acquisition_date_confidence": {
+      "type": "enumeration",
+      "enum": ["confirmed", "inferred"]
     }
   }
 }

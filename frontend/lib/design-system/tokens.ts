@@ -710,12 +710,12 @@ export const motion = {
   /** Default — general UI transitions.
    *  @source app/globals.css (.sidebar transition: width 0.3s ease-in-out)
    *  @source app/globals.css (.resizable-panel transition: all 0.3s ease)
-   *  @source blurhash-image.tsx (duration-500 ease-out) — image fade-in
+   *  @source object-image.tsx (duration-500 ease-out) — image fade-in
    */
   default: { duration: "300ms", easing: "ease-in-out" },
 
-  /** Image fade-in (blurhash reveal).
-   *  @source blurhash-image.tsx (transition-opacity duration-500 ease-out)
+  /** Image fade-in.
+   *  @source object-image.tsx (transition-opacity duration-500 ease-out)
    */
   imageFade: { duration: "500ms", easing: "ease-out" },
 

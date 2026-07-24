@@ -6,7 +6,7 @@ import { Spinner } from "@radix-ui/themes"
 import { useInView } from "react-intersection-observer"
 import { useMediaQuery } from "../hooks/use-media-query"
 import { IconSource } from "@/components/icons"
-import BlurhashImage from "@/components/blurhash-image"
+import ObjectImage from "@/components/object-image"
 import { Badge } from "@/components/ui/badge"
 import { COLLECTION_LABELS, INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 
@@ -179,12 +179,13 @@ export default function ObjectList({
               {/* Image preview */}
               <div className="w-12 h-12 bg-white rounded-[10px] overflow-hidden flex items-center justify-center">
                 {object.attributes.img_url ? (
-                  <BlurhashImage
+                  <ObjectImage
                     src={object.attributes.img_url}
                     alt={object.attributes.title || "Object"}
                     className="w-full h-full"
                     imgClassName="w-full h-full object-cover"
                     fallbackSrc="/placeholder.svg?height=48&width=48"
+                    fallbackText={object.attributes.inventory_number || undefined}
                   />
                 ) : (
                   <span className="text-xs text-gray-500">No img</span>
@@ -258,12 +259,13 @@ export default function ObjectList({
               {/* Image preview */}
               <div className="w-14 h-14 bg-white rounded-[10px] overflow-hidden flex items-center justify-center">
                 {object.attributes.img_url ? (
-                  <BlurhashImage
+                  <ObjectImage
                     src={object.attributes.img_url}
                     alt={object.attributes.title || "Object"}
                     className="w-full h-full"
                     imgClassName="w-full h-full object-cover"
                     fallbackSrc="/placeholder.svg?height=56&width=56"
+                    fallbackText={object.attributes.inventory_number || undefined}
                   />
                 ) : (
                   <span className="text-xs text-gray-500">No img</span>

@@ -975,7 +975,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         />
 
         {/* Map attribution */}
-        <div className="absolute bottom-1 right-1 z-10 text-[9px] text-gray-600/40 px-1.5 py-0.5 rounded">
+        <div className="absolute bottom-1 right-1 z-10 text-[9px] text-white/20 px-1.5 py-0.5 rounded">
           <span><a href="https://protomaps.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Protomaps</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">OpenStreetMap contributors</a></span>
         </div>
 

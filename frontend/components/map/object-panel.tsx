@@ -19,7 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import ObjectGrid from "@/components/object-grid"
-import BlurhashImage from "@/components/blurhash-image"
+import ObjectImage from "@/components/object-image"
 import type { MuseumObject } from "@/types"
 import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
@@ -1450,12 +1450,13 @@ export default function ObjectPanel({
                   >
                     <div className="relative inline-flex overflow-hidden bg-white rounded-[10px] group-hover:ring-2 group-hover:ring-blue-500">
                       {museum.attributes?.img_url ? (
-                        <BlurhashImage
+                        <ObjectImage
                           src={museum.attributes.img_url}
                           alt={museum.attributes.title || "Museum object"}
                           className="block"
                           imgClassName="block max-h-36 w-auto bg-white"
                           loading="lazy"
+                          fallbackText={museum.attributes.inventory_number || undefined}
                         />
                       ) : (
                         <div className="flex items-center justify-center text-center p-2 bg-white min-h-[80px]">

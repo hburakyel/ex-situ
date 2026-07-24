@@ -3,10 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons"
 import { IconSource, IconClose } from "@/components/icons"
-import { Spinner } from "@radix-ui/themes"
 import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
-import BlurhashImage from "@/components/blurhash-image"
+import ObjectImage from "@/components/object-image"
 import { Check, Link2 } from "lucide-react"
 import { COLLECTION_LABELS, INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 
@@ -46,6 +45,17 @@ export default function ImageGallery({
 
   const currentObject = galleryObjects.length > 0 ? galleryObjects[currentIndex] : null
 
+  // Reset image/loading state synchronously during render (not in an effect) so the
+  // browser never paints a stale frame — e.g. the previous object's "no image" fallback
+  // flashing before the new object's image is known to exist.
+  const [trackedObjectId, setTrackedObjectId] = useState(currentObject?.id)
+  if (currentObject && currentObject.id !== trackedObjectId) {
+    setTrackedObjectId(currentObject.id)
+    const objectHasImage = hasImageUrl(currentObject.attributes?.img_url)
+    setImageError(!objectHasImage)
+    setIsLoading(objectHasImage)
+  }
+
   // Log container width on mount and resize
   useEffect(() => {
     if (containerRef.current) {
@@ -61,18 +71,6 @@ export default function ImageGallery({
       return () => observer.disconnect()
     }
   }, [])
-
-  useEffect(() => {
-    // Reset image error state when changing images
-    setImageError(false)
-    setIsLoading(true)
-  }, [currentIndex])
-
-  useEffect(() => {
-    if (!currentObject?.attributes?.img_url) {
-      setIsLoading(false)
-    }
-  }, [currentObject?.attributes?.img_url])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -351,15 +349,18 @@ export default function ImageGallery({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                backgroundColor: "white",
               }}
             >
-              <Spinner size="3" />
+              <span style={{ color: "#999", fontSize: "14px" }}>
+                {currentObject.attributes.inventory_number}
+              </span>
             </div>
           )}
 
           {!imageError ? (
             <div className="gallery-image-bg" style={{ width: "100%", height: "100%" }}>
-              <BlurhashImage
+              <ObjectImage
               src={currentObject.attributes.img_url!}
               alt={currentObject.attributes.title || "Museum object"}
               className="w-full h-full flex items-center justify-center"
@@ -407,6 +408,8 @@ export default function ImageGallery({
               "Vorderasiatisches Museum": "CC BY 4.0",
               "Ägyptisches Museum": "CC BY 4.0",
               "Museum für Asiatische Kunst": "CC BY 4.0",
+              "Art Institute of Chicago": "CC0",
+              "Victoria and Albert Museum": "CC0",
             }
             const institution = currentObject.attributes.institution_name || ""
             const sourceUrl = getLinkUrl()

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import { encode } from "blurhash"
 import sharp from "sharp"
 
 export const runtime = "nodejs"
@@ -7,10 +6,8 @@ export const runtime = "nodejs"
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DEFAULT_WIDTH = 300
 const MAX_WIDTH = 800
-const BLURHASH_SIZE = 32
 
 // Allowed image source domains — NO localhost/127.0.0.1 (SSRF prevention)
-// Kept in sync with generate-blurhash/route.ts's allowlist.
 const ALLOWED_IMAGE_DOMAINS = new Set([
   "images.metmuseum.org",
   "collectionapi.metmuseum.org",
@@ -22,6 +19,7 @@ const ALLOWED_IMAGE_DOMAINS = new Set([
   "framemark.vam.ac.uk",
   "smb.museum-digital.de",
   "asset.museum-digital.org",
+  "search.smb.museum",
 ])
 
 // Block private/internal IP ranges and hostnames to prevent SSRF
@@ -57,7 +55,7 @@ function isValidUrl(value: string): boolean {
 }
 
 // In-memory cache for resized images (key: url+width → { buffer, headers })
-const imageCache = new Map<string, { buffer: Buffer; contentType: string; blurhash: string; w: number; h: number; timestamp: number }>()
+const imageCache = new Map<string, { buffer: Buffer; contentType: string; timestamp: number }>()
 const MAX_CACHE_ENTRIES = 200
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
@@ -97,16 +95,12 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": cached.contentType,
         "Cache-Control": "public, max-age=31536000, immutable",
-        "X-Blurhash": cached.blurhash,
-        "X-Blurhash-Width": String(cached.w),
-        "X-Blurhash-Height": String(cached.h),
-        "Access-Control-Expose-Headers": "X-Blurhash, X-Blurhash-Width, X-Blurhash-Height",
       },
     })
   }
 
   // Fetch original image. Some museum CDNs (e.g. id.smb.museum) hotlink-block
-  // headerless requests, so spoof the same User-Agent/Referer as generate-blurhash/route.ts.
+  // headerless requests, so spoof a browser-like User-Agent/Referer.
   let response: Response
   try {
     const controller = new AbortController()
@@ -150,23 +144,11 @@ export async function GET(request: NextRequest) {
       .jpeg({ quality: 75, progressive: true })
       .toBuffer({ resolveWithObject: true })
 
-    // Generate blurhash from a small version
-    const { data: bhData, info: bhInfo } = await sharp(originalBuffer)
-      .ensureAlpha()
-      .resize(BLURHASH_SIZE, BLURHASH_SIZE, { fit: "inside" })
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-
-    const blurhash = encode(new Uint8ClampedArray(bhData), bhInfo.width, bhInfo.height, 4, 4)
-
     // Store in cache
     evictStaleEntries()
     imageCache.set(cacheKey, {
       buffer: resized.data,
       contentType: "image/jpeg",
-      blurhash,
-      w: bhInfo.width,
-      h: bhInfo.height,
       timestamp: Date.now(),
     })
 
@@ -175,10 +157,6 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": "image/jpeg",
         "Cache-Control": "public, max-age=31536000, immutable",
-        "X-Blurhash": blurhash,
-        "X-Blurhash-Width": String(bhInfo.width),
-        "X-Blurhash-Height": String(bhInfo.height),
-        "Access-Control-Expose-Headers": "X-Blurhash, X-Blurhash-Width, X-Blurhash-Height",
       },
     })
   } catch {

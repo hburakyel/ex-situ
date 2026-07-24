@@ -407,7 +407,15 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
     draftAndPublish: true;
   };
   attributes: {
+    acquisition_date_confidence: Attribute.Enumeration<
+      ['confirmed', 'inferred']
+    >;
+    acquisition_date_precision: Attribute.Enumeration<
+      ['exact', 'range', 'unknown']
+    >;
     acquisition_year: Attribute.Integer;
+    acquisition_year_earliest: Attribute.Integer;
+    acquisition_year_latest: Attribute.Integer;
     city_en: Attribute.String;
     city_native: Attribute.String;
     country_en: Attribute.String;
@@ -444,6 +452,12 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
     manual_longitude: Attribute.Float;
     normalized_origin: Attribute.String;
     object_date: Attribute.String;
+    object_date_display: Attribute.Text;
+    object_date_earliest: Attribute.Integer;
+    object_date_latest: Attribute.Integer;
+    object_date_precision: Attribute.Enumeration<
+      ['exact', 'circa', 'range', 'before', 'after', 'unknown']
+    >;
     object_id: Attribute.BigInteger;
     object_links: Attribute.Component<'object-links.object-link-info', true>;
     origin_type: Attribute.Enumeration<

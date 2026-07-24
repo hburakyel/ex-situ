@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { MuseumObject } from "../types"
-import BlurhashImage from "@/components/blurhash-image"
+import ObjectImage from "@/components/object-image"
 import { useInView } from "react-intersection-observer"
 import { Spinner } from "@radix-ui/themes"
 
@@ -317,7 +317,7 @@ return (
         </span>
       )}
       {hasImage ? (
-        <BlurhashImage
+        <ObjectImage
           src={fallbackImageUrls[object.id] || object.attributes.img_url!}
           alt={object.attributes?.title || "Museum object"}
           className="block"
@@ -325,6 +325,7 @@ return (
           onLoad={() => handleImageLoad(object.id)}
           onError={() => handleImageError(object)}
           loading="lazy"
+          fallbackText={object.attributes.inventory_number || undefined}
         />
       ) : (
         <span className="text-[10px] text-gray-400 font-mono text-center break-words leading-tight max-w-full px-2">
