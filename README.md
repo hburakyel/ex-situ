@@ -17,8 +17,6 @@ Museums across Europe and North America hold hundreds of thousands of artifacts 
 
 Ex Situ makes this visible: not by duplicating institutional data, but by indexing the relationships between origin sites and destination collections as a spatial commons — connective tissue between archives that were never designed to speak to each other.
 
-**200,552+ artifacts · 9 collections · 194 territories · 6,679 origin sites**
-
 ---
 
 ## How It Works
