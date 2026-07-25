@@ -13,6 +13,10 @@
 
 ---
 
+**Status:** Actively developed. Started as an MA thesis in 2022, now indexing 145,000+ artifacts across 9 collections.
+
+---
+
 Museums across Europe and North America hold hundreds of thousands of artifacts whose provenance — where they came from, under what circumstances — remains buried in institutional databases, invisible to researchers and the public.
 
 Ex Situ makes this visible: not by duplicating institutional data, but by indexing the relationships between origin sites and destination collections as a spatial commons — connective tissue between archives that were never designed to speak to each other.
@@ -21,13 +25,13 @@ Ex Situ makes this visible: not by duplicating institutional data, but by indexi
 
 ## How It Works
 
-Ex Situ is a Relational Spatial Index — an indexer, not a hoster. Every artifact stays linked to its institutional source. No content is copied or mirrored.
+Ex Situ is a Relational Spatial Index — an indexer, not a hoster. Images are never duplicated; every artifact's image links directly to its source institution. Structured metadata (place, date, institution, inventory number) is indexed locally to power search and mapping, but always routes back to the institution's own record for full details.
 
 | Concept | Description |
 |---------|-------------|
 | **Artifact** | Artifact record with resolved origin coordinates |
 | **Arc** | Directional provenance connection: origin site → destination institution |
-| **Resolver** | ETL pipeline that ingests and gelocates collection data |
+| **Resolver** | ETL pipeline that ingests and geolocates collection data |
 
 The map renders arcs at three zoom levels:
 
@@ -196,11 +200,23 @@ See [COLLECTIONS.md](COLLECTIONS.md) for the full collection roadmap.
 - [Nominatim](https://nominatim.org) — geocoding
 - [Natural Earth](https://naturalearthdata.com) — public domain geodata
 
-**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum, Art Institute of Chicago (CC0).
+**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum, Art Institute of Chicago (CC0), and others — see the map for the full, current list of indexed collections.
+
+---
+
+## Funding
+
+- **HAB (Hessen-Abschlussförderung)**, 2022 — supported early research during the project's inception as an MA thesis.
+
+---
+
+## Acknowledgments
+
+Thanks to Lea Steinkampf and A. Erdem Şentürk for their contributions to this project.
 
 ---
 
 ## License
 
-Copyright © 2026 Hüseyin Burak Yel  
+Copyright © 2026 Hüseyin Burak Yel
 [GNU Affero General Public License v3.0](LICENSE)
