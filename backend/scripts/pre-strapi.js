@@ -49,6 +49,8 @@ async function main() {
       DROP INDEX IF EXISTS idx_museum_objects_resolved_coords;
       DROP MATERIALIZED VIEW IF EXISTS public.mv_country_institution_stats;
       DROP MATERIALIZED VIEW IF EXISTS public.mv_city_institution_stats;
+      DROP MATERIALIZED VIEW IF EXISTS public.mv_time_bucket_stats;
+      DROP MATERIALIZED VIEW IF EXISTS public.mv_acquisition_year_stats;
     `);
 
     console.log('[pre-strapi] Dropped manual-coord dependent objects — Strapi can sync safely.');

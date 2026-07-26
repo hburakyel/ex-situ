@@ -18,6 +18,26 @@ module.exports = {
     },
     {
       method: 'GET',
+      path: '/museum-objects/date-buckets',
+      handler: 'museum-object.dateBuckets',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
+      path: '/museum-objects/date-buckets/decades',
+      handler: 'museum-object.dateBucketDecades',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
       path: '/museum-objects/by-country',
       handler: 'museum-object.byCountry',
       config: {

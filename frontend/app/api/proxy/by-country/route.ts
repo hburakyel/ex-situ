@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   }
 
 try {
-    const ALLOWED_PARAMS = new Set(['country', 'site', 'institution', 'page', 'pageSize', 'onlyWithImages'])
+    const ALLOWED_PARAMS = new Set(['country', 'site', 'institution', 'page', 'pageSize', 'onlyWithImages', 'dateStart', 'dateEnd', 'undated', 'acqDateStart', 'acqDateEnd', 'acqUndated'])
     const safeParams = new URLSearchParams()
     for (const [key, value] of searchParams.entries()) {
       if (ALLOWED_PARAMS.has(key)) {

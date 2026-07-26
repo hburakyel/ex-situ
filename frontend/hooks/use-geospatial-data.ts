@@ -16,6 +16,14 @@ export interface GeospatialFilters {
   institutions?: string[]
   countries?: string[]
   cities?: string[]
+  /** "Time" filter (object creation date, left panel). undated takes precedence over start/end. */
+  dateStart?: number
+  dateEnd?: number
+  undated?: boolean
+  /** "Migration" filter (acquisition date, left panel). acqUndated takes precedence over start/end. */
+  acqDateStart?: number
+  acqDateEnd?: number
+  acqUndated?: boolean
 }
 
 interface UseGeospatialDataOptions {
@@ -95,7 +103,7 @@ export function useGeospatialData(
     const bounds = getBoundsFromViewport(vs)
     const boundsKey = `${bounds.minLon.toFixed(2)},${bounds.minLat.toFixed(2)},${bounds.maxLon.toFixed(2)},${bounds.maxLat.toFixed(2)}`
     // Create stable key from array filters
-    const filtersKey = `${(f?.institutions || []).sort().join(',')}:${(f?.countries || []).sort().join(',')}:${(f?.cities || []).sort().join(',')}`
+    const filtersKey = `${(f?.institutions || []).sort().join(',')}:${(f?.countries || []).sort().join(',')}:${(f?.cities || []).sort().join(',')}:${f?.dateStart ?? ''}:${f?.dateEnd ?? ''}:${f?.undated ?? ''}:${f?.acqDateStart ?? ''}:${f?.acqDateEnd ?? ''}:${f?.acqUndated ?? ''}`
 
     // Check if this fetch is necessary
     // For zoom < 7 (statistics/clusters), data is global - no bbox needed
@@ -163,7 +171,11 @@ export function useGeospatialData(
   // Create stable filter key to prevent infinite loops
   const filtersKey = useMemo(
     () => JSON.stringify(filters || {}),
-    [filters?.institutions, filters?.countries, filters?.cities]
+    [
+      filters?.institutions, filters?.countries, filters?.cities,
+      filters?.dateStart, filters?.dateEnd, filters?.undated,
+      filters?.acqDateStart, filters?.acqDateEnd, filters?.acqUndated,
+    ]
   )
 
   // Trigger fetch on viewState or filters change

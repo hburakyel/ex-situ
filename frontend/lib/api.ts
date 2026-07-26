@@ -473,7 +473,7 @@ export async function searchLocation(query: string): Promise<SearchResult | null
 export async function fetchGeospatialData(
   zoom: number,
   bounds?: { minLon: number; minLat: number; maxLon: number; maxLat: number },
-  filters?: { institutions?: string[]; countries?: string[]; cities?: string[] }
+  filters?: { institutions?: string[]; countries?: string[]; cities?: string[]; dateStart?: number; dateEnd?: number; undated?: boolean; acqDateStart?: number; acqDateEnd?: number; acqUndated?: boolean }
 ): Promise<GeospatialResponse> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
@@ -503,12 +503,26 @@ export async function fetchGeospatialData(
   if (filters?.countries && filters.countries.length > 0) {
     params.append('country', filters.countries.join(','))
   }
+  if (filters?.undated) {
+    params.append('undated', 'true')
+  } else {
+    if (filters?.dateStart !== undefined) params.append('dateStart', filters.dateStart.toString())
+    if (filters?.dateEnd !== undefined) params.append('dateEnd', filters.dateEnd.toString())
+  }
+  if (filters?.acqUndated) {
+    params.append('acqUndated', 'true')
+  } else {
+    if (filters?.acqDateStart !== undefined) params.append('acqDateStart', filters.acqDateStart.toString())
+    if (filters?.acqDateEnd !== undefined) params.append('acqDateEnd', filters.acqDateEnd.toString())
+  }
 
   // Generate cache key (sorted for consistency)
   const institutionsKey = filters?.institutions?.sort().join(',') || 'all'
   const citiesKey = filters?.cities?.sort().join(',') || 'all'
   const countriesKey = filters?.countries?.sort().join(',') || 'all'
-  const cacheKey = `geospatial:${floorZoom}:${bounds ? JSON.stringify(bounds) : 'global'}:${institutionsKey}:${citiesKey}:${countriesKey}`
+  const dateKey = filters?.undated ? 'undated' : `${filters?.dateStart ?? ''}-${filters?.dateEnd ?? ''}`
+  const acqDateKey = filters?.acqUndated ? 'undated' : `${filters?.acqDateStart ?? ''}-${filters?.acqDateEnd ?? ''}`
+  const cacheKey = `geospatial:${floorZoom}:${bounds ? JSON.stringify(bounds) : 'global'}:${institutionsKey}:${citiesKey}:${countriesKey}:${dateKey}:${acqDateKey}`
 
   try {
     const isServer = typeof window === "undefined"
@@ -543,7 +557,100 @@ export async function fetchGeospatialData(
   }
 }
 
+export interface DateBucket {
+  id: string
+  label: string
+  count: number
+  /** Present on decade buckets only (Time drill-down); century/year/undated buckets omit these. */
+  start?: number | null
+  end?: number | null
+}
+
+export interface DateBucketCounts {
+  objectDateBuckets: DateBucket[]
+  acquisitionBuckets: DateBucket[]
+  /** Records with a single exact creation year (object_date_precision='exact'). */
+  objectDateExactCount: number
+  /** Records with a confirmed (never inferred) single exact acquisition year. */
+  acquisitionExactCount: number
+  /** Every distinct (earliest, latest) date range present, with how many
+   * records share exactly that range — lets the UI detect when a run of
+   * century buckets are all made up of the same object(s) (see
+   * collapseContiguousBuckets in lib/era-buckets.ts) without an extra
+   * per-bucket query. */
+  objectDateSpans: { earliest: number; latest: number; count: number }[]
+}
+
+// Per-bucket counts for the "Time"/"Migration" left-panel filter sections,
+// cross-filtered by the current institution/city/country selection.
+export async function fetchDateBucketCounts(
+  filters?: { institutions?: string[]; countries?: string[]; cities?: string[] }
+): Promise<DateBucketCounts> {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+  const params = new URLSearchParams()
+  if (filters?.institutions && filters.institutions.length > 0) params.append('institution', filters.institutions.join(','))
+  if (filters?.cities && filters.cities.length > 0) params.append('city', filters.cities.join(','))
+  if (filters?.countries && filters.countries.length > 0) params.append('country', filters.countries.join(','))
+
+  const institutionsKey = filters?.institutions?.sort().join(',') || 'all'
+  const citiesKey = filters?.cities?.sort().join(',') || 'all'
+  const countriesKey = filters?.countries?.sort().join(',') || 'all'
+  const cacheKey = `date-buckets:${institutionsKey}:${citiesKey}:${countriesKey}`
+
+  const isServer = typeof window === "undefined"
+  const url = isServer
+    ? fixLocalhost(`${apiBaseUrl}/museum-objects/date-buckets?${params.toString()}`)
+    : `/api/proxy/date-buckets?${params.toString()}`
+
+  const data = await fetchWithRateLimit(
+    url,
+    { method: "GET", headers: { "Content-Type": "application/json" } },
+    3,
+    cacheKey
+  )
+  return data as DateBucketCounts
+}
+
+// Decade-level counts within a single Time century bucket (e.g. century="ce-19").
+export async function fetchDecadeBucketCounts(
+  century: string,
+  filters?: { institutions?: string[]; countries?: string[]; cities?: string[] }
+): Promise<{ decadeBuckets: DateBucket[] }> {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+  const params = new URLSearchParams({ century })
+  if (filters?.institutions && filters.institutions.length > 0) params.append('institution', filters.institutions.join(','))
+  if (filters?.cities && filters.cities.length > 0) params.append('city', filters.cities.join(','))
+  if (filters?.countries && filters.countries.length > 0) params.append('country', filters.countries.join(','))
+
+  const institutionsKey = filters?.institutions?.sort().join(',') || 'all'
+  const citiesKey = filters?.cities?.sort().join(',') || 'all'
+  const countriesKey = filters?.countries?.sort().join(',') || 'all'
+  const cacheKey = `date-buckets-decades:${century}:${institutionsKey}:${citiesKey}:${countriesKey}`
+
+  const isServer = typeof window === "undefined"
+  const url = isServer
+    ? fixLocalhost(`${apiBaseUrl}/museum-objects/date-buckets/decades?${params.toString()}`)
+    : `/api/proxy/date-buckets-decades?${params.toString()}`
+
+  const data = await fetchWithRateLimit(
+    url,
+    { method: "GET", headers: { "Content-Type": "application/json" } },
+    3,
+    cacheKey
+  )
+  return data as { decadeBuckets: DateBucket[] }
+}
+
 // Function to fetch objects filtered by country (and optionally site/institution) via PostGIS
+export interface ByCountryDateFilters {
+  dateStart?: number
+  dateEnd?: number
+  undated?: boolean
+  acqDateStart?: number
+  acqDateEnd?: number
+  acqUndated?: boolean
+}
+
 export async function fetchObjectsByCountry(
   country: string | null,
   page = 1,
@@ -551,6 +658,7 @@ export async function fetchObjectsByCountry(
   site?: string,
   institution?: string,
   onlyWithImages = false,
+  dateFilters?: ByCountryDateFilters,
 ): Promise<{ objects: MuseumObject[]; pagination: { page: number; pageSize: number; pageCount: number; total: number } }> {
   if (!country && !institution) throw new Error("fetchObjectsByCountry: country or institution is required")
   const params = new URLSearchParams({
@@ -561,8 +669,22 @@ export async function fetchObjectsByCountry(
   if (site) params.append('site', site)
   if (institution) params.append('institution', institution)
   if (onlyWithImages) params.append('onlyWithImages', 'true')
+  if (dateFilters?.undated) {
+    params.append('undated', 'true')
+  } else {
+    if (dateFilters?.dateStart !== undefined) params.append('dateStart', dateFilters.dateStart.toString())
+    if (dateFilters?.dateEnd !== undefined) params.append('dateEnd', dateFilters.dateEnd.toString())
+  }
+  if (dateFilters?.acqUndated) {
+    params.append('acqUndated', 'true')
+  } else {
+    if (dateFilters?.acqDateStart !== undefined) params.append('acqDateStart', dateFilters.acqDateStart.toString())
+    if (dateFilters?.acqDateEnd !== undefined) params.append('acqDateEnd', dateFilters.acqDateEnd.toString())
+  }
 
-  const cacheKey = `by-country:${country || ''}:${site || ''}:${institution || ''}:page:${page}:size:${pageSize}:images:${onlyWithImages}`
+  const dateKey = dateFilters?.undated ? 'undated' : `${dateFilters?.dateStart ?? ''}-${dateFilters?.dateEnd ?? ''}`
+  const acqDateKey = dateFilters?.acqUndated ? 'undated' : `${dateFilters?.acqDateStart ?? ''}-${dateFilters?.acqDateEnd ?? ''}`
+  const cacheKey = `by-country:${country || ''}:${site || ''}:${institution || ''}:page:${page}:size:${pageSize}:images:${onlyWithImages}:${dateKey}:${acqDateKey}`
 
   try {
     const isServer = typeof window === "undefined"

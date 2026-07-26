@@ -460,6 +460,10 @@ export interface ApiMuseumObjectMuseumObject extends Schema.CollectionType {
     >;
     object_id: Attribute.BigInteger;
     object_links: Attribute.Component<'object-links.object-link-info', true>;
+    origin_event_type_en: Attribute.String;
+    origin_event_type_id: Attribute.Integer;
+    origin_is_findspot: Attribute.Boolean;
+    origin_person_name: Attribute.String;
     origin_type: Attribute.Enumeration<
       [
         'valid_location',

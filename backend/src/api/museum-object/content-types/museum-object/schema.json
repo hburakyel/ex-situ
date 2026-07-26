@@ -172,6 +172,18 @@
     "acquisition_date_confidence": {
       "type": "enumeration",
       "enum": ["confirmed", "inferred"]
+    },
+    "origin_event_type_id": {
+      "type": "integer"
+    },
+    "origin_event_type_en": {
+      "type": "string"
+    },
+    "origin_is_findspot": {
+      "type": "boolean"
+    },
+    "origin_person_name": {
+      "type": "string"
     }
   }
 }

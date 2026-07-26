@@ -3,6 +3,8 @@ import json
 import time
 import os
 
+from smb_event_selection import select_origin_event
+
 def fetch_objects(query_string, current_position, max_results):
     url = 'https://smb.museum-digital.de/json/objects'
     params = {
@@ -82,17 +84,15 @@ def main():
             if not object_details:
                 continue
             
-            # Extract place data
+            # Extract place data — event-type-aware (see smb_event_selection.py):
+            # prefers a genuine findspot ("Gefunden") event over a production
+            # ("Hergestellt"/"Gemalt") one, and never uses Gesammelt/Aufgenommen/
+            # etc. as origin. Also folds in the 0/0 "no known coordinate" guard.
             object_events = object_details.get('object_events', [])
-            if object_events:
-                place_data = object_events[0].get('place', {})
-                place_name = place_data.get('place_name', 'N/A')
-                place_latitude = place_data.get('place_latitude', 'N/A')
-                place_longitude = place_data.get('place_longitude', 'N/A')
-            else:
-                place_name = 'N/A'
-                place_latitude = 'N/A'
-                place_longitude = 'N/A'
+            origin = select_origin_event(object_events)
+            place_name = origin['place_name'] if origin['place_name'] is not None else 'N/A'
+            place_latitude = origin['latitude'] if origin['latitude'] is not None else 'N/A'
+            place_longitude = origin['longitude'] if origin['longitude'] is not None else 'N/A'
 
             # Extract time data
             if object_events:
@@ -133,6 +133,10 @@ def main():
                 'institution_longitude': 13.398,
                 'institution_name': 'Antikensammlung',
                 'place_name': place_name,
+                'origin_event_type_id': origin['event_type_id'],
+                'origin_event_type_en': origin['event_type_en'],
+                'origin_is_findspot': origin['is_findspot'],
+                'origin_person_name': origin['person_name'],
                 'time': {
                     'time_name': time_name if time_name != 'N/A' else None,
                     'time_start': time_start if time_start != 'N/A' else None,

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { Search, X, ChevronRight, ArrowRight } from "lucide-react"
 import { Spinner } from "@radix-ui/themes"
 import { useUnifiedSearch } from "@/hooks/use-unified-search"
+import { ERA_BUCKETS, eraToDateFilters, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
+import { fetchDecadeBucketCounts, type DateBucket, type DateBucketCounts } from "@/lib/api"
 
 // ── Types ──
 
@@ -12,6 +14,10 @@ export type FacetedFilters = {
   institutions: string[]
   countries: string[]
   cities: string[]
+  /** "Time" (object creation date) — set/cleared only from this palette. */
+  era?: EraBucket | null
+  /** "Migration" (acquisition date) — set/cleared only from this palette. */
+  migrationEra?: EraBucket | null
 }
 
 export interface CommandPaletteHandlers {
@@ -45,9 +51,13 @@ interface V3CommandPaletteProps {
   handlers: CommandPaletteHandlers
   facetedFilters: FacetedFilters
   onFacetedFiltersChange: (filters: FacetedFilters) => void
+  // Time/Migration bucket counts — fetched once by the parent (page.tsx) and
+  // shared with MapView's left panel, instead of each component fetching
+  // its own copy.
+  dateBuckets: DateBucketCounts | null
 }
 
-type SectionKey = "places" | "sites" | "collections" | "flyto"
+type SectionKey = "places" | "sites" | "collections" | "flyto" | "time" | "migration"
 
 interface PlaceRow {
   name: string
@@ -79,12 +89,23 @@ export default function V3CommandPalette({
   handlers,
   facetedFilters,
   onFacetedFiltersChange,
+  dateBuckets,
 }: V3CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const search = useUnifiedSearch({ minChars: 2 })
+  const search = useUnifiedSearch({
+    minChars: 2,
+    dateFilters: eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
+  })
   const [expanded, setExpanded] = useState<Set<SectionKey>>(new Set())
   const [selectedIdx, setSelectedIdx] = useState(-1)
+  const [timeYearInput, setTimeYearInput] = useState("")
+  const [migrationYearInput, setMigrationYearInput] = useState("")
+  // Time century → decade drill-down: which centuries are expanded, and a
+  // cache of fetched decade counts per century id (fetched lazily on first expand).
+  const [expandedCenturies, setExpandedCenturies] = useState<Set<string>>(new Set())
+  const [decadeCache, setDecadeCache] = useState<Record<string, DateBucket[]>>({})
+  const [loadingDecadesFor, setLoadingDecadesFor] = useState<string | null>(null)
 
   // ── Connection Finder (6 degrees) state ──
   const [pathMode, setPathMode] = useState(false)
@@ -158,6 +179,83 @@ export default function V3CommandPalette({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+
+  const toggleEra = useCallback((bucket: EraBucket) => {
+    setTimeYearInput("")
+    onFacetedFiltersChange({ ...facetedFilters, era: facetedFilters.era?.id === bucket.id ? null : bucket })
+  }, [facetedFilters, onFacetedFiltersChange])
+
+  const toggleMigrationEra = useCallback((bucket: EraBucket) => {
+    setMigrationYearInput("")
+    onFacetedFiltersChange({ ...facetedFilters, migrationEra: facetedFilters.migrationEra?.id === bucket.id ? null : bucket })
+  }, [facetedFilters, onFacetedFiltersChange])
+
+  // Reset the year input boxes whenever their filter is cleared elsewhere
+  // (top-bar chip X, Clear all) so a stale typed value isn't left behind.
+  useEffect(() => { if (!facetedFilters.era) setTimeYearInput("") }, [facetedFilters.era])
+  useEffect(() => { if (!facetedFilters.migrationEra) setMigrationYearInput("") }, [facetedFilters.migrationEra])
+
+  // Exact-year input — same EraBucket shape as the preset buckets (a
+  // single-point range, start === end), so it flows through the exact same
+  // overlap-filter logic on the backend. Honest about what it does: an
+  // object whose date is only known as a wide range (e.g. "800–1300") will
+  // still match here if the typed year falls inside that range — typing
+  // "1906" isn't a promise the object is dated exactly 1906, only that
+  // 1906 is consistent with what's known.
+  const YEAR_INPUT_BOUNDS: [number, number] = [-1000000, 2027]
+
+  const applyTimeYear = useCallback(() => {
+    const year = parseInt(timeYearInput, 10)
+    if (isNaN(year) || year < YEAR_INPUT_BOUNDS[0] || year > YEAR_INPUT_BOUNDS[1]) return
+    onFacetedFiltersChange({ ...facetedFilters, era: { id: `year-${year}`, label: String(year), start: year, end: year } })
+  }, [timeYearInput, facetedFilters, onFacetedFiltersChange])
+
+  const applyMigrationYear = useCallback(() => {
+    const year = parseInt(migrationYearInput, 10)
+    if (isNaN(year) || year < YEAR_INPUT_BOUNDS[0] || year > YEAR_INPUT_BOUNDS[1]) return
+    onFacetedFiltersChange({ ...facetedFilters, migrationEra: { id: `year-${year}`, label: String(year), start: year, end: year } })
+  }, [migrationYearInput, facetedFilters, onFacetedFiltersChange])
+
+  // Only real century buckets ("bce-N"/"ce-N") support decade drill-down —
+  // "ancient" (the pre-500-BCE catch-all) and "undated" don't.
+  const isDrillableCentury = (bucketId: string) => /^(bce|ce)-\d+$/.test(bucketId)
+
+  const toggleCenturyExpand = useCallback((bucketId: string) => {
+    setExpandedCenturies((prev) => {
+      const next = new Set(prev)
+      if (next.has(bucketId)) {
+        next.delete(bucketId)
+      } else {
+        next.add(bucketId)
+      }
+      return next
+    })
+  }, [])
+
+  // Fetch decade counts for a century the first time it's expanded.
+  useEffect(() => {
+    for (const centuryId of expandedCenturies) {
+      if (decadeCache[centuryId] || loadingDecadesFor === centuryId) continue
+      setLoadingDecadesFor(centuryId)
+      fetchDecadeBucketCounts(centuryId, {
+        institutions: facetedFilters.institutions.length > 0 ? facetedFilters.institutions : undefined,
+        countries: facetedFilters.countries.length > 0 ? facetedFilters.countries : undefined,
+        cities: facetedFilters.cities.length > 0 ? facetedFilters.cities : undefined,
+      })
+        .then((result) => {
+          setDecadeCache((prev) => ({ ...prev, [centuryId]: result.decadeBuckets }))
+        })
+        .catch(() => { /* leave uncached — row shows a loading state indefinitely, acceptable on failure */ })
+        .finally(() => setLoadingDecadesFor((cur) => (cur === centuryId ? null : cur)))
+      break // fetch one at a time; effect re-runs as expandedCenturies/decadeCache change
+    }
+  }, [expandedCenturies, decadeCache, loadingDecadesFor, facetedFilters.institutions, facetedFilters.countries, facetedFilters.cities])
+
+  const toggleDecadeEra = useCallback((decade: DateBucket & { start?: number; end?: number }) => {
+    const bucket: EraBucket = { id: decade.id, label: decade.label, start: (decade as any).start ?? null, end: (decade as any).end ?? null }
+    onFacetedFiltersChange({ ...facetedFilters, era: facetedFilters.era?.id === bucket.id ? null : bucket })
+  }, [facetedFilters, onFacetedFiltersChange])
+
   // ── Full-dataset rows (shown when no query, clicking accordion) ──
   const allPlaceRows: PlaceRow[] = useMemo(() => {
     const map = new Map<string, PlaceRow>()
@@ -180,12 +278,18 @@ export default function V3CommandPalette({
     for (const arc of search.cityArcData) {
       const name = arc.place_name || ''
       if (!name) continue
+      const country = (arc as any).country || ''
+      // A "site" whose name is identical to its own country (e.g.
+      // place_name="Japan", country_en="Japan") is already represented in
+      // Places at the country level — display-only exclusion, doesn't touch
+      // Places, exports, or any counting/filtering logic elsewhere.
+      if (country && name.trim().toLowerCase() === country.trim().toLowerCase()) continue
       const key = name.toLowerCase()
       const existing = map.get(key)
       if (existing) {
         existing.objectCount += arc.object_count || 0
       } else {
-        map.set(key, { name, type: "city", objectCount: arc.object_count || 0, lat: arc.latitude, lng: arc.longitude, country: (arc as any).country || "" })
+        map.set(key, { name, type: "city", objectCount: arc.object_count || 0, lat: arc.latitude, lng: arc.longitude, country })
       }
     }
     return Array.from(map.values()).sort((a, b) => b.objectCount - a.objectCount)
@@ -276,7 +380,7 @@ export default function V3CommandPalette({
 
   // ── Filter toggle helpers (adds/removes chip, does NOT close palette) ──
   const toggleFilter = useCallback(
-    (dim: keyof FacetedFilters, value: string) => {
+    (dim: keyof Omit<FacetedFilters, "era" | "migrationEra">, value: string) => {
       const current = facetedFilters[dim]
       const isActive = current.some((v) => v.toLowerCase() === value.toLowerCase())
       const next = isActive
@@ -288,7 +392,7 @@ export default function V3CommandPalette({
   )
 
   const isFilterActive = useCallback(
-    (dim: keyof FacetedFilters, value: string) =>
+    (dim: keyof Omit<FacetedFilters, "era" | "migrationEra">, value: string) =>
       facetedFilters[dim].some((v) => v.toLowerCase() === value.toLowerCase()),
     [facetedFilters],
   )
@@ -364,10 +468,11 @@ export default function V3CommandPalette({
 
   // ── Filter chip helpers ──
   const activeFilterCount =
-    facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length
+    facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
+    (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
 
   const removeFilter = useCallback(
-    (dim: keyof FacetedFilters, value: string) => {
+    (dim: keyof Omit<FacetedFilters, "era" | "migrationEra">, value: string) => {
       onFacetedFiltersChange({
         ...facetedFilters,
         [dim]: facetedFilters[dim].filter((v) => v.toLowerCase() !== value.toLowerCase()),
@@ -377,7 +482,7 @@ export default function V3CommandPalette({
   )
 
   const clearAllFilters = useCallback(() => {
-    onFacetedFiltersChange({ institutions: [], countries: [], cities: [] })
+    onFacetedFiltersChange({ institutions: [], countries: [], cities: [], era: null, migrationEra: null })
   }, [onFacetedFiltersChange])
 
   // ── Keyboard ──
@@ -469,6 +574,18 @@ export default function V3CommandPalette({
                   <button onClick={() => removeFilter("institutions", c)} className="hover:bg-orange-100 rounded-md p-0.5"><X className="w-2.5 h-2.5" /></button>
                 </span>
               ))}
+              {facetedFilters.era && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[10px]">
+                  {facetedFilters.era.label}
+                  <button onClick={() => toggleEra(facetedFilters.era!)} className="hover:opacity-70 rounded-md p-0.5"><X className="w-2.5 h-2.5 text-white" /></button>
+                </span>
+              )}
+              {facetedFilters.migrationEra && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[10px]">
+                  {facetedFilters.migrationEra.label}
+                  <button onClick={() => toggleMigrationEra(facetedFilters.migrationEra!)} className="hover:opacity-70 rounded-md p-0.5"><X className="w-2.5 h-2.5 text-white" /></button>
+                </span>
+              )}
               {activeFilterCount > 1 && (
                 <button onClick={clearAllFilters} className="text-[10px] text-gray-400 hover:text-gray-600 px-1">Clear all</button>
               )}
@@ -630,6 +747,182 @@ export default function V3CommandPalette({
                     )
                   })}
 
+                {/* ── Time (object creation date) ── */}
+                <SectionHeader
+                  label="Time"
+                  count={dateBuckets ? (dateBuckets.objectDateExactCount ?? 0) : null}
+                  countLabel="Exact"
+                  isOpen={expanded.has("time")}
+                  onToggle={() => toggleSection("time")}
+                  dimmed={false}
+                />
+                {expanded.has("time") && (
+                  <>
+                    <div className="pl-7 pr-4 py-1 flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="-?[0-9]*"
+                        value={timeYearInput}
+                        onChange={(e) => setTimeYearInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") applyTimeYear() }}
+                        placeholder="Exact year (e.g. 1906, -500 for BCE)"
+                        className="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-gray-400 placeholder:text-gray-400"
+                      />
+                      <button
+                        onClick={applyTimeYear}
+                        className="text-sm text-gray-500 hover:text-gray-700 px-1.5 py-1"
+                      >
+                        Go
+                      </button>
+                    </div>
+                    {dateBuckets && collapseContiguousBuckets(
+                        ERA_BUCKETS,
+                        Object.fromEntries(dateBuckets.objectDateBuckets.map((b) => [b.id, b.count])),
+                        dateBuckets.objectDateSpans,
+                      )
+                      // Hide empty buckets now that we have a real (non-null) result.
+                      .filter((row) => row.count > 0)
+                      .map((row) => {
+                      const bucket = row.era
+                      const count = row.count
+                      const active = facetedFilters.era?.id === row.id
+                      const drillable = !row.isMerged && isDrillableCentury(bucket.id)
+                      const isExpanded = expandedCenturies.has(bucket.id)
+                      const decades = decadeCache[bucket.id]
+                      const isLoadingDecades = loadingDecadesFor === bucket.id
+                      return (
+                        <div key={`time-${bucket.id}`}>
+                          <div
+                            className={`group w-full flex items-center gap-1.5 pl-3 pr-4 py-1.5 transition-colors ${
+                              active ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+                            }`}
+                          >
+                            {drillable ? (
+                              <button
+                                onClick={() => toggleCenturyExpand(bucket.id)}
+                                className="p-0.5 -m-0.5 flex-shrink-0"
+                                aria-label={isExpanded ? "Collapse" : "Expand"}
+                              >
+                                <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                              </button>
+                            ) : (
+                              <span className="w-3.5 h-3.5 flex-shrink-0" />
+                            )}
+                            <button
+                              className="flex-1 flex items-center gap-3 text-left min-w-0"
+                              onClick={() => toggleEra(bucket)}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-gray-500" : "bg-gray-400"}`} />
+                              <span className="flex-1 text-sm truncate">{bucket.label}</span>
+                              <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                                {count.toLocaleString()}
+                              </span>
+                              {active && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
+                            </button>
+                          </div>
+                          {drillable && isExpanded && (
+                            <div className="pl-8">
+                              {isLoadingDecades && !decades && (
+                                <div className="flex items-center gap-2 pl-7 pr-4 py-1.5 text-sm text-gray-400">
+                                  <Spinner size="1" /> Loading decades…
+                                </div>
+                              )}
+                              {decades
+                                ?.filter((d) => d.count > 0)
+                                .map((decade) => {
+                                  const decadeActive = facetedFilters.era?.id === decade.id
+                                  return (
+                                    <button
+                                      key={`decade-${decade.id}`}
+                                      className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                                        decadeActive ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+                                      }`}
+                                      onClick={() => toggleDecadeEra(decade as any)}
+                                    >
+                                      <span className={`w-1 h-1 rounded-full flex-shrink-0 ${decadeActive ? "bg-gray-500" : "bg-gray-400"}`} />
+                                      <span className="flex-1 text-sm truncate">{decade.label}</span>
+                                      <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                                        {decade.count.toLocaleString()}
+                                      </span>
+                                      {decadeActive && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
+                                    </button>
+                                  )
+                                })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
+
+                {/* ── Migration (acquisition date) — hidden entirely when the
+                    current institution/place selection has zero real
+                    (non-undated) acquisition records, since an "Undated"-only
+                    list has nothing to browse. While dateBuckets is still
+                    loading (null), show it rather than flashing it away. ── */}
+                {(!dateBuckets || (dateBuckets.acquisitionExactCount ?? 0) > 0) && (
+                  <>
+                    <SectionHeader
+                      label="Migration"
+                      count={dateBuckets ? (dateBuckets.acquisitionExactCount ?? 0) : null}
+                      isOpen={expanded.has("migration")}
+                      onToggle={() => toggleSection("migration")}
+                      dimmed={false}
+                    />
+                    {expanded.has("migration") && (
+                      <>
+                        <div className="pl-7 pr-4 py-1 flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="-?[0-9]*"
+                            value={migrationYearInput}
+                            onChange={(e) => setMigrationYearInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") applyMigrationYear() }}
+                            placeholder="Exact year (e.g. 1925)"
+                            className="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-gray-400 placeholder:text-gray-400"
+                          />
+                          <button
+                            onClick={applyMigrationYear}
+                            className="text-sm text-gray-500 hover:text-gray-700 px-1.5 py-1"
+                          >
+                            Go
+                          </button>
+                        </div>
+                        {(dateBuckets?.acquisitionBuckets ?? [])
+                          // Undated is expected to dwarf every real year (most institutions
+                          // have no acquisition data at all) — keep it pinned first regardless.
+                          .filter((bucket) => bucket.count > 0 || bucket.id === 'undated')
+                          .map((bucket) => {
+                            const yearMatch = /^year-(-?\d+)$/.exec(bucket.id)
+                            const migrationBucket: EraBucket = yearMatch
+                              ? { id: bucket.id, label: bucket.label, start: parseInt(yearMatch[1], 10), end: parseInt(yearMatch[1], 10) }
+                              : { id: 'undated', label: 'Undated', start: null, end: null, undated: true }
+                            const active = facetedFilters.migrationEra?.id === migrationBucket.id
+                            return (
+                              <button
+                                key={`migration-${bucket.id}`}
+                                className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                                  active ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+                                }`}
+                                onClick={() => toggleMigrationEra(migrationBucket)}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-gray-500" : "bg-gray-400"}`} />
+                                <span className="flex-1 text-sm truncate">{migrationBucket.label}</span>
+                                <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                                  {bucket.count.toLocaleString()}
+                                </span>
+                                {active && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
+                              </button>
+                            )
+                          })}
+                      </>
+                    )}
+                  </>
+                )}
+
                 {/* ── Collections ── */}
                 <SectionHeader
                   label="Collections"
@@ -673,6 +966,7 @@ export default function V3CommandPalette({
                       </button>
                     )
                   })}
+
                 {/* ── Fly-to rows (headerless, only when searching) ── */}
                 {hasQuery && flyToRows.length > 0 && (
                   <>
@@ -722,12 +1016,19 @@ function SectionHeader({
   isOpen,
   onToggle,
   dimmed,
+  countLabel,
 }: {
   label: string
-  count: number
+  /** null means "still loading" — omits the count entirely rather than showing a misleading zero. */
+  count: number | null
   isOpen: boolean
   onToggle: () => void
   dimmed: boolean
+  /** When set (e.g. "Exact"), renders "Exact: N" instead of a bare number —
+   * for sections (Time) where this count is a narrower metric than "how many
+   * rows are in the list below", so a bare 0 would misread as "nothing here"
+   * even while range-dated buckets have real counts. */
+  countLabel?: string
 }) {
   return (
     <button
@@ -740,7 +1041,11 @@ function SectionHeader({
         className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
       />
       <span className="text-sm font-medium text-gray-500 flex-1">{label}</span>
-      <span className="text-sm text-gray-400 tabular-nums">{count}</span>
+      {count !== null && (
+        <span className="text-sm text-gray-400 tabular-nums">
+          {countLabel && `${countLabel}: `}{count.toLocaleString()}
+        </span>
+      )}
     </button>
   )
 }

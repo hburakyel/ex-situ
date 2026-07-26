@@ -4,8 +4,8 @@
 import React from "react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp } from "lucide-react"
 import { IconClose, IconSearch } from "@/components/icons"
+import type { EraBucket } from "@/lib/era-buckets"
 import type {
   BreadcrumbSegment,
   DrillLevel,
@@ -36,40 +36,13 @@ interface InfoPanelProps {
   drillInstitutions: InstitutionItem[]
   activeInstitution: string | null
   onToggleInstitution?: (inst: string) => void
+  onToggleEra?: (bucket: EraBucket) => void
   facetedFilters: FacetedFilters
-  removeFilter: (type: keyof FacetedFilters, value: string) => void
-  clearAllFilters: () => void
+  removeFilter: (type: keyof Omit<FacetedFilters, "era" | "migrationEra">, value: string) => void
+  removeEraFilter?: () => void
+  removeMigrationFilter?: () => void
   locationName?: string
-  geocodedName?: string
   activeCountry?: string | null
-}
-
-const PANEL_BOTTOM_FADE_STYLE = {
-  background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
-}
-
-const PANEL_TOP_FADE_STYLE = {
-  background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
-}
-
-function FadedAccordionList({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative">
-      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-4">
-        {children}
-      </div>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-5"
-        style={PANEL_TOP_FADE_STYLE}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
-        style={PANEL_BOTTOM_FADE_STYLE}
-      />
-    </div>
-  )
 }
 
 export default function InfoPanel({
@@ -83,29 +56,24 @@ export default function InfoPanel({
   collectionCount,
   isLoading,
   drillLevel,
-  groupedOrigins,
-  isLoadingOrigins,
-  onOriginClick,
-  groupedSites,
   activeSite,
-  onToggleSite,
-  isLoadingSubArcs,
   drillInstitutions,
-  activeInstitution,
-  onToggleInstitution,
   facetedFilters,
   removeFilter,
-  clearAllFilters,
+  removeEraFilter,
+  removeMigrationFilter,
   locationName,
-  geocodedName,
+  activeCountry,
 }: InfoPanelProps) {
-  const [showOrigins, setShowOrigins] = React.useState(false)
-  const [showSites, setShowSites] = React.useState(false)
-  const [showCollections, setShowCollections] = React.useState(false)
-
-  const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length
-  const displayName = geocodedName || ''
-  const headerLocation = drillLevel === "global" ? "" : (displayName || locationName || "")
+  const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
+    (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
+  // Real place/site name — same priority used to build the breadcrumb trail, not the reverse-geocoded name.
+  // Institution is deliberately excluded: it's always shown as a filter chip
+  // below (facetedFilters.institutions), so repeating it here as plain text
+  // duplicated the same name twice in the panel header.
+  const displayName = (activeSite && activeSite !== activeCountry)
+    ? activeSite
+    : (activeCountry || '')
 
   return (
     <div className={`${isMobile ? "px-4 pt-0 pb-4" : "p-4 pt-2"} flex flex-col bg-white`}>
@@ -164,22 +132,26 @@ export default function InfoPanel({
           <div className="flex py-1 items-center justify-between gap-2">
             <div className="text-sm min-w-0 flex-1">
               <div className="leading-normal text-left">
-                <span className="inline-block whitespace-nowrap">
-                  <span className="text-black font-medium">{totalCount}</span>
-                  <span className="ml-1">artifact{totalCount !== 1 ? "s" : ""}</span>
-                </span>
-                <span>
-                  {drillLevel === "global"
-                    ? (collectionCount > 0 ? ` from ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "")
-                    : drillInstitutions.length > 0
-                      ? ` · ${drillInstitutions.length} collection${drillInstitutions.length !== 1 ? "s" : ""}`
-                      : ""}
-                </span>
-                {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
+                {!(totalCount === 0 && isLoading) && (
+                  <>
+                    <span className="inline-block whitespace-nowrap">
+                      <span className="text-black font-medium">{totalCount}</span>
+                      <span className="ml-1">artifact{totalCount !== 1 ? "s" : ""}</span>
+                    </span>
+                    <span>
+                      {drillLevel === "global"
+                        ? (collectionCount > 0 ? ` from ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "")
+                        : drillInstitutions.length > 0
+                          ? ` · ${drillInstitutions.length} collection${drillInstitutions.length !== 1 ? "s" : ""}`
+                          : ""}
+                    </span>
+                    {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
+                  </>
+                )}
               </div>
-              {headerLocation && (
+              {displayName && (
                 <div className="truncate text-sm text-black leading-normal mt-0.5">
-                  {headerLocation}
+                  {displayName}
                 </div>
               )}
             </div>
@@ -187,99 +159,6 @@ export default function InfoPanel({
               <div className="flex-shrink-0">{actionSlot}</div>
             )}
           </div>
-
-          {/* Mobile: Drill-down sections (after artifact count) */}
-          {isMobile && (
-            <div>
-              {/* Places (global) */}
-              {drillLevel === "global" && groupedOrigins.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="panel-text-muted">
-                      Places
-                      {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                      onClick={() => setShowOrigins(!showOrigins)}
-                    >
-                      {showOrigins ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                    </Button>
-                  </div>
-                  {showOrigins && (
-                    <FadedAccordionList>
-                        {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
-                            onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
-                          >
-                            <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
-                          </div>
-                        ))}
-                    </FadedAccordionList>
-                  )}
-                </div>
-              )}
-
-              {/* Sites (country) */}
-              {drillLevel !== "global" && groupedSites.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="panel-text-muted">
-                      Sites
-                      {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                      onClick={() => setShowSites(!showSites)}
-                    >
-                      {showSites ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                    </Button>
-                  </div>
-                  {showSites && (
-                    <FadedAccordionList>
-                        {groupedSites.map((site, index) => (
-                          <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
-                            onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
-                          >
-                            <span className="truncate max-w-[70%]" title={site.name}>{site.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
-                          </div>
-                        ))}
-                    </FadedAccordionList>
-                  )}
-                </div>
-              )}
-
-              {/* Institutions — shown at all zoom levels */}
-              {drillInstitutions.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="panel-text-muted">
-                      Collections
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                      onClick={() => setShowCollections(!showCollections)}
-                    >
-                      {showCollections ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                    </Button>
-                  </div>
-                  {showCollections && (
-                    <FadedAccordionList>
-                        {drillInstitutions.map((inst, index) => (
-                          <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
-                            onClick={() => onToggleInstitution?.(inst.name)}
-                          >
-                            <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
-                          </div>
-                        ))}
-                    </FadedAccordionList>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Filter chips */}
           {activeFilterCount > 0 && (
@@ -308,10 +187,21 @@ export default function InfoPanel({
                   </button>
                 </span>
               ))}
-              {activeFilterCount > 1 && (
-                <button onClick={clearAllFilters} className="text-sm text-gray-400 hover:text-gray-600 px-0">
-                  Clear all
-                </button>
+              {facetedFilters.era && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-sm">
+                  {facetedFilters.era.label}
+                  <button onClick={() => removeEraFilter?.()} className="hover:opacity-70 rounded-md p-0.5">
+                    <IconClose className="w-2.5 h-2.5 text-white" />
+                  </button>
+                </span>
+              )}
+              {facetedFilters.migrationEra && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-sm">
+                  {facetedFilters.migrationEra.label}
+                  <button onClick={() => removeMigrationFilter?.()} className="hover:opacity-70 rounded-md p-0.5">
+                    <IconClose className="w-2.5 h-2.5 text-white" />
+                  </button>
+                </span>
               )}
             </div>
           )}

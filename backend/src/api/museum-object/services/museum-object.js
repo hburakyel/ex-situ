@@ -6,6 +6,56 @@
 
 const { createCoreService } = require('@strapi/strapi').factories;
 const { buildPublicDateFields } = require('./date-display');
+const { buildEraBuckets } = require('./era-buckets');
+
+// MUST stay structurally in sync with frontend/lib/era-buckets.ts — same ids
+// and boundaries. Omits 'undated' (handled here as a separate predicate —
+// see buildDateRangeFilter/buildAcquisitionDateRangeFilter and the
+// time_undated/acq_undated aggregates below); the frontend's copy includes
+// it as a normal, renderable list row.
+const ERA_BUCKETS = buildEraBuckets(new Date().getFullYear());
+
+/**
+ * Decade sub-buckets within a single century bucket, for the Time section's
+ * expand-to-drill-down UI (matches frontend/lib/era-buckets.ts's
+ * buildDecadeBuckets — same ids/boundaries). Decades are derived from the
+ * century NUMBER (not the century bucket's own start/end), which is why
+ * "19th century" drills into "1800s"..."1890s" rather than "1801s": century
+ * 19 covers 1801-1900 by ordinal convention, but decades use the ordinary
+ * 0-indexed convention (1800-1809, ..., 1890-1899). Only real century
+ * buckets (ids 'bce-N'/'ce-N') support this — 'ancient' and 'undated' don't.
+ */
+function buildDecadeBuckets(centuryId, currentYear) {
+  const bceMatch = /^bce-(\d+)$/.exec(centuryId);
+  const ceMatch = /^ce-(\d+)$/.exec(centuryId);
+  if (!bceMatch && !ceMatch) return null;
+
+  const decades = [];
+  if (bceMatch) {
+    const n = parseInt(bceMatch[1], 10);
+    const centuryFloor = -n * 100; // e.g. 5th century BCE -> -500
+    for (let d = 0; d < 10; d++) {
+      const decadeStart = centuryFloor + d * 10;
+      const decadeEnd = decadeStart + 9;
+      decades.push({ id: `${centuryId}-d${d}`, label: `${Math.abs(decadeStart)}s BCE`, start: decadeStart, end: decadeEnd });
+    }
+  } else {
+    const n = parseInt(ceMatch[1], 10);
+    const centuryFloor = (n - 1) * 100; // e.g. 19th century -> 1800
+    const isCurrentCentury = n === Math.ceil(currentYear / 100);
+    for (let d = 0; d < 10; d++) {
+      const decadeStart = centuryFloor + d * 10;
+      const isLastDecadeOfCurrentCentury = isCurrentCentury && d === 9;
+      decades.push({
+        id: `${centuryId}-d${d}`,
+        label: `${decadeStart}s`,
+        start: decadeStart,
+        end: isLastDecadeOfCurrentCentury ? null : decadeStart + 9,
+      });
+    }
+  }
+  return decades;
+}
 
 let manualCoordsCache = null;
 
@@ -51,6 +101,304 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       return `:${key}`;
     });
     return { clause: `AND ${fieldName} IN (${placeholders.join(', ')}) `, bindings };
+  },
+
+  /**
+   * Build parameterized SQL clause for the object-date time filter.
+   * Two mutually exclusive modes:
+   *  - filters.undated: matches only object_date_precision = 'unknown'
+   *  - filters.dateStart / filters.dateEnd: interval-OVERLAP test against
+   *    object_date_earliest/latest (not containment) — an object whose date
+   *    range spans two buckets should show up in both, not be silently
+   *    dropped from either. NULL earliest/latest (unknown-precision rows)
+   *    never satisfy this comparison, so they're naturally excluded without
+   *    an extra check.
+   * @param {object} filters - filters.dateStart / filters.dateEnd (integers) / filters.undated (bool)
+   * @param {string} bindingPrefix - unique prefix for named bindings
+   * @returns {{ clause: string, bindings: object }}
+   */
+  buildDateRangeFilter(filters, bindingPrefix) {
+    if (filters.undated) {
+      return { clause: `AND object_date_precision = 'unknown' `, bindings: {} };
+    }
+    const hasStart = filters.dateStart !== undefined && filters.dateStart !== null;
+    const hasEnd = filters.dateEnd !== undefined && filters.dateEnd !== null;
+    if (!hasStart && !hasEnd) return { clause: '', bindings: {} };
+
+    const bindings = {};
+    let clause = '';
+    if (hasEnd) {
+      const key = `${bindingPrefix}_end`;
+      bindings[key] = filters.dateEnd;
+      clause += `AND object_date_earliest <= :${key} `;
+    }
+    if (hasStart) {
+      const key = `${bindingPrefix}_start`;
+      bindings[key] = filters.dateStart;
+      clause += `AND object_date_latest >= :${key} `;
+    }
+    return { clause, bindings };
+  },
+
+  /**
+   * Build parameterized SQL clause for the "Migration" (acquisition-date) filter.
+   * Same overlap-test shape as buildDateRangeFilter, but on
+   * acquisition_year_earliest/latest, and — critically — it only ever
+   * matches rows where acquisition_date_confidence = 'confirmed'. Rows with
+   * an 'inferred' (regex-derived, e.g. V&A's accession-number guess) or
+   * absent acquisition value must never be filterable into a specific
+   * bucket; they always count as "Unknown" here, never a real year.
+   * @param {object} filters - filters.acqDateStart / filters.acqDateEnd (integers) / filters.acqUndated (bool)
+   * @param {string} bindingPrefix - unique prefix for named bindings
+   * @returns {{ clause: string, bindings: object }}
+   */
+  buildAcquisitionDateRangeFilter(filters, bindingPrefix) {
+    if (filters.acqUndated) {
+      return { clause: `AND (acquisition_date_confidence IS DISTINCT FROM 'confirmed') `, bindings: {} };
+    }
+    const hasStart = filters.acqDateStart !== undefined && filters.acqDateStart !== null;
+    const hasEnd = filters.acqDateEnd !== undefined && filters.acqDateEnd !== null;
+    if (!hasStart && !hasEnd) return { clause: '', bindings: {} };
+
+    const bindings = {};
+    let clause = `AND acquisition_date_confidence = 'confirmed' `;
+    if (hasEnd) {
+      const key = `${bindingPrefix}_end`;
+      bindings[key] = filters.acqDateEnd;
+      clause += `AND acquisition_year_earliest <= :${key} `;
+    }
+    if (hasStart) {
+      const key = `${bindingPrefix}_start`;
+      bindings[key] = filters.acqDateStart;
+      clause += `AND acquisition_year_latest >= :${key} `;
+    }
+    return { clause, bindings };
+  },
+
+  /**
+   * Get per-bucket object counts for the "Time" and "Migration" left-panel
+   * filters, respecting the current institution/city/country selection
+   * (same cross-filter behavior as the existing Places/Sites/Collections
+   * panel) so the counts shown always reflect what a click would actually
+   * select.
+   *
+   * Fast path: when no institution/city/country filter is active, reads
+   * from mv_time_bucket_stats / mv_acquisition_year_stats (bootstrap-created
+   * in src/index.js, same pattern as mv_country_institution_stats) instead
+   * of scanning museum_objects live — mirrors getCountryStatistics' MV
+   * fast-path / live-query fallback split.
+   *
+   * Migration counts only ever consider acquisition_date_confidence =
+   * 'confirmed' rows; everything else (inferred or absent) falls into the
+   * migrationBuckets 'undated' bucket — inferred values are never exposed
+   * as a selectable year here.
+   *
+   * @param {object} filters - filters.institution / filters.city / filters.country (comma-separated)
+   * @returns {Promise<{ objectDateBuckets: Array, acquisitionBuckets: Array }>}
+   */
+  async getDateBucketCounts(filters = {}) {
+    const db = strapi.db.connection;
+    const hasFilters = !!(filters.institution || filters.city || filters.country);
+
+    let timeRow, acqUndatedCount, acqYearRows;
+
+    const mvReady = !hasFilters
+      && await this._materializedViewExists(db, 'mv_time_bucket_stats')
+      && await this._materializedViewExists(db, 'mv_acquisition_year_stats');
+
+    if (mvReady) {
+      // ── Fast path: pre-aggregated materialized views (unfiltered case only) ──
+      const timeResult = await db.raw('SELECT * FROM mv_time_bucket_stats LIMIT 1');
+      timeRow = this.getRows(timeResult)[0] || {};
+
+      const acqResult = await db.raw('SELECT year, count FROM mv_acquisition_year_stats');
+      const acqRows = this.getRows(acqResult);
+      acqUndatedCount = parseInt(acqRows.find((r) => r.year === null)?.count, 10) || 0;
+      acqYearRows = acqRows
+        .filter((r) => r.year !== null)
+        .sort((a, b) => a.year - b.year);
+    } else {
+      // ── Fallback: live aggregate query (filtered case, or MVs not yet
+      // created) — Time uses overlap-FILTER per bucket since object_date
+      // ranges can be wide and span multiple centuries. ──
+      const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'db_inst');
+      const cityFilter = this.buildMultiValueFilter('city_en', filters.city, 'db_city');
+      const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'db_country');
+
+      const timeSelects = [
+        `COUNT(*) FILTER (WHERE object_date_precision = 'unknown') AS time_undated`,
+        `COUNT(*) FILTER (WHERE object_date_precision = 'exact') AS time_exact_total`,
+      ];
+      for (const bucket of ERA_BUCKETS) {
+        const overlapConds = [];
+        if (bucket.end !== null) overlapConds.push(`object_date_earliest <= ${bucket.end}`);
+        if (bucket.start !== null) overlapConds.push(`object_date_latest >= ${bucket.start}`);
+        timeSelects.push(`COUNT(*) FILTER (WHERE ${overlapConds.join(' AND ')}) AS time_${bucket.id.replace(/-/g, '_')}`);
+      }
+
+      const timeQuery = `
+        SELECT ${timeSelects.join(',\n        ')}
+        FROM museum_objects
+        WHERE published_at IS NOT NULL
+          ${institutionFilter.clause}
+          ${cityFilter.clause}
+          ${countryFilter.clause}
+      `;
+      const timeResult = await db.raw(timeQuery, {
+        ...institutionFilter.bindings,
+        ...cityFilter.bindings,
+        ...countryFilter.bindings,
+      });
+      timeRow = this.getRows(timeResult)[0] || {};
+
+      // ── Migration: flat per-year list, not buckets. Every confirmed
+      // acquisition record is a single exact year (start === end, never a
+      // range — confirmed by inspection: 100% of confirmed rows are
+      // precision='exact'), so a plain GROUP BY is both correct and simpler
+      // than the overlap-FILTER approach Time needs. ──
+      const acqInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'acqy_inst');
+      const acqCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'acqy_city');
+      const acqCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'acqy_country');
+
+      const acqUndatedQuery = `
+        SELECT COUNT(*)::integer AS count
+        FROM museum_objects
+        WHERE published_at IS NOT NULL
+          AND acquisition_date_confidence IS DISTINCT FROM 'confirmed'
+          ${acqInstitutionFilter.clause}
+          ${acqCityFilter.clause}
+          ${acqCountryFilter.clause}
+      `;
+      const acqYearsQuery = `
+        SELECT acquisition_year_earliest AS year, COUNT(*)::integer AS count
+        FROM museum_objects
+        WHERE published_at IS NOT NULL
+          AND acquisition_date_confidence = 'confirmed'
+          ${acqInstitutionFilter.clause}
+          ${acqCityFilter.clause}
+          ${acqCountryFilter.clause}
+        GROUP BY acquisition_year_earliest
+        ORDER BY acquisition_year_earliest
+      `;
+      const acqBindings = {
+        ...acqInstitutionFilter.bindings,
+        ...acqCityFilter.bindings,
+        ...acqCountryFilter.bindings,
+      };
+      const [acqUndatedResult, acqYearsResult] = await Promise.all([
+        db.raw(acqUndatedQuery, acqBindings),
+        db.raw(acqYearsQuery, acqBindings),
+      ]);
+      acqUndatedCount = parseInt(this.getRows(acqUndatedResult)[0]?.count, 10) || 0;
+      acqYearRows = this.getRows(acqYearsResult);
+    }
+
+    const objectDateBuckets = [
+      { id: 'undated', label: 'Unknown', count: parseInt(timeRow.time_undated, 10) || 0 },
+      ...ERA_BUCKETS.map((b) => ({
+        id: b.id,
+        label: b.label,
+        count: parseInt(timeRow[`time_${b.id.replace(/-/g, '_')}`], 10) || 0,
+      })),
+    ];
+
+    const acquisitionBuckets = [
+      { id: 'undated', label: 'Unknown', count: acqUndatedCount },
+      ...acqYearRows.map((r) => ({
+        id: `year-${r.year}`,
+        label: String(r.year),
+        count: parseInt(r.count, 10) || 0,
+      })),
+    ];
+    const acquisitionExactCount = acqYearRows.reduce((sum, r) => sum + (parseInt(r.count, 10) || 0), 0);
+
+    // ── Contiguous-bucket collapsing support: group objects by their exact
+    // (earliest, latest) span so the frontend can tell when a run of century
+    // buckets all trace back to the very same object(s) — see
+    // lib/era-buckets.ts's collapseContiguousBuckets. One extra aggregate
+    // query (same filter cost as the queries above), not one per bucket:
+    // a bucket's count is always the sum of every span overlapping it, so a
+    // span whose count equals a bucket's whole count is provably its only
+    // contributor — no per-bucket object-id fetch needed.
+    const spanInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'span_inst');
+    const spanCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'span_city');
+    const spanCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'span_country');
+    const spansQuery = `
+      SELECT object_date_earliest AS earliest, object_date_latest AS latest, COUNT(*)::integer AS count
+      FROM museum_objects
+      WHERE published_at IS NOT NULL
+        AND object_date_earliest IS NOT NULL AND object_date_latest IS NOT NULL
+        ${spanInstitutionFilter.clause}
+        ${spanCityFilter.clause}
+        ${spanCountryFilter.clause}
+      GROUP BY object_date_earliest, object_date_latest
+    `;
+    const spansResult = await db.raw(spansQuery, {
+      ...spanInstitutionFilter.bindings,
+      ...spanCityFilter.bindings,
+      ...spanCountryFilter.bindings,
+    });
+    const objectDateSpans = this.getRows(spansResult).map((r) => ({
+      earliest: parseInt(r.earliest, 10),
+      latest: parseInt(r.latest, 10),
+      count: parseInt(r.count, 10) || 0,
+    }));
+
+    return {
+      objectDateBuckets,
+      acquisitionBuckets,
+      objectDateExactCount: parseInt(timeRow.time_exact_total, 10) || 0,
+      acquisitionExactCount,
+      objectDateSpans,
+    };
+  },
+
+  /**
+   * Decade-level counts within a single Time century bucket (the Time
+   * section's expand-to-drill-down). Same overlap-FILTER approach as the
+   * century list, just scoped to 10 decades instead of ~26 centuries.
+   * @param {string} centuryId - one of ERA_BUCKETS' century ids (e.g. 'ce-19')
+   */
+  async getDecadeBucketCounts(centuryId, filters = {}) {
+    const decades = buildDecadeBuckets(centuryId, new Date().getFullYear());
+    if (!decades) return { decadeBuckets: [] };
+
+    const db = strapi.db.connection;
+    const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'dec_inst');
+    const cityFilter = this.buildMultiValueFilter('city_en', filters.city, 'dec_city');
+    const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'dec_country');
+
+    const selects = decades.map((bucket) => {
+      const overlapConds = [];
+      if (bucket.end !== null) overlapConds.push(`object_date_earliest <= ${bucket.end}`);
+      if (bucket.start !== null) overlapConds.push(`object_date_latest >= ${bucket.start}`);
+      return `COUNT(*) FILTER (WHERE ${overlapConds.join(' AND ')}) AS dec_${bucket.id.replace(/-/g, '_')}`;
+    });
+
+    const query = `
+      SELECT ${selects.join(',\n        ')}
+      FROM museum_objects
+      WHERE published_at IS NOT NULL
+        ${institutionFilter.clause}
+        ${cityFilter.clause}
+        ${countryFilter.clause}
+    `;
+    const result = await db.raw(query, {
+      ...institutionFilter.bindings,
+      ...cityFilter.bindings,
+      ...countryFilter.bindings,
+    });
+    const row = this.getRows(result)[0] || {};
+
+    const decadeBuckets = decades.map((b) => ({
+      id: b.id,
+      label: b.label,
+      start: b.start,
+      end: b.end,
+      count: parseInt(row[`dec_${b.id.replace(/-/g, '_')}`], 10) || 0,
+    }));
+
+    return { decadeBuckets };
   },
 
   /**
@@ -107,11 +455,16 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       // Build filter clauses (now supporting multi-select via comma-separated values)
       const instFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'cs_inst');
       const countryFilter = this.buildMultiValueFilter('origin_country', filters.country, 'cs_country');
+      const dateFilter = this.buildDateRangeFilter(filters, 'cs_date');
+      const acqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'cs_acq');
 
       // Check if materialized view exists — fall back to raw query if not
       const mvExists = await this._materializedViewExists(db, 'mv_country_institution_stats');
 
-      if (mvExists && !filters.city) {
+      // The materialized view has no date columns, so any active Time or
+      // Migration filter forces the live fallback query below (same reason
+      // `filters.city` does).
+      if (mvExists && !filters.city && !dateFilter.clause && !acqDateFilter.clause) {
         // ── Fast path: pre-aggregated materialized view ──
         const query = `
           SELECT *
@@ -152,6 +505,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const fallbackInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'fb_inst');
       const fallbackCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'fb_city');
       const fallbackCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'fb_country');
+      const fallbackDateFilter = this.buildDateRangeFilter(filters, 'fb_date');
+      const fallbackAcqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'fb_acq');
 
       const query = `
         WITH country_groups AS (
@@ -176,7 +531,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             ${fallbackInstitutionFilter.clause}
             ${fallbackCityFilter.clause}
             ${fallbackCountryFilter.clause}
-          GROUP BY 
+            ${fallbackDateFilter.clause}
+            ${fallbackAcqDateFilter.clause}
+          GROUP BY
             COALESCE(NULLIF(country_en, ''), 'Unknown'),
             institution_name
           HAVING COUNT(*) >= 1
@@ -189,6 +546,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         ...fallbackInstitutionFilter.bindings,
         ...fallbackCityFilter.bindings,
         ...fallbackCountryFilter.bindings,
+        ...fallbackDateFilter.bindings,
+        ...fallbackAcqDateFilter.bindings,
       });
       const rows = this.getRows(result);
 
@@ -231,6 +590,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'cl_inst');
       const cityFilter = this.buildMultiValueFilter('origin_city', filters.city, 'cl_city');
       const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'cl_country');
+      const dateFilter = this.buildDateRangeFilter(filters, 'cl_date');
+      const acqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'cl_acq');
 
       strapi.log.info(`getClusteredData: zoom=${zoom}, bbox=[${minLat},${maxLat},${minLon},${maxLon}]`);
 
@@ -238,7 +599,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
       let rows;
 
-      if (mvExists) {
+      // The materialized view has no date columns, so any active Time or
+      // Migration filter forces the live fallback query below.
+      if (mvExists && !dateFilter.clause && !acqDateFilter.clause) {
         // ── Fast path: materialized view with bbox filter on pre-computed coords ──
         const query = `
           SELECT
@@ -272,6 +635,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         const fbInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'cfb_inst');
         const fbCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'cfb_city');
         const fbCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'cfb_country');
+        const fbDateFilter = this.buildDateRangeFilter(filters, 'cfb_date');
+        const fbAcqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'cfb_acq');
 
         const query = `
           WITH bbox_filter AS (
@@ -295,6 +660,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               ${fbInstitutionFilter.clause}
               ${fbCityFilter.clause}
               ${fbCountryFilter.clause}
+              ${fbDateFilter.clause}
+              ${fbAcqDateFilter.clause}
           ),
           city_aggregations AS (
             SELECT
@@ -332,6 +699,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ...fbInstitutionFilter.bindings,
           ...fbCityFilter.bindings,
           ...fbCountryFilter.bindings,
+          ...fbDateFilter.bindings,
+          ...fbAcqDateFilter.bindings,
         });
         rows = this.getRows(result);
       }
@@ -390,6 +759,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'io_inst');
       const cityFilter = this.buildMultiValueFilter('city_en', filters.city, 'io_city');
       const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'io_country');
+      const dateFilter = this.buildDateRangeFilter(filters, 'io_date');
+      const acqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'io_acq');
 
       strapi.log.info(`getIndividualObjects: bbox=[${minLat},${maxLat},${minLon},${maxLon}], institution=${filters.institution || 'all'}, city=${filters.city || 'all'}, country=${filters.country || 'all'}`);
 
@@ -418,6 +789,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           institution_longitude,
           country_en,
           city_en,
+          origin_event_type_en,
+          origin_is_findspot,
+          origin_person_name,
           ${manualSelect},
           (SELECT ol.link_text FROM museum_objects_components moc
            JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
@@ -438,6 +812,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             ${institutionFilter.clause}
             ${cityFilter.clause}
             ${countryFilter.clause}
+            ${dateFilter.clause}
+            ${acqDateFilter.clause}
           ORDER BY
             CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
               THEN inventory_number ELSE id::text END, institution_name, id
@@ -452,6 +828,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         ...institutionFilter.bindings,
         ...cityFilter.bindings,
         ...countryFilter.bindings,
+        ...dateFilter.bindings,
+        ...acqDateFilter.bindings,
       };
       
       // Debug logging
@@ -482,6 +860,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           institution_longitude: row.institution_longitude ? parseFloat(row.institution_longitude) : null,
           country_en: row.country_en || null,
           city_en: row.city_en || null,
+          origin_event_type_en: row.origin_event_type_en || null,
+          origin_is_findspot: row.origin_is_findspot,
+          origin_person_name: row.origin_person_name || null,
           manual_latitude: row.manual_latitude ? parseFloat(row.manual_latitude) : null,
           manual_longitude: row.manual_longitude ? parseFloat(row.manual_longitude) : null,
           object_links: row.object_link_url ? [{ link_text: row.object_link_url, link_display: row.object_link_display }] : null,
@@ -552,6 +933,14 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         whereClause += ` AND NULLIF(BTRIM(COALESCE(img_url, '')), '') IS NOT NULL`;
       }
 
+      // Time / Migration filters — same overlap logic as the geospatial
+      // endpoint, so the object grid, its total count, and the map arcs all
+      // agree on what "1906" or "19th century" means.
+      const dateFilter = this.buildDateRangeFilter(options, 'oc_date');
+      const acqDateFilter = this.buildAcquisitionDateRangeFilter(options, 'oc_acq');
+      whereClause += ` ${dateFilter.clause} ${acqDateFilter.clause}`;
+      Object.assign(bindings, dateFilter.bindings, acqDateFilter.bindings);
+
       // Dedup key: use inventory_number when present, else fall back to id so rows
       // without an inventory number are never merged together.
       const dedupKey = `CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
@@ -586,6 +975,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             institution_city_en,
             inventory_number,
             source_link,
+            origin_event_type_en,
+            origin_is_findspot,
+            origin_person_name,
             (SELECT ti.time_name FROM museum_objects_components moc
              JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
              WHERE moc.entity_id = museum_objects.id AND moc.field = 'time'
@@ -649,6 +1041,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             city_en: row.city_en,
             country_en: row.country_en,
             country: row.country_en,
+            origin_event_type_en: row.origin_event_type_en || null,
+            origin_is_findspot: row.origin_is_findspot,
+            origin_person_name: row.origin_person_name || null,
             institution_name: row.institution_name,
             institution_place: row.institution_place,
             institution_city_en: row.institution_city_en || null,
@@ -726,6 +1121,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           geocoding_confidence,
           geocoding_status,
           geocoding_notes,
+          origin_event_type_en,
+          origin_is_findspot,
+          origin_person_name,
           ${latExpr} as latitude,
           ${lonExpr} as longitude,
           institution_latitude,
@@ -796,6 +1194,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           geocoding_confidence: row.geocoding_confidence ? parseFloat(row.geocoding_confidence) : null,
           geocoding_status: row.geocoding_status,
           geocoding_notes: row.geocoding_notes,
+          origin_event_type_en: row.origin_event_type_en || null,
+          origin_is_findspot: row.origin_is_findspot,
+          origin_person_name: row.origin_person_name || null,
           latitude: row.latitude ? parseFloat(row.latitude) : null,
           longitude: row.longitude ? parseFloat(row.longitude) : null,
           institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,

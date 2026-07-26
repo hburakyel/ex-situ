@@ -91,6 +91,15 @@ export interface UnifiedSearchResult {
 interface UseUnifiedSearchOptions {
   /** Minimum characters before triggering search (default: 3) */
   minChars?: number
+  /** Time/Migration selection — reactively refetches arcData/cityArcData when it changes. */
+  dateFilters?: {
+    dateStart?: number
+    dateEnd?: number
+    undated?: boolean
+    acqDateStart?: number
+    acqDateEnd?: number
+    acqUndated?: boolean
+  }
 }
 
 /**
@@ -119,7 +128,8 @@ function normalizeArcItem(raw: any): ArcData {
 }
 
 export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
-  const { minChars = 3 } = options
+  const { minChars = 3, dateFilters } = options
+  const { dateStart, dateEnd, undated, acqDateStart, acqDateEnd, acqUndated } = dateFilters || {}
 
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
@@ -136,11 +146,30 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
   const [isLoadingArcData, setIsLoadingArcData] = useState(true)
   const [wikiDocCount, setWikiDocCount] = useState(0)
 
-  // Fetch country-level arcs first (fast), then city-level in background
+  // Fetch country-level arcs first (fast), then city-level in background.
+  // Reactive to Time/Migration selection so Places/Sites/Collections counts
+  // (and everything downstream that aggregates arcData/cityArcData) reflect
+  // the current era filter, not just institutions/countries/cities.
   useEffect(() => {
     let cancelled = false
+
+    const dateParams = new URLSearchParams()
+    if (undated) {
+      dateParams.set('undated', 'true')
+    } else {
+      if (dateStart !== undefined) dateParams.set('dateStart', String(dateStart))
+      if (dateEnd !== undefined) dateParams.set('dateEnd', String(dateEnd))
+    }
+    if (acqUndated) {
+      dateParams.set('acqUndated', 'true')
+    } else {
+      if (acqDateStart !== undefined) dateParams.set('acqDateStart', String(acqDateStart))
+      if (acqDateEnd !== undefined) dateParams.set('acqDateEnd', String(acqDateEnd))
+    }
+    const dateQuery = dateParams.toString() ? `&${dateParams.toString()}` : ''
+
     // 1) Country data — unblocks the UI
-    fetch('/api/proxy/geospatial?zoom=1')
+    fetch(`/api/proxy/geospatial?zoom=1${dateQuery}`)
       .then(res => res.json())
       .then(data => {
         if (!cancelled && data?.data && Array.isArray(data.data)) {
@@ -151,7 +180,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       .finally(() => { if (!cancelled) setIsLoadingArcData(false) })
 
     // 2) City data — loads in background, doesn't block UI
-    fetch('/api/proxy/geospatial?zoom=4')
+    fetch(`/api/proxy/geospatial?zoom=4${dateQuery}`)
       .then(res => res.json())
       .then(data => {
         if (!cancelled && data?.data && Array.isArray(data.data)) {
@@ -161,7 +190,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       .catch(err => console.error('Failed to fetch city arc data:', err))
 
     return () => { cancelled = true }
-  }, [])
+  }, [dateStart, dateEnd, undated, acqDateStart, acqDateEnd, acqUndated])
 
   // Load synonyms from DB-backed API (replaces hardcoded COUNTRY_ALIASES)
   useEffect(() => {

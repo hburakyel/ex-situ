@@ -160,7 +160,7 @@ export interface MapLayoutProps {
  *
  * ### Accessibility
  * - `aria-label="Global View"` on globe control button
- * - `title="Toggle objects panel"`, `title="Search (⌘K)"` on icon buttons
+ * - `title="Search (⌘K)"` on icon buttons
  */
 export interface MapViewProps {
   initialViewState: { longitude: number; latitude: number; zoom: number; pitch?: number; bearing?: number; name?: string }
@@ -176,7 +176,6 @@ export interface MapViewProps {
   locationName?: string
   onDownloadCSV?: () => void
   isObjectContainerVisible: boolean
-  toggleObjectContainerVisibility: () => void
   setObjects: (objects: MuseumObject[]) => void
   setTotalCount: (count: number) => void
   initialLongitude?: number
@@ -273,6 +272,7 @@ export interface MapViewProps {
  *
  * ### Accessibility
  * - `title="Restore panel"` / `title="Minimize panel"` on toggle
+ * - `title="Hide panel"` on close button (desktop only, next to Export)
  * - `title="Search"` on search icon button
  */
 export interface ObjectPanelProps {
@@ -307,6 +307,8 @@ export interface ObjectPanelProps {
   onFacetedFiltersChange?: (filters: FacetedFilters) => void
   onCommandPaletteOpen?: () => void
   linkObjects?: MuseumObject[]
+  /** Hide the panel — desktop only. */
+  onCloseContainer?: () => void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

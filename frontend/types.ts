@@ -36,6 +36,9 @@ export interface MuseumObject {
     institution_latitude: number
     place_name?: string
     place_name_normalized?: string
+    origin_event_type_en?: string
+    origin_is_findspot?: boolean | null
+    origin_person_name?: string
     institution_place?: string
     country?: string
     country_en?: string
@@ -65,6 +68,8 @@ export interface MuseumObject {
     transfer_method?: string
     historical_relation?: string
     enrichment_confidence?: EnrichmentConfidence
+    object_date?: string
+    acquisition_year?: number | null
   }
 }
 
@@ -167,6 +172,9 @@ export interface GeospatialObject {
   institution_name: string
   place_name?: string
   place_name_normalized?: string
+  origin_event_type_en?: string
+  origin_is_findspot?: boolean | null
+  origin_person_name?: string
   source_link?: string
   inventory_number?: string
   institution_latitude?: number

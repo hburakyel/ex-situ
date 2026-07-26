@@ -8,9 +8,9 @@ import { Protocol } from "pmtiles"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
-import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
-import { IconSearch, IconPanelOpen, IconPanelClosed, iconSvgStrings } from "@/components/icons"
+import { IconSearch, iconSvgStrings } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ArcLayer, ScatterplotLayer } from "@deck.gl/layers"
@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { WIKIPEDIA_COLLECTION, ENABLE_WIKIPEDIA } from "@/components/faceted-filter"
 import { protomapsDarkStyle } from "@/lib/protomaps-dark-style"
+import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
+import type { DateBucketCounts } from "@/lib/api"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -34,7 +36,16 @@ if (typeof window !== "undefined" && !pmtilesRegistered) {
 
 
 // Re-export for parent
-export type FacetedFilters = { institutions: string[]; countries: string[]; cities: string[] }
+// `era` = "Time" (object creation date), `migrationEra` = "Migration"
+// (acquisition date) — both optional, set/cleared only from the left panel's
+// Time/Migration accordion sections.
+export type FacetedFilters = {
+  institutions: string[]
+  countries: string[]
+  cities: string[]
+  era?: EraBucket | null
+  migrationEra?: EraBucket | null
+}
 
 // Protomaps dark style — see lib/protomaps-dark-style.ts
 // For full data sovereignty, the PMTiles planet file can be downloaded from
@@ -137,7 +148,6 @@ interface MapViewProps {
   locationName?: string
   onDownloadCSV?: () => void
   isObjectContainerVisible: boolean
-  toggleObjectContainerVisibility: () => void
   setObjects: (objects: MuseumObject[]) => void
   setTotalCount: (count: number) => void
   initialLongitude?: number
@@ -162,6 +172,7 @@ interface MapViewProps {
   onOriginClick?: (country: string, lat?: number, lng?: number) => void
   groupedSites?: GroupedSite[]
   drillInstitutions?: InstitutionItem[]
+  activeCountry?: string | null
   activeSite?: string | null
   activeInstitution?: string | null
   // Transient hover-only place name (from an object card in the grid) — highlights
@@ -173,6 +184,10 @@ interface MapViewProps {
   drillArcs?: { place_name: string; institution_name: string; object_count: number; latitude: number; longitude: number; institution_latitude?: number; institution_longitude?: number }[]
   onCommandPaletteOpen?: () => void
   onWikiDocumentsChange?: (docs: any[]) => void
+  // Time/Migration bucket counts for the left-panel "Time" accordion —
+  // fetched once by the parent (page.tsx) and shared with CommandPalette,
+  // instead of each component fetching its own copy.
+  dateBuckets?: DateBucketCounts | null
 }
 
 const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
@@ -191,7 +206,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       onExpandView,
       onDownloadCSV,
       isObjectContainerVisible,
-      toggleObjectContainerVisibility,
       setObjects,
       setTotalCount,
       initialLongitude,
@@ -215,6 +229,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       onOriginClick,
       groupedSites = [],
       drillInstitutions = [],
+      activeCountry = null,
       activeSite = null,
       activeInstitution = null,
       hoveredObjectPlace = null,
@@ -224,6 +239,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       drillArcs = [],
       onCommandPaletteOpen,
       onWikiDocumentsChange,
+      dateBuckets = null,
     },
     ref,
   ) => {
@@ -243,6 +259,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // Old UI state
     const [showArcs, setShowArcs] = useState(true)
     const [showCollections, setShowCollections] = useState(true)
+    const [showTime, setShowTime] = useState(true)
     const [hoveredArc, setHoveredArc] = useState<{
       fromName: string; toName: string; count: number
       fromCity?: string; fromCountry?: string
@@ -311,7 +328,18 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       institutions: facetedFilters.institutions.length > 0 ? facetedFilters.institutions : undefined,
       countries: facetedFilters.countries.length > 0 ? facetedFilters.countries : undefined,
       cities: facetedFilters.cities.length > 0 ? facetedFilters.cities : undefined,
-    }), [facetedFilters.institutions.join(','), facetedFilters.countries.join(','), facetedFilters.cities.join(',')])
+      ...eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
+    }), [
+      facetedFilters.institutions.join(','),
+      facetedFilters.countries.join(','),
+      facetedFilters.cities.join(','),
+      facetedFilters.era?.id,
+      facetedFilters.migrationEra?.id,
+    ])
+
+    const toggleEra = useCallback((bucket: EraBucket) => {
+      setFacetedFilters({ ...facetedFilters, era: facetedFilters.era?.id === bucket.id ? null : bucket })
+    }, [facetedFilters, setFacetedFilters])
 
     // Derive geocoded/resolved place name from objects' city_en (for collapsed header)
     const closedResolvedPlaceName = useMemo(() => {
@@ -374,7 +402,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         setViewportState({ longitude: center[0], latitude: center[1], zoom: targetZoom })
         lastViewRef.current = { lng: center[0], lat: center[1], zoom: targetZoom }
         const mode = options.mode ?? "level-shift"
-        const duration = options.duration ?? (mode === "detail" ? 1200 : 1600)
+        const duration = options.duration ?? (mode === "detail" ? 2000 : 2500)
         const easingFn = mode === "detail"
           ? (t: number) => 1 - Math.pow(1 - t, 2.2)
           : (t: number) => 1 - Math.pow(1 - t, 3.2)
@@ -704,7 +732,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           const mapRef = map.current
           if (docCount > 1 && !d.source_url) {
             setSelectedDoc(null)
-            if (mapRef) animateToZoomLevel([d.longitude || 0, d.latitude || 0], Math.min((mapRef.getZoom() || 2) + 3, 12), { mode: 'level-shift', duration: 900 })
+            if (mapRef) animateToZoomLevel([d.longitude || 0, d.latitude || 0], Math.min((mapRef.getZoom() || 2) + 3, 12), { mode: 'level-shift', duration: 1800 })
             return
           }
           const wikiTitle = d.title || d.sample_title || ''
@@ -818,12 +846,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           if (!mapRef) return
           if (info.layer.id === 'arc-layer-geospatial') {
             const curZ = mapRef.getZoom()
-            if (curZ < 4) animateToZoomLevel([lng, lat], 5, { mode: 'level-shift', duration: 950 })
-            else animateToZoomLevel([lng, lat], 6, { mode: 'level-shift', duration: 900 })
+            if (curZ < 4) animateToZoomLevel([lng, lat], 5, { mode: 'level-shift', duration: 1900 })
+            else animateToZoomLevel([lng, lat], 6, { mode: 'level-shift', duration: 1800 })
           } else if (info.layer.id === 'arc-layer-objects') {
-            animateToZoomLevel([lng, lat], 14, { mode: 'detail', duration: 800 })
+            animateToZoomLevel([lng, lat], 14, { mode: 'detail', duration: 1600 })
           } else {
-            animateToZoomLevel([lng, lat], 5, { mode: 'level-shift', duration: 950 })
+            animateToZoomLevel([lng, lat], 5, { mode: 'level-shift', duration: 1900 })
           }
         },
       })
@@ -896,7 +924,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             objectCount: d.object_count,
           })
           isProgrammaticMove.current = true
-          animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 900 })
+          animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 1800 })
         },
       })
     }, [isMapReady, drillLevel, drillArcs, activeSite, hoveredObjectPlace, isMobile, currentZoom, processedArcs.dataSource, processedArcs.arcLayerData.length])
@@ -982,7 +1010,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         {/* Loading overlay */}
         {!mapLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Spinner size="2" />
           </div>
         )}
 
@@ -1119,20 +1147,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             </div>
             {/* Controls */}
             <div className="flex items-center gap-2 ml-2">
-              {/* Objects panel toggle */}
-              <Button
-                onClick={toggleObjectContainerVisibility}
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title="Toggle objects panel"
-              >
-                {isObjectContainerVisible ? (
-                  <IconPanelOpen className="h-5 w-5 text-gray-500" />
-                ) : (
-                  <IconPanelClosed className="h-5 w-5 text-gray-500" />
-                )}
-              </Button>
               {/* Search */}
               <Button variant="ghost" size="icon" className="h-8 w-8"
                 onClick={() => onCommandPaletteOpen?.()}
@@ -1159,13 +1173,14 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
           <TooltipProvider delayDuration={150}>
           <div className="px-4 pb-3 text-sm">
-            {/* ── Places Section (drill-down) ── */}
-            {drillLevel === "global" && groupedOrigins.length > 0 && (
+            {/* ── Places Section (drill-down) — header renders unconditionally
+                (like Time/Collections) so it appears during the loading window
+                instead of popping in only once groupedOrigins is non-empty. ── */}
+            {drillLevel === "global" && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
                     Places
-                    {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowArcs(!showArcs)}
@@ -1238,6 +1253,51 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
+            {/* ── Time Section — shown at all drill levels, above Collections ── */}
+            {(
+              <div className="pt-0 mt-1">
+                <div className="flex items-center justify-between">
+                  <span className="panel-text-muted">
+                    Time
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
+                    onClick={() => setShowTime(!showTime)}
+                    title={showTime ? "Collapse Time" : "Expand Time"}
+                    aria-label={showTime ? "Collapse Time" : "Expand Time"}
+                  >
+                    {showTime ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                  </Button>
+                </div>
+                {showTime && (
+                  <div className="mt-1 pl-0">
+                    <HeaderAccordionList>
+                      {dateBuckets && collapseContiguousBuckets(
+                          ERA_BUCKETS,
+                          Object.fromEntries(dateBuckets.objectDateBuckets.map((b) => [b.id, b.count])),
+                          dateBuckets.objectDateSpans,
+                        )
+                        // Hide empty buckets now that we have a real (non-null) result.
+                        .filter((row) => row.count > 0)
+                        .map((row) => (
+                          <div key={row.id}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
+                            onClick={() => toggleEra(row.era)}
+                          >
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate max-w-[70%]">{row.label}</span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">{row.label}</TooltipContent>
+                            </Tooltip>
+                            <span className="ml-2 text-gray-400 text-sm">{row.count}</span>
+                          </div>
+                        ))}
+                    </HeaderAccordionList>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── Institutions Section — shown at all drill levels ── */}
             {(
               <div className="pt-0 mt-1">
@@ -1276,7 +1336,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 )}
               </div>
             )}
-
 
           </div>
           </TooltipProvider>

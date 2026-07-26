@@ -390,22 +390,82 @@ _LOOKUP_RAW: dict[str, str] = {
     "longquan-öfen": "Longquan Kilns",
     "keram (fluß)": "Keram River",
     "lunangwa (fluß)": "Lunangwa River",
+
+    # ── Group E: German compound/prepositional place descriptions ──────────
+    # These previously fell through to the descriptive-phrase filter, which
+    # treated "der/des/von/und/bei" as disqualifying — but that's ordinary
+    # German grammar inside a real place name ("Tal von Mexiko" = "Valley of
+    # Mexico"), not a hedge. Covers the ~45 highest-frequency (~83% of 745
+    # affected rows) values from the 2026-07-26 audit; the long tail of
+    # one-off/low-count values is left for a future pass.
+    "bei lima": "Near Lima",
+    "zwischen ica und pisco": "Between Ica and Pisco",
+    "gegend von la serena": "Near La Serena",
+    "hacienda de casa grande (bei trujillo)": "Hacienda de Casa Grande (near Trujillo)",
+    "kriegsgefangenenlager frankfurt (oder) (wwi)": "POW Camp Frankfurt (Oder) (WWI)",
+    "hochland von guatemala": "Guatemalan Highlands",
+    "san juanico bei tamba d.f.": "San Juanico (near Tamba, D.F.)",
+    "san juanico bei tamba": "San Juanico (near Tamba)",
+    "s. juanico bei tamba, d.f.": "San Juanico (near Tamba, D.F.)",
+    "tal von mexiko": "Valley of Mexico",
+    "temenos der aphrodite am dali-fluß (dali)": "Temenos of Aphrodite on the Dali River (Dali)",
+    "temenos der aphrodite am dali-fluß": "Temenos of Aphrodite on the Dali River",
+    "toksu bei kucha": "Toksu (near Kucha)",
+    "bosnien und herzegowina": "Bosnia and Herzegovina",
+    "st. kitts und nevis": "St. Kitts and Nevis",
+    "tabuco bei tuxpam": "Tabuco (near Tuxpam)",
+    "tabuco bei taxpam": "Tabuco (near Taxpam)",
+    "paso bei fuerte quemado": "Paso (near Fuerte Quemado)",
+    "pucarilla bei icla": "Pucarilla (near Icla)",
+    "höhle der priesterweihe": "Cave of the Priestly Consecration",
+    "tomates bei tarija": "Tomates (near Tarija)",
+    "nördlich von rom": "North of Rome",
+    "magdalena bei lima": "Magdalena (near Lima)",
+    "cerro de s. pedro bei misantla": "Cerro de S. Pedro (near Misantla)",
+    "zwischen tempel 12 und 25": "Between Temple 12 and 25",
+    "bei arica": "Near Arica",
+    "zwischen petschora und ob": "Between Pechora and Ob",
+    "gegend von papantla": "Near Papantla",
+    "höhle von campur": "Cave of Campur",
+    "unterlauf des niger": "Lower Niger (river)",
+    "jammu und kashmir": "Jammu and Kashmir",
+    "grab des maja": "Grave of Maja",
+    "umgebung von bugaba": "Vicinity of Bugaba",
+    "lager bei kaulagu": "Camp (near Kaulagu)",
+    "licerra bei arica": "Licerra (near Arica)",
+    "moschee des amin khoja": "Mosque of Amin Khoja",
+    "totentempel des sahure (abusir)": "Mortuary Temple of Sahure (Abusir)",
+    "zwischen neuss und xanten": "Between Neuss and Xanten",
+    "santiago anizotla bei azcapotzalco": "Santiago Anizotla (near Azcapotzalco)",
+    "sistan und belutschistan": "Sistan and Baluchestan",
+    "bamugong (bei batukam)": "Bamugong (near Batukam)",
 }
 
 # Normalise lookup keys to lowercase + strip for O(1) match
 LOOKUP: dict[str, str] = {k.lower().strip(): v for k, v in _LOOKUP_RAW.items()}
 
 # ---------------------------------------------------------------------------
-# Descriptive-phrase & stopword filter
-# Any place_name matching these patterns is institutional prose, not a place name.
-# Normalised result for these is NULL.
+# Descriptive-phrase & hedge-word filter
+# Any place_name matching these patterns is institutional prose (a hedged or
+# uncertain attribution), not a confirmed place name. Normalised result for
+# these is NULL.
+#
+# Deliberately does NOT include bare German connectors (der/des/von/und/aus/
+# oder/bei/nach) — those are ordinary grammar inside real German place names
+# ("Totentempel des Sahure" = "Mortuary Temple *of* Sahure", "Tal von Mexiko"
+# = "Valley of Mexico"), not a signal of uncertainty. An earlier version of
+# this regex treated them as disqualifying, which nulled out ~745 rows of
+# perfectly good (if untranslated) German place names — see the 2026-07-26
+# provenance-display audit. Only genuine German hedge/uncertainty words are
+# listed here, mirroring the English hedge list above them.
 # ---------------------------------------------------------------------------
 _DESCRIPTIVE_RE = re.compile(
     r"\b("
     r"probably|possibly|perhaps|presumably|uncertain|unknown|unidentified|"
     r"based on|coast of|region of|area of|vicinity of|"
     r"near|attributed to|supposedly|"
-    r"der|des|von|einem|einer|und|aus|oder|bei|nach"
+    r"vermutlich|wahrscheinlich|möglicherweise|vielleicht|angeblich|"
+    r"unsicher|ungewiss|unbestimmt"
     r")\b",
     re.IGNORECASE,
 )

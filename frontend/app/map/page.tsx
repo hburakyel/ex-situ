@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "rea
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import MapView, { type FacetedFilters } from "@/components/map/map-view"
 import ObjectPanel, { type ContainerSize } from "@/components/map/object-panel"
-import { fetchMuseumObjects, fetchObjectsByCountry } from "@/lib/api"
+import { fetchMuseumObjects, fetchObjectsByCountry, fetchDateBucketCounts, type DateBucketCounts } from "@/lib/api"
+import { eraToDateFilters, type EraDateFilters } from "@/lib/era-buckets"
 import type { MuseumObject, MapBounds, SelectedArc } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { AlertTriangle } from "lucide-react"
@@ -30,9 +31,15 @@ interface SubArc {
   cluster_id: string
 }
 
-async function fetchSubArcs(country: string): Promise<SubArc[]> {
+async function fetchSubArcs(country: string, dateFilters?: EraDateFilters): Promise<SubArc[]> {
   try {
     const params = new URLSearchParams({ zoom: "4", country })
+    if (dateFilters?.dateStart !== undefined) params.set("dateStart", String(dateFilters.dateStart))
+    if (dateFilters?.dateEnd !== undefined) params.set("dateEnd", String(dateFilters.dateEnd))
+    if (dateFilters?.undated) params.set("undated", "true")
+    if (dateFilters?.acqDateStart !== undefined) params.set("acqDateStart", String(dateFilters.acqDateStart))
+    if (dateFilters?.acqDateEnd !== undefined) params.set("acqDateEnd", String(dateFilters.acqDateEnd))
+    if (dateFilters?.acqUndated) params.set("acqUndated", "true")
     const res = await fetch(`/api/proxy/geospatial?${params.toString()}`)
     if (!res.ok) return []
     const data = await res.json()
@@ -129,7 +136,9 @@ function MapContent() {
   const currentZoomRef = useRef(initialZoom)
 
   // ── Unified search for global arc data (fastest initial data) ──
-  const { arcData, cityArcData, isLoadingArcData } = useUnifiedSearch()
+  const { arcData, cityArcData, isLoadingArcData } = useUnifiedSearch({
+    dateFilters: eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
+  })
 
   // ── ⌘K shortcut for command palette ──
   useEffect(() => {
@@ -198,6 +207,8 @@ function MapContent() {
   const activeCountryRef = useRef<string | null>(urlCountry || null)
   useEffect(() => { activeCountryRef.current = activeCountry }, [activeCountry])
   const [activeSite, setActiveSite] = useState<string | null>(urlSite || null)
+  const activeSiteRef = useRef<string | null>(urlSite || null)
+  useEffect(() => { activeSiteRef.current = activeSite }, [activeSite])
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
   // Transient hover-only highlight — mirrors an object card's origin onto the
   // matching map arc without triggering the navigation/fetch side effects of setActiveSite.
@@ -205,12 +216,45 @@ function MapContent() {
   const [subArcs, setSubArcs] = useState<SubArc[]>([])
   const [isLoadingSubArcs, setIsLoadingSubArcs] = useState(false)
 
+  // Time/Migration bucket counts for the left panel + ⌘K palette — single
+  // owner (was independently fetched by both MapView and CommandPalette,
+  // tripling backend load for identical data; see museum-object.js's
+  // getDateBucketCounts for the query cost this avoids duplicating).
+  // Cross-filtered by the current institution/city/country selection, same
+  // behavior as Places/Sites/Collections; drill state (activeCountry/
+  // activeSite/activeInstitution) takes precedence over the search-panel
+  // facetedFilters arrays, mirroring how Collections is already scoped by
+  // activeCountry via aggregateInstitutions.
+  const [dateBuckets, setDateBuckets] = useState<DateBucketCounts | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetchDateBucketCounts({
+      institutions: activeInstitution ? [activeInstitution] : (facetedFilters.institutions.length > 0 ? facetedFilters.institutions : undefined),
+      countries: activeCountry ? [activeCountry] : (facetedFilters.countries.length > 0 ? facetedFilters.countries : undefined),
+      cities: activeSite ? [activeSite] : (facetedFilters.cities.length > 0 ? facetedFilters.cities : undefined),
+    }).then((result) => {
+      if (!cancelled) setDateBuckets(result)
+    }).catch(() => { /* leave previous counts visible on error */ })
+    return () => { cancelled = true }
+  }, [
+    activeCountry, activeSite, activeInstitution,
+    facetedFilters.institutions.join(','), facetedFilters.countries.join(','), facetedFilters.cities.join(','),
+  ])
+
   // Arc drill-down objects (SQL by-country)
   const [arcObjects, setArcObjects] = useState<MuseumObject[]>([])
   const [arcObjectsPage, setArcObjectsPage] = useState(1)
   const [arcObjectsHasMore, setArcObjectsHasMore] = useState(false)
   const [arcObjectsTotal, setArcObjectsTotal] = useState(0)
   const [arcObjectsLoading, setArcObjectsLoading] = useState(false)
+  // Shared sequence number for every arcObjects writer (fetchDrillObjects and
+  // the global-institution direct fetch in handleToggleInstitution) — rapid
+  // filter changes (e.g. picking a Collection then a Time bucket right after)
+  // fire overlapping requests, and without this guard a slower, superseded
+  // response can land after the correct one and silently overwrite it with
+  // stale (or empty) results — the sidebar/aggregate counts (driven by
+  // separate endpoints) then disagree with an empty object grid.
+  const drillFetchIdRef = useRef(0)
 
   const handleZoomChange = useCallback((zoom: number) => {
     currentZoomRef.current = zoom
@@ -537,20 +581,21 @@ function MapContent() {
     return () => clearTimeout(restoreTimer)
   }, [urlCountry, urlSite, urlInstitution, urlLat, urlLng, urlZoom])
 
-  // ── Fetch sub-arcs when country is selected ──
+  // ── Fetch sub-arcs when country is selected (or the Time/Migration filter changes) ──
   useEffect(() => {
     if (!activeCountry) { setSubArcs([]); return }
     let cancelled = false
     setIsLoadingSubArcs(true)
-    fetchSubArcs(activeCountry).then((data) => {
+    fetchSubArcs(activeCountry, eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra)).then((data) => {
       if (!cancelled) { setSubArcs(data); setIsLoadingSubArcs(false) }
     })
     return () => { cancelled = true }
-  }, [activeCountry])
+  }, [activeCountry, facetedFilters.era, facetedFilters.migrationEra])
 
   // ── Fetch objects when drill-down filters change (country or institution level) ──
   const fetchDrillObjects = useCallback(async (page: number, append = false) => {
     if (!activeCountry && !activeInstitution) return
+    const requestId = ++drillFetchIdRef.current
     setArcObjectsLoading(true)
     try {
       // Use explicit drill-down institution, or fall back to faceted filter institution
@@ -559,7 +604,13 @@ function MapContent() {
         activeCountry || null, page, 60,
         activeSite || undefined,
         effectiveInstitution,
+        false,
+        eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
       )
+      // A newer request (from a filter change that happened while this one was
+      // in flight) has already taken over — applying this stale result would
+      // clobber the correct, more recent state.
+      if (requestId !== drillFetchIdRef.current) return
       if (append) {
         setArcObjects((prev) => {
           const ids = new Set(prev.map(o => o.id))
@@ -573,13 +624,14 @@ function MapContent() {
       setArcObjectsPage(page)
     } catch (err) {
       console.error("[DrillObjects] fetch failed:", err)
+      if (requestId !== drillFetchIdRef.current) return
       // Stop the infinite-scroll loop: if all retries are exhausted mark hasMore
       // as false so the IntersectionObserver stops firing onLoadMore.
       setArcObjectsHasMore(false)
     } finally {
-      setArcObjectsLoading(false)
+      if (requestId === drillFetchIdRef.current) setArcObjectsLoading(false)
     }
-  }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions])
+  }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id])
 
   // Trigger object fetch when drill-down filters change
   useEffect(() => {
@@ -588,7 +640,7 @@ function MapContent() {
       setArcObjectsPage(1)
       fetchDrillObjects(1)
     }
-  }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, fetchDrillObjects, drillLevel])
+  }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id, fetchDrillObjects, drillLevel])
 
   const handleDrillLoadMore = useCallback(() => {
     if (!arcObjectsHasMore || arcObjectsLoading) return
@@ -619,6 +671,11 @@ function MapContent() {
 
   // ── Drill-down handlers ──
   const handleOriginClick = useCallback((country: string, lat?: number, lng?: number) => {
+    // Reopen the object panel only when this is a genuinely new selection —
+    // re-clicking the already-active country respects a deliberate close.
+    if (normalizePlaceKey(activeCountryRef.current) !== normalizePlaceKey(country)) {
+      setIsObjectContainerVisible(true)
+    }
     setSelectedArc(null)
     setActiveCountry(country)
     setActiveSite(null)
@@ -628,6 +685,7 @@ function MapContent() {
     debouncedGeocode.cancel()           // cancel any pending reverse-geocode
     geocodeAbort.current?.abort()        // abort in-flight fetch
     setGeocodedName("")                   // clear stale geocoded name immediately
+    drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setLocationName(country)
     // Fly to origin
@@ -642,6 +700,9 @@ function MapContent() {
 
   const handleToggleSite = useCallback((site: string, lat?: number, lng?: number) => {
     const next = normalizePlaceKey(activeSite) === normalizePlaceKey(site) ? null : site
+    // Only a genuinely new site selection reopens the panel — toggling the
+    // same site off (next === null) respects a deliberate close.
+    if (next) setIsObjectContainerVisible(true)
     setSelectedArc(null)
     setActiveSite(next)
     const nextLevel = next ? "objects" : "country"
@@ -666,34 +727,47 @@ function MapContent() {
       setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 10 }))
       debouncedGeocode(targetLng, targetLat)
     }
+    drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setArcObjectsPage(1)
   }, [activeSite, activeInstitution, groupedSites, activeCountry, debouncedGeocode])
 
   const handleToggleInstitution = useCallback((inst: string) => {
     const next = activeInstitution === inst ? null : inst
+    // Only a genuinely new institution selection reopens the panel —
+    // toggling the same one off (next === null) respects a deliberate close.
+    if (next) setIsObjectContainerVisible(true)
     setSelectedArc(null)
     setActiveInstitution(next)
+    drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setArcObjectsPage(1)
     debouncedGeocode.cancel()
     geocodeAbort.current?.abort()
     setGeocodedName("")
+    // Left-panel institution clicks are single-select and replace whatever was
+    // there — mirrors the drill-only activeInstitution toggle above, but also
+    // writes into facetedFilters so the arc layer actually filters (same
+    // mechanism Time/Migration already use), instead of only updating the
+    // object panel like before.
+    setFacetedFilters({ ...facetedFilters, institutions: next ? [next] : [] })
 
     if (!activeCountry) {
       // Global level: fetch institution objects directly with the new value
       // (direct call avoids useEffect timing race where arcObjectsLoading isn't set yet)
       if (next) {
+        const requestId = ++drillFetchIdRef.current
         setArcObjectsLoading(true)
-        fetchObjectsByCountry(null, 1, 60, undefined, next)
+        fetchObjectsByCountry(null, 1, 60, undefined, next, false, eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra))
           .then(result => {
+            if (requestId !== drillFetchIdRef.current) return
             setArcObjects(result.objects)
             setArcObjectsTotal(result.pagination?.total || 0)
             setArcObjectsHasMore((result.pagination?.page || 1) < (result.pagination?.pageCount || 1))
             setArcObjectsPage(1)
           })
           .catch(err => console.error("[GlobalInstitution] fetch failed:", err))
-          .finally(() => setArcObjectsLoading(false))
+          .finally(() => { if (requestId === drillFetchIdRef.current) setArcObjectsLoading(false) })
       } else {
         setArcObjectsTotal(0)
         setArcObjectsHasMore(false)
@@ -715,7 +789,25 @@ function MapContent() {
         setActiveSite(null)
       }
     }
-  }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode])
+  }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode, facetedFilters, setFacetedFilters])
+
+  // Faceted filter chips (places/collections/time from the search palette or
+  // filter chip UI) — reopen the panel only when a filter is newly added,
+  // never when one is removed/cleared (that's the user narrowing or backing out).
+  const handleFacetedFiltersChange = useCallback((next: FacetedFilters) => {
+    const hasNewValue = (nextValues: string[], prevValues: string[]) => {
+      const prevKeys = new Set(prevValues.map(normalizePlaceKey))
+      return nextValues.some((v) => !prevKeys.has(normalizePlaceKey(v)))
+    }
+    const addedFilter =
+      hasNewValue(next.countries, facetedFilters.countries) ||
+      hasNewValue(next.cities, facetedFilters.cities) ||
+      hasNewValue(next.institutions, facetedFilters.institutions) ||
+      (!!next.era && next.era.id !== facetedFilters.era?.id) ||
+      (!!next.migrationEra && next.migrationEra.id !== facetedFilters.migrationEra?.id)
+    if (addedFilter) setIsObjectContainerVisible(true)
+    setFacetedFilters(next)
+  }, [facetedFilters])
 
   const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
     if (level === "global") {
@@ -728,7 +820,11 @@ function MapContent() {
       debouncedGeocode.cancel()
       geocodeAbort.current?.abort()
       setGeocodedName("")
+      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
+      setArcObjectsTotal(0)
+      setArcObjectsHasMore(false)
+      setArcObjectsPage(1)
       setSubArcs([])
       setLocationName("")
       // Reset map view to globe level (same as globe icon)
@@ -747,6 +843,7 @@ function MapContent() {
       geocodeAbort.current?.abort()
       setGeocodedName("")
       setLocationName(activeCountry || "")
+      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setArcObjectsPage(1)
       // Fly back to country center at zoom 5
@@ -773,6 +870,11 @@ function MapContent() {
       }
     },
     onNavigateSite: (country: string, site: string, lat: number, lng: number) => {
+      // Reopen only for a genuinely new site — re-selecting the site that's
+      // already active respects a deliberate close.
+      if (normalizePlaceKey(activeSiteRef.current) !== normalizePlaceKey(site)) {
+        setIsObjectContainerVisible(true)
+      }
       // Atomic drill-down: set country, site, drill level in one batch
       // so breadcrumb reflects it immediately
       setActiveCountry(country)
@@ -782,6 +884,7 @@ function MapContent() {
       drillLevelRef.current = "objects"  // prevents any pending reverse-geocode from overwriting
       setLocationName(site || country)
       setGeocodedName("")
+      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setArcObjectsPage(1)
       if (mapRef.current && hasValidCoordinates(lat, lng)) {
@@ -816,25 +919,55 @@ function MapContent() {
     }
   }, [isRateLimited])
 
+  // The bbox fetch (fetchMuseumObjects → /api/proxy) has no way to carry
+  // facetedFilters — it only knows lat/lng bounds. Skip it whenever a filter
+  // is active so containerObjects falls back to the already-filtered
+  // filteredGlobalPreviewObjects/allObjects, instead of showing unfiltered
+  // objects for the current viewport.
+  const hasActiveFacetFilters =
+    facetedFilters.institutions.length > 0 ||
+    facetedFilters.countries.length > 0 ||
+    facetedFilters.cities.length > 0 ||
+    !!facetedFilters.era ||
+    !!facetedFilters.migrationEra
+
   const handleBoundsChange = useCallback(async (bounds: MapBounds) => {
     if (isRateLimited) return
     setCurrentBounds(bounds)
     const zoom = currentZoomRef.current
-    // Only fetch bbox objects when zoomed in AND we're at global level (no country drill-down)
-    if (zoom >= 7 && drillLevelRef.current === "global") { await fetchObjects(bounds, 1, true) }
+    // Only fetch bbox objects when zoomed in, at global level (no country drill-down), and no facet/date filter is active
+    if (zoom >= 7 && drillLevelRef.current === "global" && !hasActiveFacetFilters) { await fetchObjects(bounds, 1, true) }
     const centerLng = (bounds.east + bounds.west) / 2
     const centerLat = (bounds.north + bounds.south) / 2
     // Update viewState for URL sync (no flyTo feedback — initialViewState effect is bookkeeping only)
     setViewState(prev => ({ ...prev, longitude: centerLng, latitude: centerLat, zoom }))
     // Always reverse-geocode to keep the header accurate
     debouncedGeocode(centerLng, centerLat)
-  }, [fetchObjects, isRateLimited, debouncedGeocode])
+  }, [fetchObjects, isRateLimited, debouncedGeocode, hasActiveFacetFilters])
+
+  // Clear stale unfiltered bbox objects the instant a filter is applied while
+  // zoomed in — otherwise containerObjects keeps showing the last unfiltered
+  // viewport fetch until the map pans/zooms again. hasMore must go to false
+  // (not true): there is nothing to paginate into while the bbox pipeline is
+  // suspended, and leaving it true lets ObjectGrid's auto-load-more
+  // IntersectionObserver immediately re-fire handleLoadMore, re-populating
+  // `objects`/`totalCount` from the unfiltered bbox endpoint and silently
+  // overriding the correct filtered total.
+  useEffect(() => {
+    if (hasActiveFacetFilters) {
+      setObjects([])
+      setTotalCount(0)
+      setHasMore(false)
+      setCurrentPage(1)
+    }
+  }, [hasActiveFacetFilters])
 
   const handleLoadMore = useCallback(() => {
-    if (currentBounds && hasMore && !isLoading && !isRateLimited) {
+    // Bbox pagination has no way to carry facetedFilters — see handleBoundsChange above.
+    if (currentBounds && hasMore && !isLoading && !isRateLimited && !hasActiveFacetFilters) {
       fetchObjects(currentBounds, currentPage + 1)
     }
-  }, [currentBounds, hasMore, isLoading, currentPage, fetchObjects, isRateLimited])
+  }, [currentBounds, hasMore, isLoading, currentPage, fetchObjects, isRateLimited, hasActiveFacetFilters])
 
   const handleLocationFound = useCallback((longitude: number, latitude: number, name: string) => {
     setViewState({ longitude, latitude, zoom: 10, name })
@@ -872,6 +1005,7 @@ function MapContent() {
       setActiveSite(null)
       setActiveInstitution(null)
       setDrillLevel("global")
+      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setGeocodedName("")
     }
@@ -889,6 +1023,14 @@ function MapContent() {
           origin?.lat ?? latitude,
           origin?.lng ?? longitude,
         )
+        // Preview cards are aggregated per country+institution — an unfiltered
+        // country fetch only returns its first page in arbitrary order and may
+        // never include the specific object the sample image came from.
+        // Narrowing to the institution makes the drilled-down list small enough
+        // to actually contain it.
+        if (object?.attributes.institution_name) {
+          setActiveInstitution(object.attributes.institution_name)
+        }
         return
       }
 
@@ -982,6 +1124,7 @@ function MapContent() {
       setDrillLevel("global")
       drillLevelRef.current = "global"
       setSelectedArc(null)
+      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setLocationName("")
       setGeocodedName("")
@@ -1092,7 +1235,7 @@ function MapContent() {
           objects={objects}
           allObjects={allObjects}
           onError={handleMapError}
-          totalCount={mapTotalCount}
+          totalCount={containerTotalCount}
           onToggleView={() => setViewMode(prev => prev === "grid" ? "list" : "grid")}
           onExpandView={() => setContainerSize(prev => prev === "default" ? "expanded" : "default")}
           viewMode={viewMode}
@@ -1100,11 +1243,10 @@ function MapContent() {
           locationName={drillLevel === "country" ? (activeCountry || locationName) : locationName}
           onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
           isObjectContainerVisible={isObjectContainerVisible}
-          toggleObjectContainerVisibility={() => setIsObjectContainerVisible(prev => !prev)}
           setObjects={setObjects}
           setTotalCount={setTotalCount}
           facetedFilters={facetedFilters}
-          onFacetedFiltersChange={setFacetedFilters}
+          onFacetedFiltersChange={handleFacetedFiltersChange}
           selectedArc={selectedArc}
           onSelectArc={handleSelectArc}
           onZoomChange={handleZoomChange}
@@ -1121,6 +1263,7 @@ function MapContent() {
           onOriginClick={handleOriginClick}
           groupedSites={groupedSites}
           drillInstitutions={institutions}
+          activeCountry={activeCountry}
           activeSite={activeSite}
           activeInstitution={activeInstitution}
           onToggleSite={handleToggleSite}
@@ -1128,6 +1271,7 @@ function MapContent() {
           isLoadingSubArcs={isLoadingSubArcs}
           drillArcs={filteredSubArcs}
           hoveredObjectPlace={hoveredObjectPlace}
+          dateBuckets={dateBuckets}
         />
 
         {/* Floating object container — images only (+ header on mobile) */}
@@ -1137,7 +1281,15 @@ function MapContent() {
             onLoadMore={isGlobalInstitutionDrill || drillLevel !== "global" ? handleDrillLoadMore : handleLoadMore}
             hasMore={isGlobalInstitutionDrill || drillLevel !== "global" ? arcObjectsHasMore : hasMore}
             totalCount={containerTotalCount}
-            isLoading={isGlobalInstitutionDrill || drillLevel !== "global" ? arcObjectsLoading : isLoading}
+            isLoading={
+              isGlobalInstitutionDrill || drillLevel !== "global"
+                ? arcObjectsLoading
+                // At global level, `isLoading` only tracks the zoomed-in bbox fetch — it stays
+                // false while the initial arc/global-preview data (arcData) is still loading, which
+                // otherwise flashes "0 artifacts" / "No artifacts found" before the first real
+                // response lands. Fold in isLoadingArcData until there's something to show.
+                : isLoading || (isLoadingArcData && containerObjects.length === 0)
+            }
             onObjectClick={handleObjectClick}
             onObjectHover={setHoveredObjectPlace}
             isMobile={isMobile}
@@ -1167,10 +1319,11 @@ function MapContent() {
             collectionCount={globalCollectionCount}
             allObjects={allObjects}
             facetedFilters={facetedFilters}
-            onFacetedFiltersChange={setFacetedFilters}
+            onFacetedFiltersChange={handleFacetedFiltersChange}
             onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
             linkObjects={[]}
             initialGalleryArtifact={initialGalleryArtifact}
+            onCloseContainer={() => setIsObjectContainerVisible(false)}
           />
         )}
 
@@ -1180,7 +1333,8 @@ function MapContent() {
           onOpenChange={setCommandPaletteOpen}
           handlers={commandPaletteHandlers}
           facetedFilters={facetedFilters}
-          onFacetedFiltersChange={setFacetedFilters}
+          onFacetedFiltersChange={handleFacetedFiltersChange}
+          dateBuckets={dateBuckets}
         />
 
         {/* Rate limit warning */}

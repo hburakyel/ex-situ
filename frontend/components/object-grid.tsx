@@ -5,6 +5,7 @@ import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
 import { useInView } from "react-intersection-observer"
 import { Spinner } from "@radix-ui/themes"
+import { formatOriginAttribution } from "@/lib/origin-attribution"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 
@@ -232,7 +233,11 @@ export default function ObjectGrid({
   }
 
   if (isLoading && objects.length === 0) {
-    return null
+    return (
+      <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
+        <Spinner size="2" />
+      </div>
+    )
   }
 
   if (objects.length === 0 && !isLoading) {
@@ -314,6 +319,17 @@ return (
           title={`Low geocoding confidence (${Math.round(object.attributes.geocoding_confidence * 100)}%)`}
         >
           ~
+        </span>
+      )}
+      {/* Place is attributed from a maker/production event, not a confirmed
+          findspot — e.g. "Kyūshū" for a piece made by a named potter is the
+          maker's home region, not where the object was found. */}
+      {object.attributes.origin_event_type_en && !object.attributes.origin_is_findspot && (
+        <span
+          className="absolute bottom-1 right-1 z-10 bg-amber-100 text-amber-700 text-[9px] font-medium px-1 py-0.5 rounded pointer-events-none leading-none"
+          title={formatOriginAttribution(object.attributes) || undefined}
+        >
+          i
         </span>
       )}
       {hasImage ? (

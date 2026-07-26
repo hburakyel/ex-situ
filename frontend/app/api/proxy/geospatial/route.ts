@@ -34,8 +34,14 @@ export async function GET(request: NextRequest) {
   const institution = searchParams.get('institution')
   const city = searchParams.get('city')
   const country = searchParams.get('country')
-  
-  const cacheKey = `geospatial:${zoom}:${minLon}:${minLat}:${maxLon}:${maxLat}:${institution || 'all'}:${city || 'all'}:${country || 'all'}`
+  const dateStart = searchParams.get('dateStart')
+  const dateEnd = searchParams.get('dateEnd')
+  const undated = searchParams.get('undated')
+  const acqDateStart = searchParams.get('acqDateStart')
+  const acqDateEnd = searchParams.get('acqDateEnd')
+  const acqUndated = searchParams.get('acqUndated')
+
+  const cacheKey = `geospatial:${zoom}:${minLon}:${minLat}:${maxLon}:${maxLat}:${institution || 'all'}:${city || 'all'}:${country || 'all'}:${undated || ''}:${dateStart || ''}:${dateEnd || ''}:${acqUndated || ''}:${acqDateStart || ''}:${acqDateEnd || ''}`
   const zoomNum = parseInt(zoom || '2', 10)
   const cacheDuration = zoomNum < 7 ? CACHE_DURATION_GLOBAL : CACHE_DURATION_LOCAL
 
@@ -83,7 +89,7 @@ export async function GET(request: NextRequest) {
   const fetchPromise = (async () => {
     // Replace localhost with 127.0.0.1 to avoid DNS resolution issues in Node.js
     // Only forward known safe parameters — prevent Strapi filter injection
-    const ALLOWED_GEO_PARAMS = new Set(['zoom', 'minLon', 'minLat', 'maxLon', 'maxLat', 'institution', 'city', 'country'])
+    const ALLOWED_GEO_PARAMS = new Set(['zoom', 'minLon', 'minLat', 'maxLon', 'maxLat', 'institution', 'city', 'country', 'dateStart', 'dateEnd', 'undated', 'acqDateStart', 'acqDateEnd', 'acqUndated'])
     const safeParams = new URLSearchParams()
     for (const [key, value] of searchParams.entries()) {
       if (ALLOWED_GEO_PARAMS.has(key)) {

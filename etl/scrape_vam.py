@@ -188,7 +188,9 @@ INSERT INTO museum_objects (
     NOW(),
     NOW()
 )
-ON CONFLICT (institution_name, inventory_number) WHERE inventory_number IS NOT NULL DO NOTHING
+ON CONFLICT (institution_name, inventory_number, source_link)
+    WHERE institution_name = 'Victoria and Albert Museum' AND inventory_number IS NOT NULL
+DO NOTHING
 """
 
 
@@ -533,6 +535,8 @@ def main() -> None:
         with conn.cursor() as cur:
             cur.execute("REFRESH MATERIALIZED VIEW mv_country_institution_stats")
             cur.execute("REFRESH MATERIALIZED VIEW mv_city_institution_stats")
+            cur.execute("REFRESH MATERIALIZED VIEW mv_time_bucket_stats")
+            cur.execute("REFRESH MATERIALIZED VIEW mv_acquisition_year_stats")
         conn.commit()
         log.info("Views refreshed.")
         conn.close()

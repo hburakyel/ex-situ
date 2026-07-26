@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { ChevronDown, ChevronUp, Check, FileText, FileJson, Loader2 } from "lucide-react"
-import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconPanelOpen, IconPanelClosed } from "@/components/icons"
+import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconPanelOpen } from "@/components/icons"
 import { fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,7 @@ import type { MuseumObject } from "@/types"
 import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
+import type { EraBucket } from "@/lib/era-buckets"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const EXPORT_ROW_CAP = 5000
@@ -33,7 +34,13 @@ const REPORT_ISSUE_URL = "https://github.com/hburakyel/ex-situ/issues/new"
 
 export type ContainerSize = "default" | "expanded" | "minimized"
 
-export type FacetedFilters = { institutions: string[]; countries: string[]; cities: string[] }
+export type FacetedFilters = {
+  institutions: string[]
+  countries: string[]
+  cities: string[]
+  era?: EraBucket | null
+  migrationEra?: EraBucket | null
+}
 
 export type DrillLevel = "global" | "country" | "objects"
 
@@ -104,6 +111,8 @@ interface ObjectPanelProps {
   onCommandPaletteOpen?: () => void
   linkObjects?: MuseumObject[]
   initialGalleryArtifact?: MuseumObject | null
+  /** Hide the panel — desktop only. */
+  onCloseContainer?: () => void
 }
 
 export default function ObjectPanel({
@@ -144,6 +153,7 @@ export default function ObjectPanel({
   onCommandPaletteOpen,
   linkObjects = [],
   initialGalleryArtifact,
+  onCloseContainer,
 }: ObjectPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -505,17 +515,24 @@ export default function ObjectPanel({
   }, [])
 
   // Filter chip helpers
-  const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length
-  const removeFilter = useCallback((type: keyof FacetedFilters, value: string) => {
+  const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
+    (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
+  const removeFilter = useCallback((type: keyof Omit<FacetedFilters, "era" | "migrationEra">, value: string) => {
     if (!onFacetedFiltersChange) return
     onFacetedFiltersChange({
       ...facetedFilters,
       [type]: facetedFilters[type].filter(v => v !== value),
     })
   }, [facetedFilters, onFacetedFiltersChange])
-  const clearAllFilters = useCallback(() => {
-    onFacetedFiltersChange?.({ institutions: [], countries: [], cities: [] })
-  }, [onFacetedFiltersChange])
+  const removeEraFilter = useCallback(() => {
+    onFacetedFiltersChange?.({ ...facetedFilters, era: null })
+  }, [facetedFilters, onFacetedFiltersChange])
+  const removeMigrationFilter = useCallback(() => {
+    onFacetedFiltersChange?.({ ...facetedFilters, migrationEra: null })
+  }, [facetedFilters, onFacetedFiltersChange])
+  const toggleEra = useCallback((bucket: EraBucket) => {
+    onFacetedFiltersChange?.({ ...facetedFilters, era: facetedFilters.era?.id === bucket.id ? null : bucket })
+  }, [facetedFilters, onFacetedFiltersChange])
 
    // Display name: only show geocoded name (not locationName fallback)
   const displayName = geocodedName || ''
@@ -631,7 +648,27 @@ export default function ObjectPanel({
   }, [galleryOpen, isMobile, setContainerSize])
   useEffect(() => {
     if (!galleryArtifact || !galleryOpen || galleryObjects.length === 0) return
-    const idx = galleryObjects.findIndex(o => String(o.id) === String(galleryArtifact.id))
+    // Global-view preview cards are synthetic (id `preview-<cluster>`, no inventory
+    // number/links — see allObjects in map/page.tsx) and never appear in the real
+    // drilled-down list by id. Wait until the panel actually holds real data, then
+    // fall back to matching by institution/place instead of exact id.
+    const isPreviewArtifact = String(galleryArtifact.id).startsWith('preview-')
+    const stillPreviewData = galleryObjects.every(o => String(o.id).startsWith('preview-'))
+    if (isPreviewArtifact && stillPreviewData) return
+
+    let idx = galleryObjects.findIndex(o => String(o.id) === String(galleryArtifact.id))
+    if (idx === -1 && isPreviewArtifact) {
+      const a = galleryArtifact.attributes
+      // Try an exact match first (cheap win when the sample happens to be on this
+      // page), but the aggregate's sample image is picked from potentially
+      // thousands of objects for this institution/place, so it usually won't be
+      // on the first loaded page. Rather than wait forever for a page that may
+      // never come, fall back to the first object in the (already
+      // institution/place-scoped) drilled-down list — real data beats a frozen
+      // placeholder with no inventory number or links.
+      idx = a.img_url ? galleryObjects.findIndex(o => o.attributes.img_url === a.img_url) : -1
+      if (idx === -1) idx = 0
+    }
     if (idx !== -1) {
       setSelectedIndex(idx)
       setGalleryArtifact(null)
@@ -748,6 +785,19 @@ export default function ObjectPanel({
     // Wikipedia articles: open source link in new tab instead of gallery
     if (obj && String(obj.id).startsWith('wiki-') && obj.attributes?.source_link) {
       window.open(obj.attributes.source_link, '_blank', 'noopener,noreferrer')
+      return
+    }
+    // Global-view preview cards are synthetic aggregates (no inventory number,
+    // links, or real id) — open as a single-artifact placeholder and let the
+    // effect above swap in the matching real object once the drill-down loads,
+    // instead of freezing the gallery on thin preview data forever.
+    if (obj && String(obj.id).startsWith('preview-')) {
+      gallerySnapshot.current = []
+      suppressCloseOnScopeChangeRef.current = true
+      onObjectClick(longitude, latitude, obj)
+      setGalleryArtifact(obj)
+      setSelectedIndex(0)
+      setGalleryOpen(true)
       return
     }
     // Pass obj so the parent zooms to the right location and starts the
@@ -1323,11 +1373,12 @@ export default function ObjectPanel({
                 drillInstitutions={drillInstitutions}
                 activeInstitution={activeInstitution}
                 onToggleInstitution={onToggleInstitution}
+                onToggleEra={toggleEra}
                 facetedFilters={facetedFilters}
                 removeFilter={removeFilter}
-                clearAllFilters={clearAllFilters}
+                removeEraFilter={removeEraFilter}
+                removeMigrationFilter={removeMigrationFilter}
                 locationName={locationName}
-                geocodedName={geocodedName}
                 activeCountry={activeCountry}
               />
           </div>
@@ -1354,11 +1405,12 @@ export default function ObjectPanel({
                 drillInstitutions={drillInstitutions}
                 activeInstitution={activeInstitution}
                 onToggleInstitution={onToggleInstitution}
+                onToggleEra={toggleEra}
                 facetedFilters={facetedFilters}
                 removeFilter={removeFilter}
-                clearAllFilters={clearAllFilters}
+                removeEraFilter={removeEraFilter}
+                removeMigrationFilter={removeMigrationFilter}
                 locationName={locationName}
-                geocodedName={geocodedName}
                 activeCountry={activeCountry}
               />
             </div>
@@ -1410,6 +1462,19 @@ export default function ObjectPanel({
               >
                 {containerSize === "expanded" ? <IconMinimize className="h-5 w-5 text-gray-500" /> : <IconExpand className="h-5 w-5 text-gray-500" />}
               </Button>
+              {/* Hide panel — desktop only */}
+              {onCloseContainer && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onCloseContainer}
+                  title="Hide panel"
+                  aria-label="Hide panel"
+                >
+                  <IconPanelOpen className="h-5 w-5 text-gray-500" />
+                </Button>
+              )}
             </div>
           </div>
         )}

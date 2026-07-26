@@ -6,6 +6,49 @@
 
 const { createCoreController } = require('@strapi/strapi').factories;
 
+/**
+ * Parse the Time (dateStart/dateEnd/undated) and Migration
+ * (acqDateStart/acqDateEnd/acqUndated) query params shared by the
+ * geospatial and by-country endpoints. Returns { filters } on success or
+ * { error } with a message suitable for ctx.badRequest on invalid input.
+ */
+function parseDateQueryFilters(query) {
+  const { dateStart, dateEnd, undated, acqDateStart, acqDateEnd, acqUndated } = query;
+  const filters = {};
+
+  if (undated === 'true' || undated === '1') {
+    filters.undated = true;
+  } else {
+    if (dateStart !== undefined) {
+      const parsed = parseInt(dateStart, 10);
+      if (isNaN(parsed)) return { error: 'Invalid dateStart. Must be an integer year (negative for BCE).' };
+      filters.dateStart = parsed;
+    }
+    if (dateEnd !== undefined) {
+      const parsed = parseInt(dateEnd, 10);
+      if (isNaN(parsed)) return { error: 'Invalid dateEnd. Must be an integer year (negative for BCE).' };
+      filters.dateEnd = parsed;
+    }
+  }
+
+  if (acqUndated === 'true' || acqUndated === '1') {
+    filters.acqUndated = true;
+  } else {
+    if (acqDateStart !== undefined) {
+      const parsed = parseInt(acqDateStart, 10);
+      if (isNaN(parsed)) return { error: 'Invalid acqDateStart. Must be an integer year.' };
+      filters.acqDateStart = parsed;
+    }
+    if (acqDateEnd !== undefined) {
+      const parsed = parseInt(acqDateEnd, 10);
+      if (isNaN(parsed)) return { error: 'Invalid acqDateEnd. Must be an integer year.' };
+      filters.acqDateEnd = parsed;
+    }
+  }
+
+  return { filters };
+}
+
 module.exports = createCoreController('api::museum-object.museum-object', ({ strapi }) => ({
   /**
    * Custom geospatial endpoint
@@ -84,6 +127,9 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
       if (country) {
         filters.country = country;
       }
+      const { filters: dateFilters, error: dateError } = parseDateQueryFilters(ctx.query);
+      if (dateError) return ctx.badRequest(dateError);
+      Object.assign(filters, dateFilters);
 
       // Call service method
       const data = await strapi
@@ -106,6 +152,56 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
   },
 
   /**
+   * Per-bucket counts for the "Time" and "Migration" left-panel filters.
+   * GET /api/museum-objects/date-buckets?institution=...&city=...&country=...
+   */
+  async dateBuckets(ctx) {
+    try {
+      const { institution, city, country } = ctx.query;
+      const filters = {};
+      if (institution) filters.institution = institution;
+      if (city) filters.city = city;
+      if (country) filters.country = country;
+
+      const data = await strapi
+        .service('api::museum-object.museum-object')
+        .getDateBucketCounts(filters);
+
+      ctx.send(data);
+    } catch (error) {
+      strapi.log.error('Date buckets endpoint error:', error.message);
+      strapi.log.error('Stack trace:', error.stack);
+      ctx.internalServerError('Date buckets query failed');
+    }
+  },
+
+  /**
+   * Decade-level counts within a single Time century bucket.
+   * GET /api/museum-objects/date-buckets/decades?century=ce-19&institution=...
+   */
+  async dateBucketDecades(ctx) {
+    try {
+      const { century, institution, city, country } = ctx.query;
+      if (!century) return ctx.badRequest('century parameter is required');
+
+      const filters = {};
+      if (institution) filters.institution = institution;
+      if (city) filters.city = city;
+      if (country) filters.country = country;
+
+      const data = await strapi
+        .service('api::museum-object.museum-object')
+        .getDecadeBucketCounts(century, filters);
+
+      ctx.send(data);
+    } catch (error) {
+      strapi.log.error('Date bucket decades endpoint error:', error.message);
+      strapi.log.error('Stack trace:', error.stack);
+      ctx.internalServerError('Date bucket decades query failed');
+    }
+  },
+
+  /**
    * Fast PostGIS endpoint for fetching objects by country
    * GET /api/museum-objects/by-country?country=Turkey&site=Pergamon&institution=...&page=1&pageSize=60
    */
@@ -120,6 +216,9 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
       const pageNum = parseInt(page) || 1;
       const size = Math.min(parseInt(pageSize) || 60, 200);
 
+      const { filters: dateFilters, error: dateError } = parseDateQueryFilters(ctx.query);
+      if (dateError) return ctx.badRequest(dateError);
+
       const data = await strapi
         .service('api::museum-object.museum-object')
         .getObjectsByCountry(country || null, {
@@ -128,6 +227,7 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
           page: pageNum,
           pageSize: size,
           onlyWithImages: onlyWithImages === 'true',
+          ...dateFilters,
         });
 
       ctx.send(data);
