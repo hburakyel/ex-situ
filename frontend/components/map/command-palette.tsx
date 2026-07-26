@@ -751,7 +751,6 @@ export default function V3CommandPalette({
                 <SectionHeader
                   label="Time"
                   count={dateBuckets ? (dateBuckets.objectDateExactCount ?? 0) : null}
-                  countLabel="Exact"
                   isOpen={expanded.has("time")}
                   onToggle={() => toggleSection("time")}
                   dimmed={false}
