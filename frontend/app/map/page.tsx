@@ -1070,7 +1070,16 @@ function MapContent() {
         })
       }
 
-      if (objectCountry && objectSite) {
+      // Only (re-)drill from the clicked object's own place attributes when
+      // we're navigating INTO a site for the first time (country-level view,
+      // no site chosen yet). Once already at site/object level, activeSite is
+      // the source of truth for the current drill — overwriting it here with
+      // objectSite (place_name_normalized || place_name) is unreliable, since
+      // that can differ from the city_en value the drill itself is keyed on
+      // (e.g. "Northwest (Mongolia)" vs "Mongolei" for the same place), which
+      // would silently swap the whole grid/Time/Collections to a near-empty,
+      // barely-matching filter just from opening an object's detail view.
+      if (objectCountry && objectSite && drill !== "objects") {
         setActiveCountry(objectCountry)
         setActiveSite(objectSite)
         setActiveInstitution(null)
