@@ -511,6 +511,108 @@ def cmd_fetch_fast(args):
     )
 
 
+def cmd_upgrade(args):
+    """Re-check already-'ok' records that were resolved via the museum-digital.de
+    fallback (mostly from the original slow pass, before search.smb.museum was
+    found) and upgrade them to search.smb.museum where it now resolves —
+    same asset id, meaningfully higher resolution. Appends new cache lines
+    rather than editing in place; the existing priority dedup (search.smb.museum
+    beats museum-digital.de among "ok" results) means these supersede the old
+    entries automatically in report/apply. Resumable via the "upgrade_checked"
+    marker written on every line this command produces, success or not."""
+    records = load_cache_records(CACHE_PATH)
+    candidates = [r for r in records if r["status"] == "ok" and r.get("source") != "search.smb.museum"]
+
+    already_checked = set()
+    with open(CACHE_PATH, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get("upgrade_checked"):
+                already_checked.add(rec["id"])
+
+    remaining = [r for r in candidates if r["id"] not in already_checked]
+
+    print(f"Upgrade candidates (currently non-search.smb.museum 'ok'): {len(candidates)}")
+    print(f"Already checked in a prior upgrade run:                   {len(already_checked)}")
+    print(f"Remaining to check:                                       {len(remaining)}")
+    print(f"Workers:                                                  {FAST_WORKERS}")
+    sys.stdout.flush()
+
+    if not remaining:
+        print("Nothing left to check.")
+        return
+
+    upgraded = unchanged = 0
+    completed = 0
+    start = time.time()
+    write_lock = threading.Lock()
+
+    adapter = requests.adapters.HTTPAdapter(pool_connections=FAST_WORKERS, pool_maxsize=FAST_WORKERS)
+    session = requests.Session()
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+
+    def check_one(row):
+        asset_id = extract_asset_id(row["old_url"])
+        if asset_id is not None and len(asset_id) > 3:
+            candidate_url = compute_search_url(asset_id)
+            is_ok, _ = verify_image_url(
+                candidate_url, FAST_REQUEST_TIMEOUT_SECONDS, FAST_MAX_RETRIES, FAST_RETRY_SLEEP_SECONDS,
+                session=session,
+            )
+            if is_ok:
+                return {
+                    **{k: row[k] for k in ("id", "object_id", "inventory_number", "institution_name", "old_url")},
+                    "new_url": candidate_url,
+                    "status": "ok",
+                    "error": None,
+                    "source": "search.smb.museum",
+                    "upgraded_from": row.get("source") or "museum-digital.de",
+                    "upgrade_checked": True,
+                }
+        return {
+            **{k: row[k] for k in ("id", "object_id", "inventory_number", "institution_name", "old_url")},
+            "new_url": row["new_url"],
+            "status": row["status"],
+            "error": row.get("error"),
+            "source": row.get("source"),
+            "upgrade_checked": True,
+        }
+
+    with open(CACHE_PATH, "a", buffering=1) as cache_f:
+        with ThreadPoolExecutor(max_workers=FAST_WORKERS) as executor:
+            futures = {executor.submit(check_one, row): row for row in remaining}
+            for future in as_completed(futures):
+                record = future.result()
+                if record["source"] == "search.smb.museum" and record.get("upgraded_from"):
+                    upgraded += 1
+                else:
+                    unchanged += 1
+
+                with write_lock:
+                    cache_f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    completed += 1
+                    i = completed
+
+                if i % 200 == 0 or i == len(remaining):
+                    elapsed = time.time() - start
+                    rate = i / elapsed if elapsed > 0 else 0
+                    eta_min = (len(remaining) - i) / rate / 60 if rate > 0 else float("nan")
+                    print(
+                        f"[{i}/{len(remaining)}] upgraded={upgraded} unchanged={unchanged} "
+                        f"elapsed={elapsed/60:.1f}m eta={eta_min:.1f}m",
+                        flush=True,
+                    )
+
+    print(f"\nUpgrade pass complete. upgraded={upgraded} unchanged={unchanged} total_checked={len(remaining)}")
+
+
 def cmd_report(args):
     records = load_cache_records(CACHE_PATH)
     if not records:
@@ -557,6 +659,8 @@ def main():
 
     sub.add_parser("fetch-fast", help="Fast method: resumable crawl via search.smb.museum URL construction")
 
+    sub.add_parser("upgrade", help="Re-check museum-digital.de-sourced 'ok' records against search.smb.museum")
+
     p_report = sub.add_parser("report", help="Read cache file, print sample + summary (no network calls)")
     p_report.add_argument("--sample", type=int, default=40, help="Number of 'ok' records to sample")
 
@@ -566,6 +670,8 @@ def main():
         cmd_fetch(args)
     elif args.command == "fetch-fast":
         cmd_fetch_fast(args)
+    elif args.command == "upgrade":
+        cmd_upgrade(args)
     elif args.command == "report":
         cmd_report(args)
 
