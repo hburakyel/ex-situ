@@ -214,8 +214,8 @@ export default function InfoPanel({
               back on scroll-up (see drillSectionsVisible in object-panel.tsx). */}
           {isMobile && (
             <div
-              className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-out ${
-                drillSectionsVisible ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+              className={`overflow-hidden transition-[max-height,opacity] ease-in-out ${
+                drillSectionsVisible ? "duration-700 max-h-[1000px] opacity-100" : "duration-400 max-h-0 opacity-0"
               }`}
             >
               {/* Places (global) */}
