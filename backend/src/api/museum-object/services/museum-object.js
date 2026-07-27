@@ -1784,8 +1784,22 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       bindings.place_name_normalized = String(place_name_normalized).slice(0, 255);
     }
     if (city_en) {
+      const cityStr = String(city_en).slice(0, 255);
+      const countryToCompare = country_en || (await db.raw(
+        'SELECT country_en FROM museum_objects WHERE place_name = :place_name AND country_en IS NOT NULL LIMIT 1',
+        { place_name: placeName }
+      )).rows?.[0]?.country_en;
+      if (
+        countryToCompare &&
+        cityStr.toLowerCase() !== countryToCompare.toLowerCase() &&
+        cityStr.toLowerCase().includes(countryToCompare.toLowerCase())
+      ) {
+        throw new Error(
+          `city_en ("${cityStr}") appears to duplicate country_en ("${countryToCompare}") — strip the country suffix before saving.`
+        );
+      }
       setClauses.push('city_en = :city_en');
-      bindings.city_en = String(city_en).slice(0, 255);
+      bindings.city_en = cityStr;
     }
     if (country_en) {
       setClauses.push('country_en = :country_en');

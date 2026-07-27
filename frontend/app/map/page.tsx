@@ -229,12 +229,25 @@ function MapContent() {
   useEffect(() => {
     let cancelled = false
     fetchDateBucketCounts({
-      institutions: activeInstitution ? [activeInstitution] : (facetedFilters.institutions.length > 0 ? facetedFilters.institutions : undefined),
+      // facetedFilters.institutions/.cities are only meaningful as a fallback
+      // when there's no active drill — once activeCountry is set, they can
+      // still hold a chip from a completely different country (toggled via
+      // the ⌘K palette earlier and never cleared on breadcrumb/arc
+      // navigation), which would silently AND-filter Time down to zero while
+      // Sites/Collections (which don't consult facetedFilters at all) keep
+      // showing the country's real data. Once inside a drill, only the drill
+      // state itself should scope Time, matching Sites/Collections.
+      institutions: activeInstitution ? [activeInstitution] : (activeCountry ? undefined : (facetedFilters.institutions.length > 0 ? facetedFilters.institutions : undefined)),
       countries: activeCountry ? [activeCountry] : (facetedFilters.countries.length > 0 ? facetedFilters.countries : undefined),
-      cities: activeSite ? [activeSite] : (facetedFilters.cities.length > 0 ? facetedFilters.cities : undefined),
+      cities: activeSite ? [activeSite] : (activeCountry ? undefined : (facetedFilters.cities.length > 0 ? facetedFilters.cities : undefined)),
     }).then((result) => {
       if (!cancelled) setDateBuckets(result)
-    }).catch(() => { /* leave previous counts visible on error */ })
+    }).catch((error) => {
+      // Leave previous counts visible on error, but don't swallow it silently —
+      // this was masking failures on brand-new filter combos (nothing to fall
+      // back to yet), which read as the Time section going blank.
+      console.error("Failed to fetch date bucket counts:", error)
+    })
     return () => { cancelled = true }
   }, [
     activeCountry, activeSite, activeInstitution,
