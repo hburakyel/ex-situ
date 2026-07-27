@@ -20,6 +20,8 @@ interface ObjectGridProps {
   isFullscreen?: boolean
   panelSize?: number
   mobileColumns?: number
+  /** Fires on every scroll of the grid's internal container, with its current scrollTop. */
+  onScroll?: (scrollTop: number) => void
 }
 
 const GRID_BOTTOM_FADE_STYLE = {
@@ -41,6 +43,7 @@ export default function ObjectGrid({
   isFullscreen = false,
   panelSize = 50,
   mobileColumns = 2,
+  onScroll,
 }: ObjectGridProps) {
   const { ref: observerRef, inView } = useInView({
     threshold: 0.1,
@@ -115,6 +118,8 @@ export default function ObjectGrid({
     const { scrollTop, clientHeight, scrollHeight } = containerRef.current
     const scrollPosition = scrollTop + clientHeight
 
+    onScroll?.(scrollTop)
+
     // If we're near the bottom of our current range, load more items into view
     if (scrollPosition > scrollHeight - 200 && visibleRange.end < objects.length) {
       setVisibleRange((prev) => ({
@@ -135,7 +140,7 @@ export default function ObjectGrid({
         end: prev.end,
       }))
     }
-  }, [imageObjects.length, visibleRange, hasMore, isLoading, onLoadMore])
+  }, [imageObjects.length, visibleRange, hasMore, isLoading, onLoadMore, onScroll])
 
   // Attach scroll listener
   useEffect(() => {

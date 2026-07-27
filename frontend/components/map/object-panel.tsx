@@ -25,6 +25,7 @@ import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
 import type { EraBucket } from "@/lib/era-buckets"
+import type { DateBucketCounts } from "@/lib/api"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const EXPORT_ROW_CAP = 5000
@@ -109,6 +110,7 @@ interface ObjectPanelProps {
   facetedFilters?: FacetedFilters
   onFacetedFiltersChange?: (filters: FacetedFilters) => void
   onCommandPaletteOpen?: () => void
+  dateBuckets?: DateBucketCounts | null
   linkObjects?: MuseumObject[]
   initialGalleryArtifact?: MuseumObject | null
   /** Hide the panel — desktop only. */
@@ -151,6 +153,7 @@ export default function ObjectPanel({
   facetedFilters = { institutions: [], countries: [], cities: [] },
   onFacetedFiltersChange,
   onCommandPaletteOpen,
+  dateBuckets = null,
   linkObjects = [],
   initialGalleryArtifact,
   onCloseContainer,
@@ -181,6 +184,9 @@ export default function ObjectPanel({
   const [showOrigins, setShowOrigins] = useState(false)
   const [showSites, setShowSites] = useState(false)
   const [showCollections, setShowCollections] = useState(true)
+  // Places/Time/Collections drill-down block: hidden while the object grid is
+  // scrolled down (frees up room for the grid), brought back on scroll-up.
+  const [drillSectionsVisible, setDrillSectionsVisible] = useState(true)
   const [showCopied, setShowCopied] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const hasSiteExportScope = Boolean(activeSite)
@@ -209,6 +215,7 @@ export default function ObjectPanel({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
+  const drillSectionsScrollTopRef = useRef(0)
   const prefersReducedMotion = useRef(false)
   const [liveHeight, setLiveHeight] = useState<number | null>(null)
 
@@ -493,6 +500,30 @@ export default function ObjectPanel({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobile, setContainerSize])
+
+  // ── Hide drill-down sections (Places/Time/Collections) on grid scroll-down ──
+  // Frees up room for the object grid; a small scroll-up brings the block back.
+  // ObjectGrid owns the actual scrolling element internally (its own containerRef),
+  // so this listens via its onScroll callback rather than a ref on the wrapper div.
+  const handleGridScroll = useCallback((scrollTop: number) => {
+    const SCROLL_HYSTERESIS = 8
+    const delta = scrollTop - drillSectionsScrollTopRef.current
+    if (scrollTop <= SCROLL_HYSTERESIS) {
+      setDrillSectionsVisible(true)
+    } else if (delta > SCROLL_HYSTERESIS) {
+      setDrillSectionsVisible(false)
+    } else if (delta < -SCROLL_HYSTERESIS) {
+      setDrillSectionsVisible(true)
+    }
+    drillSectionsScrollTopRef.current = scrollTop
+  }, [])
+
+  // Reset when the grid (re)mounts (e.g. sheet leaves "minimized") since it starts at scrollTop 0.
+  useEffect(() => {
+    if (!isMobile) return
+    drillSectionsScrollTopRef.current = 0
+    setDrillSectionsVisible(true)
+  }, [isMobile, containerSize])
 
   // Share current URL to clipboard
   const handleShare = useCallback(async () => {
@@ -1374,6 +1405,8 @@ export default function ObjectPanel({
                 activeInstitution={activeInstitution}
                 onToggleInstitution={onToggleInstitution}
                 onToggleEra={toggleEra}
+                dateBuckets={dateBuckets}
+                drillSectionsVisible={drillSectionsVisible}
                 facetedFilters={facetedFilters}
                 removeFilter={removeFilter}
                 removeEraFilter={removeEraFilter}
@@ -1406,6 +1439,8 @@ export default function ObjectPanel({
                 activeInstitution={activeInstitution}
                 onToggleInstitution={onToggleInstitution}
                 onToggleEra={toggleEra}
+                dateBuckets={dateBuckets}
+                drillSectionsVisible={drillSectionsVisible}
                 facetedFilters={facetedFilters}
                 removeFilter={removeFilter}
                 removeEraFilter={removeEraFilter}
@@ -1493,6 +1528,7 @@ export default function ObjectPanel({
             isFullscreen={containerSize === "expanded"}
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
+            onScroll={isMobile ? handleGridScroll : undefined}
           />
           {/* Links section — paired museum image + wiki link cards */}
           {wikiLinks.length > 0 && (

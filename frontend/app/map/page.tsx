@@ -1330,6 +1330,7 @@ function MapContent() {
             facetedFilters={facetedFilters}
             onFacetedFiltersChange={handleFacetedFiltersChange}
             onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
+            dateBuckets={dateBuckets}
             linkObjects={[]}
             initialGalleryArtifact={initialGalleryArtifact}
             onCloseContainer={() => setIsObjectContainerVisible(false)}

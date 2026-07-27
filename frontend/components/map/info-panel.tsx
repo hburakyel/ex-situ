@@ -4,8 +4,10 @@
 import React from "react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp } from "lucide-react"
 import { IconClose, IconSearch } from "@/components/icons"
-import type { EraBucket } from "@/lib/era-buckets"
+import { ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
+import type { DateBucketCounts } from "@/lib/api"
 import type {
   BreadcrumbSegment,
   DrillLevel,
@@ -14,6 +16,34 @@ import type {
   InstitutionItem,
   FacetedFilters
 } from "./object-panel"
+
+const PANEL_BOTTOM_FADE_STYLE = {
+  background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
+const PANEL_TOP_FADE_STYLE = {
+  background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+}
+
+function FadedAccordionList({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-4">
+        {children}
+      </div>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-5"
+        style={PANEL_TOP_FADE_STYLE}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+        style={PANEL_BOTTOM_FADE_STYLE}
+      />
+    </div>
+  )
+}
 
 interface InfoPanelProps {
   isMobile: boolean
@@ -37,6 +67,9 @@ interface InfoPanelProps {
   activeInstitution: string | null
   onToggleInstitution?: (inst: string) => void
   onToggleEra?: (bucket: EraBucket) => void
+  dateBuckets?: DateBucketCounts | null
+  /** Collapses the Places/Time/Collections block (mobile only) to free up room for the object grid while it's scrolled down. Defaults to visible. */
+  drillSectionsVisible?: boolean
   facetedFilters: FacetedFilters
   removeFilter: (type: keyof Omit<FacetedFilters, "era" | "migrationEra">, value: string) => void
   removeEraFilter?: () => void
@@ -56,8 +89,19 @@ export default function InfoPanel({
   collectionCount,
   isLoading,
   drillLevel,
+  groupedOrigins,
+  isLoadingOrigins,
+  onOriginClick,
+  groupedSites,
   activeSite,
+  onToggleSite,
+  isLoadingSubArcs,
   drillInstitutions,
+  activeInstitution,
+  onToggleInstitution,
+  onToggleEra,
+  dateBuckets,
+  drillSectionsVisible = true,
   facetedFilters,
   removeFilter,
   removeEraFilter,
@@ -65,6 +109,11 @@ export default function InfoPanel({
   locationName,
   activeCountry,
 }: InfoPanelProps) {
+  const [showOrigins, setShowOrigins] = React.useState(false)
+  const [showSites, setShowSites] = React.useState(false)
+  const [showTime, setShowTime] = React.useState(false)
+  const [showCollections, setShowCollections] = React.useState(false)
+
   const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
     (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
   // Real place/site name — same priority used to build the breadcrumb trail, not the reverse-geocoded name.
@@ -159,6 +208,140 @@ export default function InfoPanel({
               <div className="flex-shrink-0">{actionSlot}</div>
             )}
           </div>
+
+          {/* Mobile: Drill-down sections (after artifact count) — collapses while the
+              object grid below is scrolled down, to free up room for it, and comes
+              back on scroll-up (see drillSectionsVisible in object-panel.tsx). */}
+          {isMobile && (
+            <div
+              className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-out ${
+                drillSectionsVisible ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+              }`}
+            >
+              {/* Places (global) */}
+              {drillLevel === "global" && groupedOrigins.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="panel-text-muted">
+                      Places
+                      {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
+                      onClick={() => setShowOrigins(!showOrigins)}
+                    >
+                      {showOrigins ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                    </Button>
+                  </div>
+                  {showOrigins && (
+                    <FadedAccordionList>
+                        {groupedOrigins.map((origin, index) => (
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
+                            onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
+                          >
+                            <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
+                          </div>
+                        ))}
+                    </FadedAccordionList>
+                  )}
+                </div>
+              )}
+
+              {/* Sites (country) */}
+              {drillLevel !== "global" && groupedSites.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="panel-text-muted">
+                      Sites
+                      {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
+                      onClick={() => setShowSites(!showSites)}
+                    >
+                      {showSites ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                    </Button>
+                  </div>
+                  {showSites && (
+                    <FadedAccordionList>
+                        {groupedSites.map((site, index) => (
+                          <div key={index}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
+                            onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
+                          >
+                            <span className="truncate max-w-[70%]" title={site.name}>{site.name}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
+                          </div>
+                        ))}
+                    </FadedAccordionList>
+                  )}
+                </div>
+              )}
+
+              {/* Time — shown at all drill levels */}
+              {dateBuckets && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="panel-text-muted">
+                      Time
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
+                      onClick={() => setShowTime(!showTime)}
+                    >
+                      {showTime ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                    </Button>
+                  </div>
+                  {showTime && (
+                    <FadedAccordionList>
+                        {collapseContiguousBuckets(
+                            ERA_BUCKETS,
+                            Object.fromEntries(dateBuckets.objectDateBuckets.map((b) => [b.id, b.count])),
+                            dateBuckets.objectDateSpans,
+                          )
+                          .filter((row) => row.count > 0)
+                          .map((row) => (
+                            <div key={row.id}
+                              className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
+                              onClick={() => onToggleEra?.(row.era)}
+                            >
+                              <span className="truncate max-w-[70%]" title={row.label}>{row.label}</span>
+                              <span className="ml-2 text-gray-400 text-sm">{row.count}</span>
+                            </div>
+                          ))}
+                    </FadedAccordionList>
+                  )}
+                </div>
+              )}
+
+              {/* Institutions — shown at all zoom levels */}
+              {drillInstitutions.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="panel-text-muted">
+                      Collections
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
+                      onClick={() => setShowCollections(!showCollections)}
+                    >
+                      {showCollections ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                    </Button>
+                  </div>
+                  {showCollections && (
+                    <FadedAccordionList>
+                        {drillInstitutions.map((inst, index) => (
+                          <div key={index}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
+                            onClick={() => onToggleInstitution?.(inst.name)}
+                          >
+                            <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
+                          </div>
+                        ))}
+                    </FadedAccordionList>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Filter chips */}
           {activeFilterCount > 0 && (
