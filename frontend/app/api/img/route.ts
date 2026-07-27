@@ -5,7 +5,7 @@ export const runtime = "nodejs"
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DEFAULT_WIDTH = 300
-const MAX_WIDTH = 800
+const MAX_WIDTH = 1200
 
 // Allowed image source domains — NO localhost/127.0.0.1 (SSRF prevention)
 const ALLOWED_IMAGE_DOMAINS = new Set([

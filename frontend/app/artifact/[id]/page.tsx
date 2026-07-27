@@ -7,8 +7,40 @@ import ArtifactRedirect from "./artifact-redirect"
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:1337/api"
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://exsitu.app"
 
+// Mirrors ALLOWED_IMAGE_DOMAINS in app/api/img/route.ts — only those hosts can
+// be proxied there, so an image outside this set must stay a direct link.
+const PROXIABLE_IMAGE_DOMAINS = new Set([
+	"images.metmuseum.org",
+	"collectionapi.metmuseum.org",
+	"www.britishmuseum.org",
+	"recherche.smb.museum",
+	"upload.wikimedia.org",
+	"commons.wikimedia.org",
+	"id.smb.museum",
+	"framemark.vam.ac.uk",
+	"smb.museum-digital.de",
+	"asset.museum-digital.org",
+	"search.smb.museum",
+])
+
 function fixLocalhost(url: string) {
 	return url.replace("localhost", "127.0.0.1")
+}
+
+// Some source CDNs (e.g. id.smb.museum) hotlink-block requests that lack a
+// browser-like User-Agent/Referer, which left link-preview bots with a broken
+// og:image. Route those through our proxy (which spoofs the right headers);
+// anything outside the proxy's allowlist stays a direct link.
+function buildOgImageUrl(rawUrl: string): string {
+	try {
+		const hostname = new URL(rawUrl).hostname
+		if (PROXIABLE_IMAGE_DOMAINS.has(hostname)) {
+			return `${SITE_URL}/api/img?url=${encodeURIComponent(rawUrl)}&w=1200`
+		}
+	} catch {
+		// not a valid absolute URL — fall through to raw
+	}
+	return rawUrl
 }
 
 async function fetchArtifact(id: string): Promise<MuseumObject | null> {
@@ -106,7 +138,8 @@ export async function generateMetadata({
 	const title = buildArtifactTitle(artifact, id)
 	const description = buildArtifactDescription(artifact)
 	const canonicalUrl = `${SITE_URL}/artifact/${encodeURIComponent(id)}`
-	const imageUrl = artifact?.attributes.img_url?.trim()
+	const rawImageUrl = artifact?.attributes.img_url?.trim()
+	const imageUrl = rawImageUrl ? buildOgImageUrl(rawImageUrl) : undefined
 
 	return {
 		title,
