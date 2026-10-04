@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { fetchAllowedImage, isAllowedImageUrl } from "@/lib/remote-image-url"
 
 // Server-side validated image lookup for an institution. Unlike by-country's
 // onlyWithImages (which only checks img_url is non-empty), this actually
@@ -19,7 +20,7 @@ async function isImageReachable(url: string): Promise<boolean> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), HEAD_TIMEOUT_MS)
   try {
-    const res = await fetch(url, {
+    const res = await fetchAllowedImage(url, {
       method: "HEAD",
       signal: controller.signal,
       headers: {
@@ -28,8 +29,8 @@ async function isImageReachable(url: string): Promise<boolean> {
       },
     })
     // res.ok alone isn't enough: some CDN hosts now 301-redirect stale image
-    // URLs to an HTML homepage that itself returns 200, which fetch()'s
-    // default redirect-follow reports as "ok" despite not being an image.
+    // URLs to an HTML homepage that itself returns 200, which the followed
+    // redirect reports as "ok" despite not being an image.
     return res.ok && (res.headers.get("content-type") || "").startsWith("image/")
   } catch {
     return false
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
     const candidates: string[] = Array.isArray(json?.data)
       ? json.data
           .map((o: any) => o?.attributes?.img_url as string | undefined)
-          .filter((url: unknown): url is string => typeof url === "string" && url.trim().length > 0 && !exclude.has(url))
+          .filter((url: unknown): url is string => typeof url === "string" && isAllowedImageUrl(url) && !exclude.has(url))
       : []
 
     let validated: string | null = null

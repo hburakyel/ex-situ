@@ -129,8 +129,9 @@ module.exports = {
       path: '/museum-objects/refresh-views',
       handler: 'museum-object.refreshViews',
       config: {
+        // Admin panel (GeoCorrection) only — see src/policies/is-admin-user.js
         auth: false,
-        policies: [],
+        policies: ['global::is-admin-user'],
         middlewares: [],
       },
     },
@@ -149,8 +150,9 @@ module.exports = {
       path: '/museum-objects/bulk-geocode',
       handler: 'museum-object.bulkGeocode',
       config: {
+        // Admin panel (GeoCorrection) only — see src/policies/is-admin-user.js
         auth: false,
-        policies: [],
+        policies: ['global::is-admin-user'],
         middlewares: [],
       },
     },

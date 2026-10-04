@@ -1,59 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import sharp from "sharp"
+import { fetchAllowedImage, isAllowedImageUrl } from "@/lib/remote-image-url"
 
 export const runtime = "nodejs"
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DEFAULT_WIDTH = 300
 const MAX_WIDTH = 800
-
-// Allowed image source domains — NO localhost/127.0.0.1 (SSRF prevention)
-const ALLOWED_IMAGE_DOMAINS = new Set([
-  "images.metmuseum.org",
-  "collectionapi.metmuseum.org",
-  "www.britishmuseum.org",
-  "recherche.smb.museum",
-  "upload.wikimedia.org",
-  "commons.wikimedia.org",
-  "id.smb.museum",
-  "framemark.vam.ac.uk",
-  "smb.museum-digital.de",
-  "asset.museum-digital.org",
-  "search.smb.museum",
-  "www.artic.edu",
-])
-
-// Block private/internal IP ranges and hostnames to prevent SSRF
-const PRIVATE_IP_PATTERNS = [
-  /^127\./,
-  /^10\./,
-  /^172\.(1[6-9]|2[0-9]|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^0\./,
-  /^fc00:/i,
-  /^fe80:/i,
-  /^::1$/,
-  /^fd/i,
-]
-
-const PRIVATE_HOSTNAMES = new Set(["localhost", "ip6-localhost", "ip6-loopback"])
-
-const isPrivateIp = (hostname: string): boolean =>
-  PRIVATE_HOSTNAMES.has(hostname.toLowerCase()) ||
-  PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(hostname))
-
-function isValidUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    if (url.protocol !== "http:" && url.protocol !== "https:") return false
-    if (isPrivateIp(url.hostname)) return false
-    if (!ALLOWED_IMAGE_DOMAINS.has(url.hostname)) return false
-    return true
-  } catch {
-    return false
-  }
-}
 
 // In-memory cache for resized images (key: url+width → { buffer, headers })
 const imageCache = new Map<string, { buffer: Buffer; contentType: string; timestamp: number }>()
@@ -74,7 +27,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const url = searchParams.get("url")
 
-  if (!url || !isValidUrl(url)) {
+  if (!url || !isAllowedImageUrl(url)) {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 })
   }
 
@@ -107,7 +60,7 @@ export async function GET(request: NextRequest) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10_000)
     try {
-      response = await fetch(url, {
+      response = await fetchAllowedImage(url, {
         // Not Next's fetch data cache: it serializes image bodies to disk as JSON
         // and, under concurrent requests, reads back half-written entries
         // ("Unexpected end of JSON input" → 500). imageCache above plus the

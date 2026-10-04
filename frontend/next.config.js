@@ -1,3 +1,22 @@
+// 'unsafe-inline' is required by the App Router's inline bootstrap scripts
+// (removing it means per-request nonces, which would make every page dynamic).
+// 'unsafe-eval' is only needed by the dev server's React Refresh.
+const isDev = process.env.NODE_ENV !== "production"
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum https://framemark.vam.ac.uk https://smb.museum-digital.de https://asset.museum-digital.org https://search.smb.museum https://www.artic.edu",
+  "connect-src 'self' https://api.protomaps.com https://fonts.openmaptiles.org https://protomaps.github.io",
+  "font-src 'self' data: https://fonts.openmaptiles.org",
+  "worker-src 'self' blob:",
+  "child-src blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ")
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   webpack: (config, { isServer }) => {
@@ -32,7 +51,7 @@ const nextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "X-DNS-Prefetch-Control", value: "on" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum https://framemark.vam.ac.uk https://smb.museum-digital.de https://asset.museum-digital.org https://search.smb.museum https://www.artic.edu; connect-src 'self' https://api.protomaps.com https://fonts.openmaptiles.org https://protomaps.github.io; font-src 'self' data: https://fonts.openmaptiles.org; worker-src 'self' blob:; child-src blob:; frame-ancestors 'none'" },
+          { key: "Content-Security-Policy", value: contentSecurityPolicy },
         ],
       },
       // ── CORS for API routes — restricted to our own origin ──
