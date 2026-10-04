@@ -5,7 +5,9 @@
 // - www.artic.edu: AIC's IIIF server sits behind Cloudflare, which blocks
 //   hotlinked browser requests ("Sorry, you have been blocked"). It only lets
 //   through requests carrying AIC's documented AIC-User-Agent header, which a
-//   browser <img> can't send — so route through /api/img, which adds it.
+//   browser <img> can't send — so route through /api/proxy/img, which adds it.
+//   (It must live under /api/proxy/: production nginx sends every other
+//   /api/* path to Strapi, not Next.)
 // - id.smb.museum: hotlink-blocks headerless requests; proxied for the same reason.
 
 const PROXIED_HOSTS = new Set(["id.smb.museum", "www.artic.edu"])
@@ -34,7 +36,7 @@ export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): strin
   }
 
   if (PROXIED_HOSTS.has(url.hostname)) {
-    return `/api/img?url=${encodeURIComponent(url.toString())}&w=${width}`
+    return `/api/proxy/img?url=${encodeURIComponent(url.toString())}&w=${width}`
   }
 
   return src
