@@ -207,7 +207,7 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
    */
   async byCountry(ctx) {
     try {
-      const { country, site, institution, page, pageSize, onlyWithImages } = ctx.query;
+      const { country, site, institution, page, pageSize, onlyWithImages, located, countOnly } = ctx.query;
 
       if (!country && !institution) {
         return ctx.badRequest('country or institution parameter is required');
@@ -227,6 +227,8 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
           page: pageNum,
           pageSize: size,
           onlyWithImages: onlyWithImages === 'true',
+          located: located === 'true',
+          countOnly: countOnly === 'true',
           ...dateFilters,
         });
 

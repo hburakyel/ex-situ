@@ -8,6 +8,7 @@
  */
 
 const { buildEraBuckets } = require('./api/museum-object/services/era-buckets');
+const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG } = require('./api/museum-object/services/place-group');
 
 const DROP_DEPENDENCIES_SQL = `
   DROP INDEX IF EXISTS idx_museum_objects_resolved_lat;
@@ -76,15 +77,12 @@ const MV_COUNTRY_SQL = `
   WITH DATA;
 `;
 
+// Origin place grouping is shared with getClusteredData — see place-group.js.
 const MV_CITY_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_city_institution_stats AS
   SELECT
-      COALESCE(
-          CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
-                    AND octet_length(city_en) = char_length(city_en)
-               THEN city_en END,
-          COALESCE(NULLIF(country_en::text, ''), 'Unknown')
-      ) AS origin_city,
+      mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) AS origin_city,
+      ${PLACE_VARIANTS_AGG}                      AS place_variants,
       country_en,
       avg(COALESCE(manual_latitude, latitude))   AS origin_lat,
       avg(COALESCE(manual_longitude, longitude)) AS origin_lon,
@@ -108,12 +106,7 @@ const MV_CITY_SQL = `
       AND institution_longitude IS NOT NULL
       AND institution_name IS NOT NULL
   GROUP BY
-      COALESCE(
-          CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
-                    AND octet_length(city_en) = char_length(city_en)
-               THEN city_en END,
-          COALESCE(NULLIF(country_en::text, ''), 'Unknown')
-      ),
+      ${PLACE_GROUP_KEY},
       country_en,
       institution_name
   WITH DATA;

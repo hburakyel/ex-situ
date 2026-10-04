@@ -4,6 +4,7 @@
  * museum-object service
  */
 
+const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG } = require('./place-group');
 const { createCoreService } = require('@strapi/strapi').factories;
 const { buildPublicDateFields } = require('./date-display');
 const { buildEraBuckets } = require('./era-buckets');
@@ -605,7 +606,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         // ── Fast path: materialized view with bbox filter on pre-computed coords ──
         const query = `
           SELECT
-            origin_city, country_en, origin_lat, origin_lon,
+            origin_city, place_variants, country_en, origin_lat, origin_lon,
             institution_name, inst_lat, inst_lon,
             object_count, sample_img_url
           FROM mv_city_institution_stats
@@ -644,6 +645,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               ${latExpr} as latitude,
               ${lonExpr} as longitude,
               city_en,
+              place_name_normalized,
               country_en,
               institution_name,
               institution_latitude,
@@ -665,12 +667,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ),
           city_aggregations AS (
             SELECT
-              COALESCE(
-                CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
-                          AND octet_length(city_en) = char_length(city_en)
-                     THEN city_en END,
-                COALESCE(NULLIF(country_en, ''), 'Unknown')
-              ) as origin_city,
+              mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) as origin_city,
+              ${PLACE_VARIANTS_AGG} as place_variants,
               country_en,
               AVG(latitude) as origin_lat,
               AVG(longitude) as origin_lon,
@@ -680,13 +678,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               COUNT(*)::integer as object_count,
               MIN(img_url) as sample_img_url
             FROM bbox_filter
-            GROUP BY 
-              COALESCE(
-                CASE WHEN city_en IS NOT NULL AND TRIM(city_en) != ''
-                          AND octet_length(city_en) = char_length(city_en)
-                     THEN city_en END,
-                COALESCE(NULLIF(country_en, ''), 'Unknown')
-              ),
+            GROUP BY
+              ${PLACE_GROUP_KEY},
               country_en,
               institution_name
           )
@@ -709,6 +702,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         type: 'clusters',
         data: rows.map(row => ({
           place_name: row.origin_city,
+          // Raw city_en spellings grouped into this place (see place-group.js).
+          place_variants: Array.isArray(row.place_variants) ? row.place_variants : [],
           country: row.country_en || null,
           latitude: parseFloat(row.origin_lat) || 0,
           longitude: parseFloat(row.origin_lon) || 0,
@@ -901,7 +896,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
    */
   async getObjectsByCountry(country, options = {}) {
     const db = strapi.db.connection;
-    const { site, institution, page = 1, pageSize = 60, onlyWithImages = false } = options;
+    const { site, institution, page = 1, pageSize = 60, onlyWithImages = false, located = false, countOnly = false } = options;
     const offset = (page - 1) * pageSize;
 
     try {
@@ -933,6 +928,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         whereClause += ` AND NULLIF(BTRIM(COALESCE(img_url, '')), '') IS NOT NULL`;
       }
 
+      // Only objects with map coordinates (used by the MCP server's located/unlocated coverage).
+      if (located) {
+        whereClause += ` AND ${latExpr} IS NOT NULL AND ${lonExpr} IS NOT NULL`;
+      }
+
       // Time / Migration filters — same overlap logic as the geospatial
       // endpoint, so the object grid, its total count, and the map arcs all
       // agree on what "1906" or "19th century" means.
@@ -957,6 +957,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       `;
       const countResult = await db.raw(countQuery, bindings);
       const total = this.getRows(countResult)[0]?.total || 0;
+
+      // Count-only callers (the MCP server) skip the much slower row query.
+      if (countOnly) {
+        return { data: [], meta: { pagination: { page, pageSize, pageCount: Math.ceil(total / pageSize), total } } };
+      }
 
       // Data query — deduplicate (pick the lowest id per inv+institution group), then page
       const dataQuery = `

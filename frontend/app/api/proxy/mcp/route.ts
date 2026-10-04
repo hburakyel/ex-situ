@@ -3,6 +3,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
 import { z } from "zod"
 import { LARGE_WIDTH, resolveImageSrc } from "@/lib/image-src"
+import { loadGazetteer } from "@/lib/mcp/gazetteer"
+import {
+  type Flow, type Gazetteer, type RawFlow, coverage, coverageNote, disputedFlags, mergeFlows,
+} from "@/lib/mcp/origins"
 
 // Public, read-only MCP server for Ex Situ — lets Claude (or any MCP client)
 // answer questions about the collections by querying the same Strapi GET
@@ -20,7 +24,8 @@ export const runtime = "nodejs"
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://exsitu.app"
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:1337/api").replace("localhost", "127.0.0.1")
 
-const UPSTREAM_TIMEOUT_MS = 15_000
+// Exact counts for the largest museum take ~4 s locally.
+const UPSTREAM_TIMEOUT_MS = 25_000
 const MAX_BODY_BYTES = 64 * 1024
 
 // ── Rate limiting (in-memory, per process) ─────────────────────────────────
@@ -109,6 +114,23 @@ function compactObject(id: number, a: any) {
   }
 }
 
+const EMPTY_GAZETTEER: Gazetteer = { countries: new Set(), regions: new Set(), cities: new Set() }
+
+// The geospatial endpoint returns at most this many rows per call.
+const GEOSPATIAL_ROW_CAP = 1000
+
+type CoverageFilters = { country?: string; institution?: string; date_start?: number; date_end?: number }
+
+/** Exact total / located / unlocated counts for the filters (deduplicated like the site's object grid). */
+async function getCoverage({ country, institution, date_start, date_end }: CoverageFilters) {
+  const params = { country, institution, dateStart: date_start, dateEnd: date_end, page: 1, pageSize: 1, countOnly: "true" }
+  const [all, located] = await Promise.all([
+    strapiGet("/museum-objects/by-country", params),
+    strapiGet("/museum-objects/by-country", { ...params, located: "true" }),
+  ])
+  return coverage(all?.meta?.pagination?.total ?? 0, located?.meta?.pagination?.total ?? 0)
+}
+
 function result(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data) }] }
 }
@@ -136,7 +158,9 @@ function buildServer(): McpServer {
         "Ex Situ maps museum objects from where they were made or found to the museum that holds them today. " +
         "Data covers 9 museums (Berlin State Museums collections, The Met, V&A, Art Institute of Chicago). " +
         "Start with get_overview for museum names and totals. Counts reflect what Ex Situ has indexed, not a museum's full holdings. " +
-        "Origin places come from museum records and may be uncertain (e.g. 'Egypt?'). Link answers to the ex_situ_page / map_url provided.",
+        "Many objects have no located origin: report counts with the coverage (total / located / unlocated) the tools return. " +
+        "Origin places come from museum records; precision says whether a place is a site, city, region or only a country, and a trailing '?' marks an uncertain attribution. " +
+        "Link answers to the ex_situ_page / map_url provided.",
     },
   )
 
@@ -175,8 +199,9 @@ function buildServer(): McpServer {
     {
       title: "Count objects",
       description:
-        "Count objects by origin country and/or holding museum, optionally limited to an object date range. " +
-        "At least one of country or institution is required.",
+        "Count objects by origin country and/or holding museum, optionally within an object date range. " +
+        "Returns total, located (has map coordinates) and unlocated. Requires country or institution; " +
+        "country matches as a substring (\"Cyprus\" also counts Northern Cyprus).",
       inputSchema: {
         country,
         institution,
@@ -187,12 +212,11 @@ function buildServer(): McpServer {
     },
     async ({ country, institution, date_start, date_end }) => {
       if (!country && !institution) return errorResult("Provide country or institution.")
-      const data = await strapiGet("/museum-objects/by-country", {
-        country, institution, dateStart: date_start, dateEnd: date_end, page: 1, pageSize: 1,
-      })
+      const cov = await getCoverage({ country, institution, date_start, date_end })
       return result({
         filters: { country, institution, date_start, date_end },
-        count: data?.meta?.pagination?.total ?? 0,
+        ...cov,
+        note: coverageNote(cov),
         map_url: mapUrl({ country, institution }),
       })
     },
@@ -203,37 +227,73 @@ function buildServer(): McpServer {
     {
       title: "Where objects come from",
       description:
-        "Origin → museum flows with object counts. Filter by museum to see where its objects come from, " +
-        "or by country to see which museums hold objects from there. detail='country' groups by country, " +
-        "detail='site' lists individual find-spots and cities.",
+        "Origin → museum flows with object counts, for located objects only (coverage gives total/located/unlocated). " +
+        "detail='country' groups by country. detail='site' lists places, each with precision site|city|region|country; " +
+        "country-level-only records are excluded and counted in country_level_only unless include_country_level=true. " +
+        "Results are paged: check truncated and use offset. flags lists disputed-territory origins.",
       inputSchema: {
         country,
         institution,
         detail: z.enum(["country", "site"]).default("country"),
+        include_country_level: z.boolean().default(false)
+          .describe("detail='site' only: also list records located only to a country"),
         date_start: year("Earliest object date"),
         date_end: year("Latest object date"),
         limit: z.number().int().min(1).max(50).default(20),
+        offset: z.number().int().min(0).max(5000).default(0),
       },
       annotations: READ_ONLY,
     },
-    async ({ country, institution, detail, date_start, date_end, limit }) => {
-      const data = await strapiGet("/museum-objects/geospatial", {
-        // zoom ≤ 6 is the deepest level that works without a bounding box.
-        zoom: detail === "country" ? 2 : 5, country, institution, dateStart: date_start, dateEnd: date_end,
-      })
-      const rows = (Array.isArray(data?.data) ? data.data : [])
-        .map((r: any) => ({
-          origin: r.place_name,
-          origin_country: r.country,
-          museum: r.institution_name,
-          objects: r.object_count,
-        }))
-        .sort((a: any, b: any) => (b.objects ?? 0) - (a.objects ?? 0))
+    async ({ country, institution, detail, include_country_level, date_start, date_end, limit, offset }) => {
+      const [data, cov] = await Promise.all([
+        strapiGet("/museum-objects/geospatial", {
+          // zoom 2 = country aggregates; 5 = place level (≤ 6 works without a bbox).
+          zoom: detail === "country" ? 2 : 5, country, institution, dateStart: date_start, dateEnd: date_end,
+        }),
+        getCoverage({ country, institution, date_start, date_end }),
+      ])
+      const raw: RawFlow[] = (Array.isArray(data?.data) ? data.data : []).map((r: any) => ({
+        place_name: String(r.place_name ?? ""),
+        // Country-level (zoom 2) rows carry the country only in place_name.
+        country: r.country ?? (detail === "country" ? r.place_name ?? null : null),
+        institution_name: String(r.institution_name ?? ""),
+        object_count: Number(r.object_count) || 0,
+        // Spellings the backend already grouped (place_name_normalized); mergeFlows only re-merges as a fallback.
+        ...(Array.isArray(r.place_variants) && r.place_variants.length > 0 && { variants: r.place_variants.map(String) }),
+      }))
+
+      let flows: Array<Omit<Flow, "country"> & { country?: string | null }> =
+        mergeFlows(raw, detail === "site" ? loadGazetteer() ?? EMPTY_GAZETTEER : null)
+      let countryLevelOnly: { flows: number; objects: number } | undefined
+      if (detail === "country") {
+        // Every row is a country here; drop the duplicate country field.
+        flows = flows.map(({ country: _country, ...rest }) => rest)
+      } else if (!include_country_level) {
+        const countryRows = flows.filter((f) => f.precision === "country")
+        flows = flows.filter((f) => f.precision !== "country")
+        if (countryRows.length > 0) {
+          countryLevelOnly = { flows: countryRows.length, objects: countryRows.reduce((n, f) => n + f.objects, 0) }
+        }
+      }
+
+      const page = flows.slice(offset, offset + limit)
+      const flags = disputedFlags(raw)
+      if (raw.length >= GEOSPATIAL_ROW_CAP) {
+        flags.push(`The data source returned its maximum of ${GEOSPATIAL_ROW_CAP} places, so smaller places are missing and flows_total is a lower bound. Narrow the filters (country or dates).`)
+      }
+
       return result({
         filters: { country, institution, detail, date_start, date_end },
-        flows_total: rows.length,
-        flows: rows.slice(0, limit),
-        note: "Only objects with a located origin appear here; count_objects may be slightly higher.",
+        coverage: cov,
+        note: coverageNote(cov),
+        flows_total: flows.length,
+        flows_objects: flows.reduce((n, f) => n + f.objects, 0),
+        ...(countryLevelOnly && { country_level_only: countryLevelOnly }),
+        returned: page.length,
+        offset,
+        truncated: offset + page.length < flows.length,
+        flows: page,
+        ...(flags.length > 0 && { flags }),
         map_url: mapUrl({ country, institution }),
       })
     },

@@ -15,6 +15,8 @@ etl/
 ├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
 ├── import_gazetteer.sh        # Loads a GeoNames extract into gazetteer_places
 ├── normalize_place_names.py   # Place name normalization + deduplication
+├── fill_place_name_normalized.py # Fills remaining NULLs from city_en (map/MCP grouping)
+├── build_mcp_gazetteer.py     # GeoNames lookup for the MCP server's place precision
 └── requirements.txt           # Python dependencies
 ```
 
@@ -124,6 +126,23 @@ python normalize_place_names.py
 # Apply updates
 python normalize_place_names.py --apply
 ```
+
+Then fill the rows it left `NULL`, so spelling variants of one place group
+together on the map and in the MCP server (`"Olympia, Greece"` and `"Olympia"`
+→ `Olympia`). Run it **after** `normalize_place_names.py`, which only processes
+rows whose `place_name_normalized` is still `NULL`:
+
+```bash
+python fill_place_name_normalized.py            # dry run
+python fill_place_name_normalized.py --apply    # then restart Strapi to rebuild the map views
+```
+
+It strips a trailing `", <country_en>"` from `city_en`, trims and collapses
+whitespace, and keeps casing; the map view groups case-insensitively. Curated
+values and `place_name` are never changed. The rules are shared with the MCP
+server (`frontend/lib/mcp/origins.ts`) through
+`frontend/lib/mcp/place-normalization-cases.json`; both sides test against it
+(`python fill_place_name_normalized.py --self-test`, `pnpm test` in `frontend/`).
 
 ---
 

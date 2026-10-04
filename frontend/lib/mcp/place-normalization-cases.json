@@ -1,0 +1,18 @@
+{
+  "_comment": "Shared cases for place normalization. Checked by frontend/lib/mcp/origins.test.ts (normalizePlaceDisplay / placeKey) and by `python etl/fill_place_name_normalized.py --self-test`, so the ETL and the MCP fallback apply the same rules. display = value stored in place_name_normalized; key = case-folded grouping key.",
+  "cases": [
+    { "name": "Olympia, Greece", "country": "Greece", "display": "Olympia", "key": "olympia" },
+    { "name": "Olympia", "country": "Greece", "display": "Olympia", "key": "olympia" },
+    { "name": "  OLYMPIA  ", "country": "Greece", "display": "OLYMPIA", "key": "olympia" },
+    { "name": "Cairo, Egypt", "country": "Egypt", "display": "Cairo", "key": "cairo" },
+    { "name": "Cairo,  egypt ", "country": "Egypt", "display": "Cairo", "key": "cairo" },
+    { "name": "Tarquinia, Tomba del Guerriero", "country": "Italy", "display": "Tarquinia, Tomba del Guerriero", "key": "tarquinia, tomba del guerriero" },
+    { "name": "Tomba del Guerriero (Tarquinia)", "country": "Italy", "display": "Tomba del Guerriero (Tarquinia)", "key": "tomba del guerriero (tarquinia)" },
+    { "name": "Olympia?", "country": "Greece", "display": "Olympia?", "key": "olympia?" },
+    { "name": "Benin City,   Nigeria", "country": "Nigeria", "display": "Benin City", "key": "benin city" },
+    { "name": "São Paulo, Brazil", "country": "Brazil", "display": "São Paulo", "key": "sao paulo" },
+    { "name": "Athens, Georgia", "country": "United States", "display": "Athens, Georgia", "key": "athens, georgia" },
+    { "name": "Idalion  (Nekropolen)", "country": "Cyprus", "display": "Idalion (Nekropolen)", "key": "idalion (nekropolen)" },
+    { "name": "Unknown", "country": null, "display": "Unknown", "key": "unknown" }
+  ]
+}
