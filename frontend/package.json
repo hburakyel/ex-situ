@@ -16,6 +16,7 @@
     "@loaders.gl/core": "~4.3.4",
     "@luma.gl/core": "~9.0.28",
     "@luma.gl/engine": "~9.0.28",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "@protomaps/basemaps": "^5.7.2",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
