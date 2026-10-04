@@ -183,6 +183,25 @@ def extract_asset_id(old_url):
     return m.group(1)
 
 
+def extract_asset_id_from_filename_loc(filename_loc):
+    """For records that were never broken (already on smb.museum-digital.de,
+    which has no asset id embedded in its own URL), the museum-digital.de
+    object API's object_images[].filename_loc field carries it instead —
+    in one of two formats seen in practice:
+      - "https://id.smb.museum/digital-asset/{id}"           (newer)
+      - "http://www.smb-digital.de/eMuseumPlus?...#{id}"      (legacy)
+    """
+    if not filename_loc:
+        return None
+    m = re.search(r"digital-asset/(\d+)", filename_loc)
+    if m:
+        return m.group(1)
+    m = re.search(r"#(\d+)$", filename_loc)
+    if m:
+        return m.group(1)
+    return None
+
+
 def compute_search_url(asset_id, size="extra_large"):
     """search.smb.museum buckets assets into a 2-level directory tree:
     dir1 = zero-pad(floor(id/1000) % 1000, 3)
@@ -613,6 +632,126 @@ def cmd_upgrade(args):
     print(f"\nUpgrade pass complete. upgraded={upgraded} unchanged={unchanged} total_checked={len(remaining)}")
 
 
+UNTOUCHED_WORKERS = 8  # a bit more conservative than FAST_WORKERS: each request
+# here is a museum-digital.de JSON API lookup (DB-backed), not a static file GET.
+
+
+def fetch_untouched_candidates(conn, exclude_ids):
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        """
+        SELECT id, object_id, inventory_number, institution_name, img_url
+        FROM museum_objects
+        WHERE institution_name = ANY(%s)
+          AND img_url LIKE 'https://smb.museum-digital.de%%'
+        ORDER BY id
+        """,
+        [SMB_INSTITUTIONS],
+    )
+    rows = cur.fetchall()
+    cur.close()
+    return [r for r in rows if r["id"] not in exclude_ids]
+
+
+def check_one_untouched(row, session):
+    """Records here were never broken — img_url already works. Only ever
+    upgrade (never null it out): on any failure, keep the existing img_url
+    exactly as-is and just mark the row checked so a re-run skips it."""
+    details, _ = fetch_object_details(row["object_id"], session=session)
+    asset_id = None
+    if details:
+        images = details.get("object_images", [])
+        main = next((im for im in images if im.get("is_main") == "j"), images[0] if images else None)
+        if main:
+            asset_id = extract_asset_id_from_filename_loc(main.get("filename_loc"))
+
+    if asset_id:
+        candidate_url = compute_search_url(asset_id)
+        is_ok, _ = verify_image_url(
+            candidate_url, FAST_REQUEST_TIMEOUT_SECONDS, FAST_MAX_RETRIES, FAST_RETRY_SLEEP_SECONDS,
+            session=session,
+        )
+        if is_ok:
+            return {
+                "id": row["id"], "object_id": row["object_id"], "inventory_number": row["inventory_number"],
+                "institution_name": row["institution_name"], "old_url": row["img_url"],
+                "new_url": candidate_url, "status": "ok", "error": None,
+                "source": "search.smb.museum", "upgraded_from": "museum-digital.de (untouched)",
+                "upgrade_checked": True,
+            }
+
+    return {
+        "id": row["id"], "object_id": row["object_id"], "inventory_number": row["inventory_number"],
+        "institution_name": row["institution_name"], "old_url": row["img_url"],
+        "new_url": row["img_url"], "status": "ok", "error": None,
+        "source": "museum-digital.de", "upgrade_checked": True,
+    }
+
+
+def cmd_upgrade_untouched(args):
+    """Check the records that were NEVER broken (already smb.museum-digital.de
+    from the start, so outside every previous pass) against search.smb.museum
+    too. Unlike cmd_upgrade, the asset id isn't in the URL here — it has to be
+    looked up via museum-digital.de's object API (rate-limited, ~1 req/s-per-
+    worker), so expect this to run at the slower fetch-fast-fallback pace, not
+    the free-URL-construction speed. Also expect a meaningfully lower hit rate
+    (~68% in a 31-record cross-institution test) — some objects return
+    "no displayable object" from that API entirely (withdrawn from public
+    display on SMB's end), concentrated in some institutions/collections more
+    than others. Records that don't resolve are left with their existing
+    (already working) img_url untouched — this command only ever upgrades,
+    never breaks a working record."""
+    conn = get_conn()
+    already_done = load_cache_ids(CACHE_PATH)
+    remaining = fetch_untouched_candidates(conn, already_done)
+    conn.close()
+
+    print(f"Never-broken candidates (smb.museum-digital.de, not in cache): {len(remaining)}")
+    print(f"Workers: {UNTOUCHED_WORKERS}")
+    sys.stdout.flush()
+
+    if not remaining:
+        print("Nothing left to check.")
+        return
+
+    upgraded = unchanged = 0
+    completed = 0
+    start = time.time()
+    write_lock = threading.Lock()
+
+    adapter = requests.adapters.HTTPAdapter(pool_connections=UNTOUCHED_WORKERS, pool_maxsize=UNTOUCHED_WORKERS)
+    session = requests.Session()
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+
+    with open(CACHE_PATH, "a", buffering=1) as cache_f:
+        with ThreadPoolExecutor(max_workers=UNTOUCHED_WORKERS) as executor:
+            futures = {executor.submit(check_one_untouched, row, session): row for row in remaining}
+            for future in as_completed(futures):
+                record = future.result()
+                if record.get("upgraded_from"):
+                    upgraded += 1
+                else:
+                    unchanged += 1
+
+                with write_lock:
+                    cache_f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    completed += 1
+                    i = completed
+
+                if i % 100 == 0 or i == len(remaining):
+                    elapsed = time.time() - start
+                    rate = i / elapsed if elapsed > 0 else 0
+                    eta_min = (len(remaining) - i) / rate / 60 if rate > 0 else float("nan")
+                    print(
+                        f"[{i}/{len(remaining)}] upgraded={upgraded} unchanged={unchanged} "
+                        f"elapsed={elapsed/60:.1f}m eta={eta_min:.1f}m",
+                        flush=True,
+                    )
+
+    print(f"\nUpgrade-untouched pass complete. upgraded={upgraded} unchanged={unchanged} total_checked={len(remaining)}")
+
+
 def cmd_report(args):
     records = load_cache_records(CACHE_PATH)
     if not records:
@@ -661,6 +800,8 @@ def main():
 
     sub.add_parser("upgrade", help="Re-check museum-digital.de-sourced 'ok' records against search.smb.museum")
 
+    sub.add_parser("upgrade-untouched", help="Check never-broken records (via museum-digital.de API lookup) against search.smb.museum")
+
     p_report = sub.add_parser("report", help="Read cache file, print sample + summary (no network calls)")
     p_report.add_argument("--sample", type=int, default=40, help="Number of 'ok' records to sample")
 
@@ -672,6 +813,8 @@ def main():
         cmd_fetch_fast(args)
     elif args.command == "upgrade":
         cmd_upgrade(args)
+    elif args.command == "upgrade-untouched":
+        cmd_upgrade_untouched(args)
     elif args.command == "report":
         cmd_report(args)
 

@@ -3,11 +3,25 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
+import { resolveImageSrc, THUMB_WIDTH } from "@/lib/image-src"
 import { useInView } from "react-intersection-observer"
 import { Spinner } from "@radix-ui/themes"
 import { formatOriginAttribution } from "@/lib/origin-attribution"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
+
+// A tile is only ever shown once its image has actually loaded — objects with
+// no image, or whose image fails, are left out of the grid entirely rather than
+// rendered as an empty/placeholder tile. Images are preloaded in list order and
+// revealed as a contiguous prefix, so tiles never shift once on screen.
+const PRELOAD_CONCURRENCY = 8
+const PRELOAD_LOOKAHEAD = 24
+const PRELOAD_TIMEOUT_MS = 8000
+// Stop auto-fetching further pages after this many in a row reveal nothing new
+// (e.g. a filter whose objects are almost all imageless).
+const MAX_EMPTY_AUTOLOADS = 5
+
+type ImageStatus = "ok" | "failed"
 
 interface ObjectGridProps {
   objects: MuseumObject[]
@@ -50,17 +64,11 @@ export default function ObjectGrid({
     triggerOnce: false,
   })
 
-  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({})
-  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
+  const [imageStatus, setImageStatus] = useState<Record<string, ImageStatus>>({})
+  const inflightRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  const emptyAutoloadsRef = useRef(0)
   const [gridClass, setGridClass] = useState("")
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
-  // Any card's img_url can die (museum CDN outage, hotlink block, etc). When it
-  // does, ask the server to find and HEAD-validate a working replacement from
-  // the same institution — the browser only ever receives a URL already
-  // confirmed reachable, so a dead link degrades to another real photo from
-  // the same collection instead of a blank tile.
-  const [fallbackImageUrls, setFallbackImageUrls] = useState<Record<string, string>>({})
-  const attemptedFallbackRef = useRef<Set<string>>(new Set())
 
   // Use virtualization for better performance with large lists
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 })
@@ -71,37 +79,89 @@ export default function ObjectGrid({
     return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
   }, [objects])
 
-  // Objects sorted so image-bearing items come first; imageless ones go to the end
-  const sortedObjects = useMemo(() => {
-    const withImages = objects.filter((o) => hasImageUrl(o.attributes?.img_url))
-    const withoutImages = objects.filter((o) => !hasImageUrl(o.attributes?.img_url))
-    return [...withImages, ...withoutImages]
-  }, [objects])
+  const markImage = useCallback((id: string, status: ImageStatus) => {
+    setImageStatus((prev) => (prev[id] === status ? prev : { ...prev, [id]: status }))
+  }, [])
 
-  // Drop state for images that are no longer present, but keep already-loaded
-  // entries when new pages append to the current result set.
+  // revealed: loaded objects up to the first one still pending (the frontier).
+  const { revealed, frontier } = useMemo(() => {
+    const revealed: MuseumObject[] = []
+    let frontier = imageObjects.length
+    for (let i = 0; i < imageObjects.length; i++) {
+      const status = imageStatus[imageObjects[i].id]
+      if (status === "ok") revealed.push(imageObjects[i])
+      else if (status === undefined) {
+        frontier = i
+        break
+      }
+    }
+    return { revealed, frontier }
+  }, [imageObjects, imageStatus])
+
+  // Preload images from the frontier onward, a bounded window ahead of what's shown.
   useEffect(() => {
-    const currentIds = new Set(imageObjects.map((object) => object.id))
+    if (revealed.length >= visibleRange.end + PRELOAD_LOOKAHEAD) return
+    const inflight = inflightRef.current
+    const end = Math.min(imageObjects.length, frontier + PRELOAD_LOOKAHEAD)
+    for (let i = frontier; i < end && inflight.size < PRELOAD_CONCURRENCY; i++) {
+      const object = imageObjects[i]
+      if (imageStatus[object.id] || inflight.has(object.id)) continue
+      const img = new window.Image()
+      const settle = (status: ImageStatus) => {
+        clearTimeout(timer)
+        img.onload = null
+        img.onerror = null
+        inflight.delete(object.id)
+        markImage(object.id, status)
+      }
+      const timer = setTimeout(() => {
+        img.src = ""
+        settle("failed")
+      }, PRELOAD_TIMEOUT_MS)
+      // naturalWidth guard: some hosts answer dead links with a 1px placeholder.
+      img.onload = () => settle(img.naturalWidth > 1 ? "ok" : "failed")
+      img.onerror = () => settle("failed")
+      img.src = resolveImageSrc(object.attributes.img_url!, THUMB_WIDTH)
+      inflight.set(object.id, img)
+    }
+  }, [imageObjects, frontier, imageStatus, revealed.length, visibleRange.end, markImage])
 
-    setBrokenImages((prev) => {
-      const next = Object.fromEntries(
-        Object.entries(prev).filter(([id]) => currentIds.has(id))
-      )
-      return Object.keys(next).length === Object.keys(prev).length ? prev : next
-    })
+  // Abort in-flight preloads on unmount.
+  useEffect(() => {
+    const inflight = inflightRef.current
+    return () => {
+      inflight.forEach((img) => {
+        img.onload = null
+        img.onerror = null
+        img.src = ""
+      })
+      inflight.clear()
+    }
+  }, [])
 
-    setLoadedImages((prev) => {
-      const next = Object.fromEntries(
-        Object.entries(prev).filter(([id]) => currentIds.has(id))
-      )
-      return Object.keys(next).length === Object.keys(prev).length ? prev : next
-    })
-  }, [imageObjects])
-
-  // Calculate visible objects based on current range — images first, then imageless
   const visibleObjects = useMemo(() => {
-    return sortedObjects.slice(visibleRange.start, visibleRange.end)
-  }, [sortedObjects, visibleRange])
+    return revealed.slice(visibleRange.start, visibleRange.end)
+  }, [revealed, visibleRange])
+
+  // Every loaded object has been checked but too few had images to fill the
+  // view — fetch the next page instead of waiting for a scroll that can't happen.
+  const lastRevealedCountRef = useRef(0)
+  useEffect(() => {
+    if (revealed.length !== lastRevealedCountRef.current) {
+      lastRevealedCountRef.current = revealed.length
+      emptyAutoloadsRef.current = 0
+    }
+    if (
+      frontier === imageObjects.length &&
+      revealed.length < visibleRange.end &&
+      hasMore &&
+      !isLoading &&
+      emptyAutoloadsRef.current < MAX_EMPTY_AUTOLOADS
+    ) {
+      emptyAutoloadsRef.current += 1
+      onLoadMore()
+    }
+  }, [frontier, imageObjects.length, revealed.length, visibleRange.end, hasMore, isLoading, onLoadMore])
 
   // Load more when reaching the end of the list
   useEffect(() => {
@@ -121,15 +181,15 @@ export default function ObjectGrid({
     onScroll?.(scrollTop)
 
     // If we're near the bottom of our current range, load more items into view
-    if (scrollPosition > scrollHeight - 200 && visibleRange.end < objects.length) {
+    if (scrollPosition > scrollHeight - 200 && visibleRange.end < revealed.length) {
       setVisibleRange((prev) => ({
         start: prev.start,
-        end: Math.min(prev.end + 40, objects.length),
+        end: prev.end + 40,
       }))
     }
 
     // If near bottom AND we've shown all loaded objects, fetch next page
-    if (scrollPosition > scrollHeight - 400 && visibleRange.end >= objects.length - 5 && hasMore && !isLoading) {
+    if (scrollPosition > scrollHeight - 400 && visibleRange.end >= revealed.length - 5 && hasMore && !isLoading) {
       onLoadMore()
     }
 
@@ -140,7 +200,7 @@ export default function ObjectGrid({
         end: prev.end,
       }))
     }
-  }, [imageObjects.length, visibleRange, hasMore, isLoading, onLoadMore, onScroll])
+  }, [revealed.length, visibleRange, hasMore, isLoading, onLoadMore, onScroll])
 
   // Attach scroll listener
   useEffect(() => {
@@ -180,11 +240,6 @@ export default function ObjectGrid({
   useEffect(() => {
     if (objects.length === 0) {
       setVisibleRange({ start: 0, end: 50 })
-    } else {
-      setVisibleRange((prev) => ({
-        start: prev.start,
-        end: Math.max(prev.end, Math.min(objects.length, prev.end + 40)),
-      }))
     }
   }, [objects.length])
 
@@ -197,47 +252,8 @@ export default function ObjectGrid({
     onObjectClick(lng, lat, objectIndex, object)
   }
 
-  const handleImageError = (object: MuseumObject) => {
-    const id = object.id
-    console.log(`Image failed to load for object ${id}`)
-
-    const institutionName = object.attributes.institution_name
-
-    if (institutionName && !attemptedFallbackRef.current.has(id)) {
-      attemptedFallbackRef.current.add(id)
-      const brokenUrl = fallbackImageUrls[id] || object.attributes.img_url || ""
-
-      // The server HEAD-validates candidates before responding, so whatever
-      // comes back is already confirmed reachable — no client-side retry loop.
-      fetch(`/api/proxy/institution-image?institution=${encodeURIComponent(institutionName)}&exclude=${encodeURIComponent(brokenUrl)}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((json) => {
-          if (json?.img_url) {
-            setFallbackImageUrls((prev) => ({ ...prev, [id]: json.img_url }))
-          } else {
-            setBrokenImages((prev) => ({ ...prev, [id]: true }))
-          }
-        })
-        .catch(() => {
-          setBrokenImages((prev) => ({ ...prev, [id]: true }))
-        })
-      return
-    }
-
-    setBrokenImages((prev) => ({
-      ...prev,
-      [id]: true,
-    }))
-  }
-
-  const handleImageLoad = (id: string) => {
-    setLoadedImages((prev) => ({
-      ...prev,
-      [id]: true,
-    }))
-  }
-
-  if (isLoading && objects.length === 0) {
+  const isCheckingImages = frontier < imageObjects.length || (isLoading && hasMore)
+  if (revealed.length === 0 && (isCheckingImages || (isLoading && objects.length === 0))) {
     return (
       <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
         <Spinner size="2" />
@@ -245,7 +261,7 @@ export default function ObjectGrid({
     )
   }
 
-  if (objects.length === 0 && !isLoading) {
+  if (revealed.length === 0) {
     return (
       <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
         <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
@@ -260,9 +276,6 @@ return (
       <div className={`grid ${gridClass} gap-3`}>
       {visibleObjects.map((object, index) => {
         const isSelected = object.id === selectedImageId
-        const hasImage = hasImageUrl(object.attributes?.img_url) && !brokenImages[object.id]
-
-const isPending = hasImage && !loadedImages[object.id]
 
 return (
   <div
@@ -278,18 +291,10 @@ return (
       onObjectHover(null)
     }}
   >
-    {/* For image tiles: inventory number as absolute overlay while image is loading */}
-    {isPending && object.attributes.inventory_number && (
-      <span className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
-        <span className="text-[10px] text-gray-300 font-mono text-center px-2 break-words leading-tight max-w-full">
-          {object.attributes.inventory_number}
-        </span>
-      </span>
-    )}
     <div
       className={[
         "relative overflow-hidden bg-white rounded-[4px]",
-        hasImage ? "inline-flex" : "w-full h-full flex items-center justify-center",
+        "inline-flex",
         isSelected ? "ring-2 ring-blue-500" : "",
         "group-hover:ring-2 group-hover:ring-blue-500",
       ].join(" ")}
@@ -337,22 +342,15 @@ return (
           i
         </span>
       )}
-      {hasImage ? (
-        <ObjectImage
-          src={fallbackImageUrls[object.id] || object.attributes.img_url!}
-          alt={object.attributes?.title || "Museum object"}
-          className="block"
-          imgClassName="block max-h-44 w-auto bg-white"
-          onLoad={() => handleImageLoad(object.id)}
-          onError={() => handleImageError(object)}
-          loading="lazy"
-          fallbackText={object.attributes.inventory_number || undefined}
-        />
-      ) : (
-        <span className="text-[10px] text-gray-400 font-mono text-center break-words leading-tight max-w-full px-2">
-          {object.attributes.inventory_number || "—"}
-        </span>
-      )}
+      <ObjectImage
+        src={object.attributes.img_url!}
+        alt={object.attributes?.title || "Museum object"}
+        className="block"
+        imgClassName="block max-h-44 w-auto bg-white"
+        onError={() => markImage(object.id, "failed")}
+        // Already preloaded into the browser cache before the tile was revealed.
+        loading="eager"
+      />
     </div>
   </div>
 )
@@ -373,9 +371,9 @@ return (
         </div>
       )}
 
-      {!hasMore && objects.length > 0 && (
+      {!hasMore && !isCheckingImages && (
         <div className="text-center py-4 text-[10px] text-gray-300">
-          {objects.length} artifact{objects.length !== 1 ? "s" : ""}
+          {revealed.length} artifact{revealed.length !== 1 ? "s" : ""}
         </div>
       )}
     </div>

@@ -1,8 +1,9 @@
 "use client"
 
 import type { CSSProperties } from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
+import { resolveImageSrc, THUMB_WIDTH } from "@/lib/image-src"
 
 interface ObjectImageProps {
   src: string
@@ -17,17 +18,8 @@ interface ObjectImageProps {
   fallbackSrc?: string
   /** Text shown in place of the image while it loads or if it fails — e.g. the inventory number. */
   fallbackText?: string
-}
-
-function toProxySrc(src: string): string {
-  try {
-    if (new URL(src).hostname === "id.smb.museum") {
-      return `/api/img?url=${encodeURIComponent(src)}`
-    }
-  } catch {
-    // not a valid absolute URL — return as-is
-  }
-  return src
+  /** Target width for proxied images (see resolveImageSrc). Use LARGE_WIDTH for full-size views. */
+  width?: number
 }
 
 export default function ObjectImage({
@@ -42,15 +34,21 @@ export default function ObjectImage({
   onError,
   fallbackSrc,
   fallbackText,
+  width = THUMB_WIDTH,
 }: ObjectImageProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
 
   const imageSrc = hasError ? fallbackSrc || src : src
 
+  const imgRef = useRef<HTMLImageElement>(null)
+
   useEffect(() => {
-    setIsLoaded(false)
     setHasError(false)
+    // A cached image can finish loading before this effect runs (onLoad already
+    // fired) — resetting to "not loaded" then would leave it invisible forever.
+    const img = imgRef.current
+    setIsLoaded(Boolean(img?.complete && img.naturalWidth > 0))
   }, [src])
 
   return (
@@ -61,7 +59,8 @@ export default function ObjectImage({
         </div>
       )}
       <img
-        src={toProxySrc(imageSrc)}
+        ref={imgRef}
+        src={resolveImageSrc(imageSrc, width)}
         alt={alt}
         loading={loading}
         decoding="async"

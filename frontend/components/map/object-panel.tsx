@@ -197,7 +197,9 @@ export default function ObjectPanel({
     ? `${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)}`
     : undefined
 
-  const galleryObjects = useMemo(() => objects, [objects])
+  // The gallery steps only through objects that have an image — matching the
+  // grid, which never shows imageless objects.
+  const galleryObjects = useMemo(() => objects.filter((o) => hasImageUrl(o.attributes?.img_url)), [objects])
 
   // ── Mobile bottom-sheet drag-to-resize ──
   const containerSizeRef = useRef<ContainerSize>(containerSize)

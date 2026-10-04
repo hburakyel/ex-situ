@@ -8,6 +8,7 @@ import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
 import { Check, Link2 } from "lucide-react"
 import { COLLECTION_LABELS, INSTITUTION_CITIES } from "@/hooks/use-unified-search"
+import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const MOBILE_CLOSE_SWIPE_THRESHOLD = 48
@@ -90,18 +91,38 @@ export default function ImageGallery({
     }
   }, [currentIndex, objects?.length, onClose])
 
+  // Direction of the last navigation, so a failed image is skipped the way the
+  // user was already heading instead of showing an empty frame.
+  const directionRef = useRef<1 | -1>(1)
+  const skippedRef = useRef(0)
+
   const handleNext = useCallback(() => {
     if (galleryObjects.length === 0) return
+    directionRef.current = 1
+    skippedRef.current = 0
     setCurrentIndex((prevIndex) => (prevIndex + 1) % galleryObjects.length)
   }, [galleryObjects])
 
   const handlePrevious = useCallback(() => {
     if (galleryObjects.length === 0) return
+    directionRef.current = -1
+    skippedRef.current = 0
     setCurrentIndex((prevIndex) => (prevIndex - 1 + galleryObjects.length) % galleryObjects.length)
   }, [galleryObjects])
 
   const handleImageLoad = () => {
+    skippedRef.current = 0
     setIsLoading(false)
+  }
+
+  const handleImageError = () => {
+    const n = galleryObjects.length
+    if (n > 1 && skippedRef.current < n - 1) {
+      skippedRef.current += 1
+      setCurrentIndex((prev) => (prev + directionRef.current + n) % n)
+      return
+    }
+    setImageError(true)
   }
 
   const handleImageTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
@@ -341,20 +362,26 @@ export default function ImageGallery({
             </>
           )}
 
+          {/* While the full-size image loads, show the grid thumbnail (already in
+              the browser cache from the grid) instead of an empty frame. */}
           {isLoading && !imageError && (
             <div
               style={{
                 position: "absolute",
                 inset: "0",
+                zIndex: 1,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: "white",
               }}
             >
-              <span style={{ color: "#999", fontSize: "14px" }}>
-                {currentObject.attributes.inventory_number}
-              </span>
+              <img
+                src={resolveImageSrc(currentObject.attributes.img_url!, THUMB_WIDTH)}
+                alt=""
+                aria-hidden="true"
+                className="max-h-full max-w-full object-contain"
+              />
             </div>
           )}
 
@@ -367,9 +394,10 @@ export default function ImageGallery({
               imgClassName="max-h-full max-w-full object-contain"
               imgStyle={{ backgroundColor: "white", margin: "0", padding: "0" }}
               wrapperStyle={{ backgroundColor: "white" }}
-             onError={() => setImageError(true)}
+             onError={handleImageError}
              onLoad={handleImageLoad}
              loading="eager"
+             width={LARGE_WIDTH}
                />
             </div>
           ) : (

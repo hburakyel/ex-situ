@@ -24,6 +24,7 @@ import { WIKIPEDIA_COLLECTION, ENABLE_WIKIPEDIA } from "@/components/faceted-fil
 import { protomapsDarkStyle } from "@/lib/protomaps-dark-style"
 import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
+import { resolveImageSrc } from "@/lib/image-src"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -1090,7 +1091,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             {selectedDoc.img_url && (
               <div className="w-full h-40  bg-blue-50 flex items-center justify-center overflow-hidden">
                 <img
-                  src={selectedDoc.img_url}
+                  src={resolveImageSrc(selectedDoc.img_url)}
                   alt={selectedDoc.title}
                   className="w-full h-full object-cover"
                   loading="lazy"

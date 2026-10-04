@@ -20,6 +20,7 @@ const ALLOWED_IMAGE_DOMAINS = new Set([
   "smb.museum-digital.de",
   "asset.museum-digital.org",
   "search.smb.museum",
+  "www.artic.edu",
 ])
 
 // Block private/internal IP ranges and hostnames to prevent SSRF
@@ -107,13 +108,20 @@ export async function GET(request: NextRequest) {
     const timeout = setTimeout(() => controller.abort(), 10_000)
     try {
       response = await fetch(url, {
-        next: { revalidate: 86400 },
+        // Not Next's fetch data cache: it serializes image bodies to disk as JSON
+        // and, under concurrent requests, reads back half-written entries
+        // ("Unexpected end of JSON input" → 500). imageCache above plus the
+        // immutable Cache-Control on our response already cover caching.
+        cache: "no-store",
         signal: controller.signal,
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; ExSitu/1.0; +https://ex-situ.eu)",
           "Accept": "image/webp,image/jpeg,image/*,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.5",
           "Referer": new URL(url).origin + "/",
+          // AIC's Cloudflare blocks IIIF image requests (even from real
+          // browsers) unless AIC's own identification header is set.
+          "AIC-User-Agent": "ExSitu (https://exsitu.app)",
         },
       })
     } finally {

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useUnifiedSearch, type ArcData } from "@/hooks/use-unified-search"
 import type { MuseumObject } from "@/types"
+import { resolveImageSrc } from "@/lib/image-src"
 
 interface SubArc {
   place_name: string
@@ -429,7 +430,7 @@ export default function ArcDetailClient({ params }: { params: Promise<{ slug: st
                   {obj.attributes.img_url ? (
                     <div className="mb-2">
                       <img
-                        src={obj.attributes.img_url}
+                        src={resolveImageSrc(obj.attributes.img_url)}
                         alt={obj.attributes.title || ""}
                         className="w-full h-40 object-contain bg-gray-50"
                         loading="lazy"

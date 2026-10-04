@@ -7,6 +7,7 @@ import { IconSearch, IconClose } from "@/components/icons"
 import { Input } from "@/components/ui/input"
 import type { ArcData, PlaceResult, CollectionResult } from "@/hooks/use-unified-search"
 import { COLLECTION_LABELS } from "@/hooks/use-unified-search"
+import { resolveImageSrc } from "@/lib/image-src"
 
 export interface UnifiedSearchBoxProps {
   /** Current search query */
@@ -149,7 +150,7 @@ export default function UnifiedSearchBox({
                   >
                     {arc.sample_img_url ? (
                       <img
-                        src={arc.sample_img_url}
+                        src={resolveImageSrc(arc.sample_img_url)}
                         alt={arc.place_name}
                         className="h-9 w-9 rounded-lg object-cover shrink-0 bg-gray-100"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -188,7 +189,7 @@ export default function UnifiedSearchBox({
                   >
                     {c.sampleImageUrl ? (
                       <img
-                        src={c.sampleImageUrl}
+                        src={resolveImageSrc(c.sampleImageUrl)}
                         alt={c.shortName}
                         className="h-9 w-9 rounded-lg object-cover shrink-0 bg-gray-100"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}

@@ -45,7 +45,7 @@ export const metadata = {
 mapped from origin site to holding institution.`,
   openGraph: {
     title: 'Ex Situ',
-    description: 'Explore the global spatial index of cultural heritage objects. Browse provenance arcs by country, institution, and collection on an interactive map.',
+    description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',
     url: 'https://exsitu.app',
     siteName: 'Ex Situ',
     type: 'website',
@@ -53,6 +53,6 @@ mapped from origin site to holding institution.`,
   twitter: {
     card: 'summary_large_image',
     title: 'Ex Situ',
-    description: 'Explore the global spatial index of cultural heritage objects. Browse provenance arcs by country, institution, and collection on an interactive map.',
+    description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',
   },
 };
