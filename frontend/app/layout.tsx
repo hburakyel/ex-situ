@@ -50,8 +50,10 @@ mapped from origin site to holding institution.`,
     siteName: 'Ex Situ',
     type: 'website',
   },
+  // Text-only link previews: no og:image by default. Pages with a real image
+  // (artifacts) declare their own large-image card.
   twitter: {
-    card: 'summary_large_image',
+    card: 'summary',
     title: 'Ex Situ',
     description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',
   },
