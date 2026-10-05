@@ -21,11 +21,14 @@ Coordinates (flag only — never invented or moved):
   at_museum        identical to the holding museum's coordinates
   Flagged rows get geocoding_status = 'ambiguous', a [place-audit] note and
   review_status = 'pending'. Rows with review_status = 'verified' are skipped.
+  With --clear-null-island, coordinates of exactly 0, 0 (a failed geocode, not a
+  place) are set to NULL so the objects stop drawing arcs from the ocean; the
+  note records it.
 
 Usage:
     python etl/audit_places.py report              # CSVs in etl/reports/, no DB writes
     python etl/audit_places.py apply --dry-run     # transaction + counts, rolled back
-    python etl/audit_places.py apply
+    python etl/audit_places.py apply [--clear-null-island]
 """
 
 import argparse
@@ -55,6 +58,7 @@ COUNTRY_ALIASES = {
     "north korea": "KP", "laos": "LA", "syria": "SY", "iran": "IR", "vietnam": "VN", "taiwan": "TW",
     "bolivia": "BO", "venezuela": "VE", "tanzania": "TZ", "moldova": "MD", "brunei": "BN",
     "netherlands": "NL", "the gambia": "GM", "czech republic": "CZ",
+    "people's republic of china": "CN", "palestinian territories": "PS",
 }
 # Territories GeoNames files separately that country_en records under the parent state.
 EXTRA_CODES = {
@@ -286,7 +290,7 @@ def run(args):
             if args.command == "report":
                 return
 
-            fixed = flagged = moved = 0
+            fixed = flagged = moved = cleared = 0
             for r in names:
                 cur.execute(
                     f"""
@@ -316,10 +320,24 @@ def run(args):
                       AND ROUND(COALESCE(manual_longitude, longitude)::numeric, 4) = %s
                     """,
                     (f"{NOTE_TAG} coordinates: {r['issue']}" + (f"; set to GeoNames match in {r['country_en']} "
-                     f"({r['fix_lat']}, {r['fix_lon']}); original latitude/longitude kept" if r["fix_lat"] != "" else "; not moved"),
+                     f"({r['fix_lat']}, {r['fix_lon']}); original latitude/longitude kept" if r["fix_lat"] != ""
+                     else "; were 0,0 (failed geocode), cleared to NULL" if r["issue"] == "null_island" and args.clear_null_island
+                     else "; not moved"),
                      r["country_en"] or None, r["museum"], r["place_name"] or None, r["lat"], r["lon"]),
                 )
                 flagged += cur.rowcount
+                if r["issue"] == "null_island" and args.clear_null_island:
+                    cur.execute(
+                        """
+                        UPDATE museum_objects SET latitude = NULL, longitude = NULL
+                        WHERE published_at IS NOT NULL AND COALESCE(review_status,'') <> 'verified'
+                          AND latitude = 0 AND longitude = 0 AND manual_latitude IS NULL
+                          AND country_en IS NOT DISTINCT FROM %s AND institution_name = %s
+                          AND place_name IS NOT DISTINCT FROM %s
+                        """,
+                        (r["country_en"] or None, r["museum"], r["place_name"] or None),
+                    )
+                    cleared += cur.rowcount
                 if r["fix_lat"] != "":
                     cur.execute(
                         """
@@ -335,7 +353,8 @@ def run(args):
                     )
                     moved += cur.rowcount
             print(f"\nLabels corrected on {fixed} rows; coordinate issues flagged on {flagged} rows, "
-                  f"of which {moved} got GeoNames coordinates in manual_latitude/longitude (originals kept).")
+                  f"of which {moved} got GeoNames coordinates in manual_latitude/longitude (originals kept)"
+                  + (f" and {cleared} had 0,0 cleared to NULL." if args.clear_null_island else "."))
             if args.dry_run:
                 conn.rollback()
                 print("Dry run — rolled back, nothing written.")
@@ -355,6 +374,7 @@ def main():
     sub.add_parser("report", help="write CSVs to etl/reports/, no DB writes")
     a = sub.add_parser("apply", help="correct wrong labels, flag coordinate issues")
     a.add_argument("--dry-run", action="store_true")
+    a.add_argument("--clear-null-island", action="store_true", help="set exactly-0,0 coordinates to NULL")
     run(parser.parse_args())
 
 
