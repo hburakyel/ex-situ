@@ -122,6 +122,9 @@ describe("disputedFlags", () => {
       "2 objects have an origin in a disputed or partially recognized territory (Turkish Republic of Northern Cyprus).",
     ])
   })
+  it("treats Palestine as a country like any other", () => {
+    expect(disputedFlags([row("Jerusalem", "Palestine", 4)])).toEqual([])
+  })
   it("returns nothing when no disputed origins are present", () => {
     expect(disputedFlags([row("Dodona", "Greece", 150)])).toEqual([])
   })

@@ -16,6 +16,8 @@ etl/
 ├── import_gazetteer.sh        # Loads a GeoNames extract into gazetteer_places
 ├── normalize_place_names.py   # Place name normalization + deduplication
 ├── fill_place_name_normalized.py # Fills remaining NULLs from city_en (map/MCP grouping)
+├── normalize_place_labels.py  # Clean display labels (strip/translate tags), flags for review
+├── audit_places.py            # Finds wrong labels (Lagos → Laos) and wrong-country coordinates
 ├── build_mcp_gazetteer.py     # GeoNames lookup for the MCP server's place precision
 └── requirements.txt           # Python dependencies
 ```
@@ -137,7 +139,21 @@ python fill_place_name_normalized.py            # dry run
 python fill_place_name_normalized.py --apply    # then restart Strapi to rebuild the map views
 ```
 
-It strips a trailing `", <country_en>"` from `city_en`, trims and collapses
+Finally, check the result against the raw source and GeoNames:
+
+```bash
+python audit_places.py report            # CSVs in reports/, no writes
+python audit_places.py apply --dry-run   # then: apply
+```
+
+It restores labels that name a different place than the raw `place_name`
+(an old fuzzy pass turned "Lagos" into "Laos", "Borno" into "Borneo") and flags
+coordinates outside the recorded country. Coordinates are only moved when the
+raw name has exactly one GeoNames match in that country, and then only into
+`manual_latitude`/`manual_longitude` — the original values are kept.
+`normalize_place_names.py` no longer fuzzy-matches unless run with `--fuzzy`.
+
+`fill_place_name_normalized.py` strips a trailing `", <country_en>"` from `city_en`, trims and collapses
 whitespace, and keeps casing; the map view groups case-insensitively. Curated
 values and `place_name` are never changed. The rules are shared with the MCP
 server (`frontend/lib/mcp/origins.ts`) through

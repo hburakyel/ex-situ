@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/toaster"
 import debounce from "lodash/debounce"
 import { useUnifiedSearch, type ArcData } from "@/hooks/use-unified-search"
 import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/command-palette"
+import { placeDisplayLabel } from "@/lib/place-label"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -522,10 +523,12 @@ function MapContent() {
     segments.push({ label: "Ex Situ", level: "global" })
     if (activeCountry) segments.push({ label: activeCountry, level: "country" })
     // Deduplication: if activeSite === activeCountry, skip site segment
-    if (activeSite && activeSite !== activeCountry) segments.push({ label: activeSite, level: "objects" })
+    if (activeSite && activeSite !== activeCountry) {
+      segments.push({ label: placeDisplayLabel(activeSite, groupedSites.map((s) => s.name)), level: "objects" })
+    }
     if (activeInstitution && !activeSite) segments.push({ label: activeInstitution, level: "objects" })
     return segments
-  }, [activeCountry, activeSite, activeInstitution])
+  }, [activeCountry, activeSite, activeInstitution, groupedSites])
 
   // ── Sync drill-down state → URL (shallow replace, no scroll) ──
   const isRestoringFromUrl = useRef(!!urlCountry)

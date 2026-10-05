@@ -1699,11 +1699,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       if (hasVector) {
         // Full-text search with prefix matching (term:*) and weighted ranking
         const tsQuery = cleanQuery.split(/\s+/).filter(Boolean).map(w => `${w}:*`).join(' & ');
+        // Matches raw and normalized text (search_vector) but returns the same
+        // place label the map's Sites list shows (place-group.js).
         const result = await db.raw(`
           SELECT
-            place_name,
+            mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) AS place_name,
             country_en,
-            city_en,
+            MIN(city_en)                               AS city_en,
             AVG(COALESCE(manual_latitude, latitude))  AS latitude,
             AVG(COALESCE(manual_longitude, longitude)) AS longitude,
             COUNT(*)                                   AS object_count,
@@ -1711,7 +1713,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           FROM museum_objects
           WHERE search_vector @@ to_tsquery('simple', :tsQuery)
             AND place_name IS NOT NULL
-          GROUP BY place_name, country_en, city_en
+          GROUP BY ${PLACE_GROUP_KEY}, country_en
           ORDER BY rank DESC, object_count DESC
           LIMIT :limit
         `, { tsQuery, limit: safeLimit });
@@ -1720,20 +1722,21 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         // Fallback: ILIKE on key columns before migration is applied
         const result = await db.raw(`
           SELECT
-            place_name,
+            mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) AS place_name,
             country_en,
-            city_en,
+            MIN(city_en)                               AS city_en,
             AVG(COALESCE(manual_latitude, latitude))  AS latitude,
             AVG(COALESCE(manual_longitude, longitude)) AS longitude,
             COUNT(*)                                   AS object_count
           FROM museum_objects
           WHERE (
             place_name ILIKE :pattern
+            OR place_name_normalized ILIKE :pattern
             OR country_en ILIKE :pattern
             OR city_en ILIKE :pattern
           )
             AND place_name IS NOT NULL
-          GROUP BY place_name, country_en, city_en
+          GROUP BY ${PLACE_GROUP_KEY}, country_en
           ORDER BY object_count DESC
           LIMIT :limit
         `, { pattern: `${cleanQuery}%`, limit: safeLimit });

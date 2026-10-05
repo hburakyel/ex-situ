@@ -25,6 +25,7 @@ import { protomapsDarkStyle } from "@/lib/protomaps-dark-style"
 import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
+import { placeDisplayLabels } from "@/lib/place-label"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -259,6 +260,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Old UI state
     const [showArcs, setShowArcs] = useState(true)
+    // Display-only labels: "Kano (State)" shows as "Kano" unless another site shares the name.
+    const siteLabels = useMemo(() => placeDisplayLabels(groupedSites.map((s) => s.name)), [groupedSites])
     const [showCollections, setShowCollections] = useState(true)
     const [showTime, setShowTime] = useState(true)
     const [hoveredArc, setHoveredArc] = useState<{
@@ -1241,7 +1244,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                         >
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="truncate max-w-[70%]">{site.name}</span>
+                              <span className="truncate max-w-[70%]">{siteLabels.get(site.name) ?? site.name}</span>
                             </TooltipTrigger>
                             <TooltipContent side="top">{site.name}</TooltipContent>
                           </Tooltip>

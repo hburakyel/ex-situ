@@ -134,7 +134,7 @@ const DISPUTED_TERRITORIES = new Set(
     "South Ossetia",
     "Transnistria",
     "Taiwan",
-    "Palestine",
+    // Palestine is treated as a country like any other (project decision, 2026-10-05).
   ].map(normalizePlaceName),
 )
 

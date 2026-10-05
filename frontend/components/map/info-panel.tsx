@@ -16,6 +16,7 @@ import type {
   InstitutionItem,
   FacetedFilters
 } from "./object-panel"
+import { placeDisplayLabels } from "@/lib/place-label"
 
 const PANEL_BOTTOM_FADE_STYLE = {
   background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
@@ -111,6 +112,8 @@ export default function InfoPanel({
 }: InfoPanelProps) {
   const [showOrigins, setShowOrigins] = React.useState(false)
   const [showSites, setShowSites] = React.useState(false)
+  // Display-only labels: "Kano (State)" shows as "Kano" unless another site shares the name.
+  const siteLabels = React.useMemo(() => placeDisplayLabels(groupedSites.map((s) => s.name)), [groupedSites])
   const [showTime, setShowTime] = React.useState(false)
   const [showCollections, setShowCollections] = React.useState(false)
 
@@ -268,7 +271,7 @@ export default function InfoPanel({
                             className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
-                            <span className="truncate max-w-[70%]" title={site.name}>{site.name}</span>
+                            <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
                             <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
                           </div>
                         ))}

@@ -7,7 +7,8 @@ Applies normalization in priority order per value:
   b. Language detection — if German, attempt lookup; fall through to fuzzy if unresolved
   c. Historical → modern mapping  (covered by lookup table in a single pass)
   d. Fuzzy deduplication via rapidfuzz token_sort_ratio ≥ 88 against existing
-     place_name_normalized values in the DB
+     place_name_normalized values in the DB — only with --fuzzy (it merged
+     different places, e.g. Lagos → Laos); run audit_places.py afterwards
   e. Descriptive phrase / stopword / length filter → sets normalized = NULL
 
 Usage:
@@ -504,6 +505,7 @@ def column_exists(cur: psycopg2.extensions.cursor, table: str, column: str) -> b
 def normalize(
     raw: str,
     existing_normalized: set[str],
+    fuzzy: bool = False,
 ) -> tuple[str | None, str]:
     """
     Normalise a single raw place_name.
@@ -531,7 +533,10 @@ def normalize(
     # Logging is intentionally omitted here to avoid noisy output on large datasets.
 
     # ── Step d: fuzzy deduplication against known normalised values ──────────
-    if HAS_RAPIDFUZZ and existing_normalized:
+    # Off by default: string similarity merged different places ("Lagos" → "Laos",
+    # "Borno" → "Borneo", "Delphi" → "Delhi", "Kinkaku-ji" → "Peru (Inca)").
+    # Check results with audit_places.py if you enable it with --fuzzy.
+    if fuzzy and HAS_RAPIDFUZZ and existing_normalized:
         best_score = 0
         best_match: str | None = None
         for candidate in existing_normalized:
@@ -555,6 +560,11 @@ def parse_args() -> argparse.Namespace:
             "Normalize place_name → place_name_normalized in museum_objects. "
             "Defaults to --dry-run (no DB writes)."
         )
+    )
+    p.add_argument(
+        "--fuzzy",
+        action="store_true",
+        help="also snap names to similar existing values (risky: can merge different places; run audit_places.py after)",
     )
     p.add_argument(
         "--apply",
@@ -648,7 +658,7 @@ def main() -> None:
             raw: str = row["place_name"]
             count: int = row["row_count"]
 
-            normalized, method = normalize(raw, existing_normalized)
+            normalized, method = normalize(raw, existing_normalized, fuzzy=args.fuzzy)
 
             needs_update = (
                 normalized is None  # descriptive filter OR null sentinel in lookup

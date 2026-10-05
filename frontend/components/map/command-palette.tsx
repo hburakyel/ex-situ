@@ -7,6 +7,7 @@ import { Spinner } from "@radix-ui/themes"
 import { useUnifiedSearch } from "@/hooks/use-unified-search"
 import { ERA_BUCKETS, eraToDateFilters, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import { fetchDecadeBucketCounts, type DateBucket, type DateBucketCounts } from "@/lib/api"
+import { placeDisplayLabels } from "@/lib/place-label"
 
 // ── Types ──
 
@@ -350,6 +351,13 @@ export default function V3CommandPalette({
     const siteNames = new Set(siteRows.map((s) => s.name.toLowerCase()))
     return searchSiteRows.filter((r) => !placeNames.has(r.name.toLowerCase()) && !siteNames.has(r.name.toLowerCase()))
   }, [search.hasQuery, searchPlaceRows, siteRows, searchSiteRows])
+
+  // Display-only labels: "Kano (State)" shows as "Kano" unless another row anywhere
+  // in the palette shares the name — sections are seen together, so one map for all.
+  const placeLabels = useMemo(
+    () => placeDisplayLabels([...placeRows, ...siteRows, ...flyToRows].map((r) => r.name)),
+    [placeRows, siteRows, flyToRows],
+  )
 
   // ── Auto-expand matching sections on search, collapse non-matching ──
   useEffect(() => {
@@ -702,7 +710,7 @@ export default function V3CommandPalette({
                         onMouseEnter={() => setSelectedIdx(fi)}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-blue-500" : "bg-blue-400"}`} />
-                        <span className="flex-1 text-sm truncate">{row.name}</span>
+                        <span className="flex-1 text-sm truncate" title={row.name}>{placeLabels.get(row.name) ?? row.name}</span>
                         <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
@@ -738,7 +746,7 @@ export default function V3CommandPalette({
                         onMouseEnter={() => setSelectedIdx(fi)}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-blue-500" : "bg-blue-400"}`} />
-                        <span className="flex-1 text-sm truncate">{row.name}</span>
+                        <span className="flex-1 text-sm truncate" title={row.name}>{placeLabels.get(row.name) ?? row.name}</span>
                         <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
@@ -984,7 +992,7 @@ export default function V3CommandPalette({
                           onClick={() => handleSelectFlyTo(row)}
                           onMouseEnter={() => setSelectedIdx(fi)}
                         >
-                          <span className="flex-1 text-sm truncate text-gray-500">{row.name}</span>
+                          <span className="flex-1 text-sm truncate text-gray-500" title={row.name}>{placeLabels.get(row.name) ?? row.name}</span>
                           <ArrowRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
                         </button>
                       )
