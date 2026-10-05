@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import type { MuseumObject } from "@/types"
+import { LARGE_WIDTH, resolveImageSrc } from "@/lib/image-src"
 
 import ArtifactRedirect from "./artifact-redirect"
 
@@ -106,7 +107,14 @@ export async function generateMetadata({
 	const title = buildArtifactTitle(artifact, id)
 	const description = buildArtifactDescription(artifact)
 	const canonicalUrl = `${SITE_URL}/artifact/${encodeURIComponent(id)}`
-	const imageUrl = artifact?.attributes.img_url?.trim()
+	// The object's own photo, at a size link previews can fetch (Met web-large
+	// instead of multi-MB originals, AIC through our proxy). No photo → the
+	// default orange image from app/opengraph-image.tsx.
+	const rawImage = artifact?.attributes.img_url?.trim()
+	const resolved = rawImage ? resolveImageSrc(rawImage, LARGE_WIDTH) : undefined
+	const objectImage = resolved ? (resolved.startsWith("/") ? `${SITE_URL}${resolved}` : resolved) : undefined
+	// A page-level openGraph replaces the inherited one, so the orange default must be named explicitly.
+	const imageUrl = objectImage ?? `${SITE_URL}/opengraph-image`
 
 	return {
 		title,
@@ -117,20 +125,17 @@ export async function generateMetadata({
 			description,
 			url: canonicalUrl,
 			type: "website",
-			images: imageUrl
-				? [
-						{
-							url: imageUrl,
-							alt: artifact?.attributes.title || artifact?.attributes.inventory_number || "Artifact image",
-						},
-					]
-				: undefined,
+			images: [
+				objectImage
+					? { url: objectImage, alt: artifact?.attributes.title || artifact?.attributes.inventory_number || "Artifact image" }
+					: { url: imageUrl, width: 1200, height: 630, alt: "Ex Situ" },
+			],
 		},
 		twitter: {
-			card: imageUrl ? "summary_large_image" : "summary",
+			card: "summary_large_image",
 			title,
 			description,
-			images: imageUrl ? [imageUrl] : undefined,
+			images: [imageUrl],
 		},
 	}
 }
