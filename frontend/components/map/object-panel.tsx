@@ -930,13 +930,10 @@ export default function ObjectPanel({
   }
 
   const getInventorySeriesPrefix = (inventoryNumber?: string | null) => {
-    const firstSegment = String(inventoryNumber || "")
-      .split("/")[0]
-      ?.trim()
+    // Series = leading letter prefix, e.g. "ÄM 2303" → "ÄM", "VÄGM 1997/117" → "VÄGM"
+    const prefix = String(inventoryNumber || "").trim().match(/^[^\d\s.,/-]+(?:\s+[^\d\s.,/-]+)*/u)?.[0]
 
-    if (!firstSegment) return null
-
-    return firstSegment || null
+    return prefix?.trim() || null
   }
 
   const escapeMarkdownCell = (value?: string | number | null) => String(value ?? "—")
@@ -1101,7 +1098,17 @@ export default function ObjectPanel({
           .filter((value): value is string => Boolean(value))
       )]
       const artifactSample = all.slice(0, 50)
-      const firstInstitutionalSource = all[0]?.attributes.source_link?.trim() || "—"
+      const sourceHosts = [...new Set(
+        all
+          .map((artifact) => {
+            try {
+              return new URL(artifact.attributes.source_link?.trim() || "").hostname
+            } catch {
+              return null
+            }
+          })
+          .filter((value): value is string => Boolean(value))
+      )]
       const originSiteRows = sortedSites.length > 0
         ? sortedSites.map(([_, data]) => (
             `| ${escapeMarkdownCell(data.displayName)} | ${formatCoordinate(data.lat)} | ${formatCoordinate(data.lng)} | ${data.count} |`
@@ -1140,7 +1147,7 @@ export default function ObjectPanel({
         `| Origin territory | ${escapeMarkdownCell(originTerritory)} |`,
         `| Origin site | ${escapeMarkdownCell(originSite)} |`,
         `| Holding institution | ${escapeMarkdownCell(institution)} |`,
-        `| artifacts indexed | ${total} |`,
+        `| Artifacts indexed | ${total} |`,
         `| Unique origin sites | ${sortedSites.length} |`,
         `| Inventory series | ${escapeMarkdownCell(inventorySeries.length > 0 ? inventorySeries.join(", ") : "—")} |`,
         `| Dates recorded | ${recordedDateCount} / ${total} |`,
@@ -1148,11 +1155,13 @@ export default function ObjectPanel({
         "",
         "## Origin Sites",
         "",
-        "| Place | Lat | Lon | artifacts |",
-        "|-------|-----|-----|---------|",
+        "| Place | Lat | Lon | Artifacts |",
+        "|-------|-----|-----|-----------|",
         ...originSiteRows,
         "",
-        "## artifacts (sample, first 50)",
+        total > artifactSample.length
+          ? `## Artifacts (sample, first ${artifactSample.length} of ${total})`
+          : `## Artifacts (all ${total})`,
         "",
         "| Inventory | Title | Origin | Date | Institution | Source |",
         "|-----------|-------|--------|------|-------------|--------|",
@@ -1161,14 +1170,14 @@ export default function ObjectPanel({
         "## Data Notes",
         "",
         `- Site precision: ${sitePrecision}`,
-        `- Date coverage: ${missingDatePct}% of artifacts have no date recorded`,
+        `- Date coverage: ${recordedDateCount} / ${total} dated (${missingDatePct}% undated)`,
         "",
         "## Source",
         "",
         "- Platform: https://exsitu.app",
-        "- API: https://exsitu.app/api/museum-artifacts/geospatial",
+        "- API: https://exsitu.app/api/museum-objects/geospatial",
         "- GitHub: https://github.com/hburakyel/ex-situ",
-        `- Institutional source: ${escapeMarkdownCell(firstInstitutionalSource)}`,
+        `- Institutional sources: ${escapeMarkdownCell(sourceHosts.length > 0 ? sourceHosts.join(", ") : "—")} (per-artifact links in the table above)`,
       ].filter((l) => l !== null).join("\n")
 
       triggerDownload(md, buildExportFilename("md", { includeSite: true }), "text/markdown")
