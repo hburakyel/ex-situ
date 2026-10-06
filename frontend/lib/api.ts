@@ -498,7 +498,7 @@ export async function fetchGeospatialData(
     params.append('institution', filters.institutions.join(','))
   }
   if (filters?.cities && filters.cities.length > 0) {
-    params.append('city', filters.cities.join(','))
+    params.append('city', filters.cities.join('|')) // site names contain commas
   }
   if (filters?.countries && filters.countries.length > 0) {
     params.append('country', filters.countries.join(','))
@@ -589,7 +589,7 @@ export async function fetchDateBucketCounts(
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const params = new URLSearchParams()
   if (filters?.institutions && filters.institutions.length > 0) params.append('institution', filters.institutions.join(','))
-  if (filters?.cities && filters.cities.length > 0) params.append('city', filters.cities.join(','))
+  if (filters?.cities && filters.cities.length > 0) params.append('city', filters.cities.join('|')) // site names contain commas
   if (filters?.countries && filters.countries.length > 0) params.append('country', filters.countries.join(','))
 
   const institutionsKey = filters?.institutions?.sort().join(',') || 'all'
@@ -619,7 +619,7 @@ export async function fetchDecadeBucketCounts(
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const params = new URLSearchParams({ century })
   if (filters?.institutions && filters.institutions.length > 0) params.append('institution', filters.institutions.join(','))
-  if (filters?.cities && filters.cities.length > 0) params.append('city', filters.cities.join(','))
+  if (filters?.cities && filters.cities.length > 0) params.append('city', filters.cities.join('|')) // site names contain commas
   if (filters?.countries && filters.countries.length > 0) params.append('country', filters.countries.join(','))
 
   const institutionsKey = filters?.institutions?.sort().join(',') || 'all'

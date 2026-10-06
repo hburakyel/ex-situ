@@ -105,6 +105,28 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
   },
 
   /**
+   * Filter by origin site, matching the same site name the map shows
+   * (place-group.js), case-insensitively. Multiple sites are separated by "|"
+   * — site names often contain commas ("Mortuary Temple of Sahure, North Side
+   * …, Abusir"), so the comma split above would cut them apart.
+   * @param {string} filterValue - one site, or several joined with "|"
+   * @param {string} bindingPrefix
+   * @param {string} [column] - SQL expression to compare (default: site key on museum_objects)
+   */
+  buildSiteFilter(filterValue, bindingPrefix, column = PLACE_GROUP_KEY) {
+    if (!filterValue) return { clause: '', bindings: {} };
+    const values = String(filterValue).split('|').map(v => v.trim()).filter(Boolean).slice(0, 50);
+    if (values.length === 0) return { clause: '', bindings: {} };
+    const bindings = {};
+    const placeholders = values.map((v, i) => {
+      const key = `${bindingPrefix}_${i}`;
+      bindings[key] = v;
+      return `LOWER(:${key})`;
+    });
+    return { clause: `AND ${column} IN (${placeholders.join(', ')}) `, bindings };
+  },
+
+  /**
    * Build parameterized SQL clause for the object-date time filter.
    * Two mutually exclusive modes:
    *  - filters.undated: matches only object_date_precision = 'unknown'
@@ -223,7 +245,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       // created) — Time uses overlap-FILTER per bucket since object_date
       // ranges can be wide and span multiple centuries. ──
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'db_inst');
-      const cityFilter = this.buildMultiValueFilter('city_en', filters.city, 'db_city');
+      const cityFilter = this.buildSiteFilter(filters.city, 'db_city');
       const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'db_country');
 
       const timeSelects = [
@@ -258,7 +280,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       // precision='exact'), so a plain GROUP BY is both correct and simpler
       // than the overlap-FILTER approach Time needs. ──
       const acqInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'acqy_inst');
-      const acqCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'acqy_city');
+      const acqCityFilter = this.buildSiteFilter(filters.city, 'acqy_city');
       const acqCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'acqy_country');
 
       const acqUndatedQuery = `
@@ -322,7 +344,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     // span whose count equals a bucket's whole count is provably its only
     // contributor — no per-bucket object-id fetch needed.
     const spanInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'span_inst');
-    const spanCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'span_city');
+    const spanCityFilter = this.buildSiteFilter(filters.city, 'span_city');
     const spanCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'span_country');
     const spansQuery = `
       SELECT object_date_earliest AS earliest, object_date_latest AS latest, COUNT(*)::integer AS count
@@ -366,7 +388,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
     const db = strapi.db.connection;
     const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'dec_inst');
-    const cityFilter = this.buildMultiValueFilter('city_en', filters.city, 'dec_city');
+    const cityFilter = this.buildSiteFilter(filters.city, 'dec_city');
     const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'dec_country');
 
     const selects = decades.map((bucket) => {
@@ -504,7 +526,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const lonFilter = hasManual ? '(manual_longitude IS NOT NULL OR longitude IS NOT NULL)' : 'longitude IS NOT NULL';
 
       const fallbackInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'fb_inst');
-      const fallbackCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'fb_city');
+      const fallbackCityFilter = this.buildSiteFilter(filters.city, 'fb_city');
       const fallbackCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'fb_country');
       const fallbackDateFilter = this.buildDateRangeFilter(filters, 'fb_date');
       const fallbackAcqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'fb_acq');
@@ -589,7 +611,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
       // Build filter clauses
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'cl_inst');
-      const cityFilter = this.buildMultiValueFilter('origin_city', filters.city, 'cl_city');
+      const cityFilter = this.buildSiteFilter(filters.city, 'cl_city', 'LOWER(origin_city)');
       const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'cl_country');
       const dateFilter = this.buildDateRangeFilter(filters, 'cl_date');
       const acqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'cl_acq');
@@ -634,7 +656,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         const lonFilter = hasManual ? '(manual_longitude IS NOT NULL OR longitude IS NOT NULL)' : 'longitude IS NOT NULL';
 
         const fbInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'cfb_inst');
-        const fbCityFilter = this.buildMultiValueFilter('city_en', filters.city, 'cfb_city');
+        const fbCityFilter = this.buildSiteFilter(filters.city, 'cfb_city');
         const fbCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'cfb_country');
         const fbDateFilter = this.buildDateRangeFilter(filters, 'cfb_date');
         const fbAcqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'cfb_acq');
@@ -752,7 +774,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
       // Build filter clauses (now supporting multi-select via comma-separated values)
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'io_inst');
-      const cityFilter = this.buildMultiValueFilter('city_en', filters.city, 'io_city');
+      const cityFilter = this.buildSiteFilter(filters.city, 'io_city');
       const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'io_country');
       const dateFilter = this.buildDateRangeFilter(filters, 'io_date');
       const acqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'io_acq');
@@ -915,8 +937,10 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       }
 
       if (site) {
-        whereClause += ` AND (city_en ILIKE :site OR COALESCE(place_name_normalized, place_name) ILIKE :site)`;
-        bindings.site = `%${site}%`;
+        // Same site name as the map's Sites list (place-group.js) — an exact,
+        // case-insensitive match, so "Kano" doesn't also pull in "Kano (City)".
+        whereClause += ` AND ${PLACE_GROUP_KEY} = LOWER(:site)`;
+        bindings.site = site;
       }
 
       if (institution) {

@@ -16,6 +16,7 @@ import debounce from "lodash/debounce"
 import { useUnifiedSearch, type ArcData } from "@/hooks/use-unified-search"
 import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/command-palette"
 import { placeDisplayLabel } from "@/lib/place-label"
+import { siteLabel } from "@/lib/site-label"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -167,7 +168,9 @@ function MapContent() {
 
         const artifact = data.data as MuseumObject
         const objectCountry = artifact.attributes.country_en || artifact.attributes.country || artifact.attributes.place_name || null
-        const objectSite = artifact.attributes.place_name_normalized || artifact.attributes.place_name || null
+        // Same site name as the Sites list / arcs (lib/site-label.ts), not the raw place_name.
+        const artifactSite = siteLabel(artifact.attributes)
+        const objectSite = artifactSite !== "Unknown" ? artifactSite : null
         const originLat = artifact.attributes.latitude
         const originLng = artifact.attributes.longitude
         const fallbackLat = artifact.attributes.institution_latitude
@@ -477,8 +480,9 @@ function MapContent() {
   const aggregateInstitutions = useMemo(() => {
     if (activeSite && filteredSubArcs.length > 0) {
       const map = new Map<string, number>()
+      const siteKey = normalizePlaceKey(activeSite)
       let source = filteredSubArcs
-        .filter((a) => a.place_name.toLowerCase() === activeSite.toLowerCase())
+        .filter((a) => normalizePlaceKey(a.place_name) === siteKey)
 
       if (activeInstitution) {
         source = source.filter((a) => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
@@ -695,7 +699,9 @@ function MapContent() {
     setSelectedArc(null)
     setActiveCountry(country)
     setActiveSite(null)
-    setActiveInstitution(null)
+    // Keep a collection chosen in the left panel: it stays in facetedFilters (arcs,
+    // chip, results), so it must stay in activeInstitution (URL, breadcrumb) too.
+    setActiveInstitution(facetedFilters.institutions.length === 1 ? facetedFilters.institutions[0] : null)
     setDrillLevel("country")
     drillLevelRef.current = "country"  // sync ref immediately
     debouncedGeocode.cancel()           // cancel any pending reverse-geocode
@@ -712,7 +718,7 @@ function MapContent() {
       setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 5 }))
       debouncedGeocode(targetLng, targetLat)
     }
-  }, [debouncedGeocode])
+  }, [debouncedGeocode, facetedFilters.institutions])
 
   const handleToggleSite = useCallback((site: string, lat?: number, lng?: number) => {
     const next = normalizePlaceKey(activeSite) === normalizePlaceKey(site) ? null : site
@@ -733,6 +739,7 @@ function MapContent() {
       const siteData = groupedSites.find(s => normalizePlaceKey(s.name) === normalizePlaceKey(next))
       if (siteData && !siteData.institutions.includes(activeInstitution)) {
         setActiveInstitution(null)
+        if (facetedFilters.institutions.length > 0) setFacetedFilters({ ...facetedFilters, institutions: [] })
       }
     }
     // Fly to site location
@@ -746,7 +753,7 @@ function MapContent() {
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setArcObjectsPage(1)
-  }, [activeSite, activeInstitution, groupedSites, activeCountry, debouncedGeocode])
+  }, [activeSite, activeInstitution, groupedSites, activeCountry, debouncedGeocode, facetedFilters])
 
   const handleToggleInstitution = useCallback((inst: string) => {
     const next = activeInstitution === inst ? null : inst
@@ -822,8 +829,13 @@ function MapContent() {
       (!!next.era && next.era.id !== facetedFilters.era?.id) ||
       (!!next.migrationEra && next.migrationEra.id !== facetedFilters.migrationEra?.id)
     if (addedFilter) setIsObjectContainerVisible(true)
+    // Removing the collection chip must also drop it from the URL / breadcrumb.
+    if (activeInstitution && !next.institutions.some((i) => normalizePlaceKey(i) === normalizePlaceKey(activeInstitution))
+        && facetedFilters.institutions.some((i) => normalizePlaceKey(i) === normalizePlaceKey(activeInstitution))) {
+      setActiveInstitution(null)
+    }
     setFacetedFilters(next)
-  }, [facetedFilters])
+  }, [facetedFilters, activeInstitution])
 
   const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
     if (level === "global") {
@@ -1061,7 +1073,8 @@ function MapContent() {
 
     if (object) {
       const objectCountry = object.attributes.country_en || object.attributes.country || object.attributes.place_name || null
-      const objectSite = object.attributes.place_name_normalized || object.attributes.place_name || null
+      const clickedSite = siteLabel(object.attributes)
+      const objectSite = clickedSite !== "Unknown" ? clickedSite : null
       const objectInstitution = object.attributes.institution_name || null
       const objectLat = object.attributes.latitude
       const objectLng = object.attributes.longitude

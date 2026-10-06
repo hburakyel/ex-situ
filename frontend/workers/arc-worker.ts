@@ -15,6 +15,20 @@
  *       It only uses the plain TS types copied here to stay self-contained.
  */
 
+// ── Site name (copy of lib/site-label.ts — keep in sync) ─────────────
+// Street-zoom objects carry the raw place_name; arcs must use the same site
+// name as the zoom 4–6 clusters / Sites list (backend place-group.js), or a
+// clicked arc selects a "site" nothing else matches (empty Collections list).
+function siteLabel(o: { place_name_normalized?: string | null; city_en?: string | null; country_en?: string | null; country?: string | null }): string {
+  const usable = (v?: string | null): v is string => typeof v === "string" && v.trim() !== "" && /^[\x00-\x7F]*$/.test(v)
+  const country = o.country_en ?? o.country ?? null
+  const city = usable(o.city_en) ? o.city_en.trim() : null
+  const normalized = usable(o.place_name_normalized) ? o.place_name_normalized.trim() : null
+  if (normalized && !(city && normalized.toLowerCase() === (country ?? "").toLowerCase())) return normalized
+  if (city) return city
+  return country && country.trim() !== "" ? country : "Unknown"
+}
+
 // ── Inline types (mirrors workers/arc-types.ts exactly) ─────────────
 // We duplicate instead of importing so the worker bundle stays standalone.
 
@@ -229,7 +243,7 @@ function processObjects(data: any[]): ProcessedArcsResult {
       arcGroups.set(key, {
         sourcePosition: [obj.longitude, obj.latitude],
         targetPosition: [obj.institution_longitude, obj.institution_latitude],
-        fromName: obj.place_name || "Unknown Origin",
+        fromName: siteLabel(obj),
         toName: obj.institution_name || obj.institution_place || "Unknown Destination",
         fromCity,
         fromCountry,
@@ -314,7 +328,7 @@ function processFallbackObjects(
       arcGroups.set(layerKey, {
         sourcePosition: [fromLng, fromLat],
         targetPosition: [toLng, toLat],
-        fromName: obj.place_name || "Unknown Origin",
+        fromName: siteLabel(obj),
         toName: obj.institution_place || obj.institution_name || "Unknown Destination",
         fromCity: obj.city_en || "",
         fromCountry: obj.country_en || "",
@@ -327,10 +341,11 @@ function processFallbackObjects(
     arcGroups.get(layerKey)!.count++
 
     if (obj.place_name) {
-      const cardKey = `${obj.place_name}-${obj.institution_place || obj.institution_name || "Unknown"}`
+      const site = siteLabel(obj)
+      const cardKey = `${site}-${obj.institution_place || obj.institution_name || "Unknown"}`
       if (!cardMap.has(cardKey)) {
         cardMap.set(cardKey, {
-          from: obj.place_name,
+          from: site,
           to: obj.institution_place || obj.institution_name || "Unknown",
           fromCity: obj.city_en || "",
           fromCountry: obj.country_en || "",
