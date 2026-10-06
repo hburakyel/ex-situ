@@ -1003,7 +1003,7 @@ export default function ObjectPanel({
     try {
       const all = await fetchAllForExport(hasTerritoryExportScope ? EXPORT_ROW_CAP : undefined)
       const headers = [
-        "id", "title", "inventory_number", "place_name", "time", "object_date", "acquisition_year",
+        "id", "inventory_number", "place_name", "time", "object_date", "acquisition_year",
         "city_en", "country_en",
         "institution_name", "institution_place", "institution_city_en",
         "longitude", "latitude", "institution_longitude", "institution_latitude",
@@ -1018,7 +1018,6 @@ export default function ObjectPanel({
         const esc = (v?: string | null) => `"${(v || "").replace(/"/g, '""')}"`
         return [
           obj.id,
-          esc(a.title),
           esc(a.inventory_number),
           esc(a.place_name),
           esc(getArtifactDate(obj)),
@@ -1119,14 +1118,13 @@ export default function ObjectPanel({
             const attrs = artifact.attributes
             return [
               escapeMarkdownCell(attrs.inventory_number || "—"),
-              escapeMarkdownCell(attrs.title || "—"),
               escapeMarkdownCell(getMostSpecificPlaceName(attrs.place_name || attrs.city_en || attrs.country_en || attrs.country || "—")),
               escapeMarkdownCell(hasRecordedArtifactDate(artifact) ? getArtifactDate(artifact) : "—"),
               escapeMarkdownCell(attrs.institution_name || "—"),
               escapeMarkdownCell(attrs.source_link || "—"),
             ].join(" | ")
           }).map((row) => `| ${row} |`)
-        : ["| — | — | — | — | — | — |"]
+        : ["| — | — | — | — | — |"]
 
       const md = [
         "---",
@@ -1163,8 +1161,8 @@ export default function ObjectPanel({
           ? `## Artifacts (sample, first ${artifactSample.length} of ${total})`
           : `## Artifacts (all ${total})`,
         "",
-        "| Inventory | Title | Origin | Date | Institution | Source |",
-        "|-----------|-------|--------|------|-------------|--------|",
+        "| Inventory | Origin | Date | Institution | Source |",
+        "|-----------|--------|------|-------------|--------|",
         ...artifactRows,
         "",
         "## Data Notes",
@@ -1199,7 +1197,6 @@ export default function ObjectPanel({
         }
         return {
           id: obj.id,
-          title: a.title,
           inventory_number: a.inventory_number,
           place_name: a.place_name,
           object_date: a.object_date || null,
