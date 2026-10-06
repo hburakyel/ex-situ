@@ -12,7 +12,8 @@
     "strapi": "strapi",
     "delete-entries": "node ./scripts/deleteAllEntries.js",
     "publish-entries": "node ./scripts/publishAllEntries.js",
-    "setup-postgis": "node ./scripts/setupPostGIS.js"
+    "setup-postgis": "node ./scripts/setupPostGIS.js",
+    "test": "node --test tests/"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",

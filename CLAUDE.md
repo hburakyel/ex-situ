@@ -23,6 +23,7 @@ cd frontend && pnpm dev          # :3000
 cd frontend && pnpm test         # vitest
 cd frontend && pnpm build        # also the CI check
 cd backend && npm run develop    # :1337
+cd backend && npm test           # node:test, no DB needed
 ```
 
 Live integration tests against production:

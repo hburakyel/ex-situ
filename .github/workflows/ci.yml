@@ -51,6 +51,10 @@ jobs:
         working-directory: backend
         run: npm ci --omit=dev
 
+      - name: Test
+        working-directory: backend
+        run: npm test
+
       - name: Audit
         working-directory: backend
         run: npm audit --audit-level=high || true
