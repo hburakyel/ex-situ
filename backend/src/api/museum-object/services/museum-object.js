@@ -603,11 +603,16 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
    */
   async getClusteredData(db, zoom, bbox, filters = {}) {
     try {
-      // Default bbox if not provided (global view)
-      const minLat = Number(bbox?.minLat) || -90;
-      const maxLat = Number(bbox?.maxLat) || 90;
-      const minLon = Number(bbox?.minLon) || -180;
-      const maxLon = Number(bbox?.maxLon) || 180;
+      // Default bbox if not provided (global view). 0 is a valid edge (equator,
+      // prime meridian), so only missing/non-numeric values fall back.
+      const coord = (value, fallback) => {
+        const n = value === null || value === undefined || value === '' ? NaN : Number(value);
+        return Number.isFinite(n) ? n : fallback;
+      };
+      const minLat = coord(bbox?.minLat, -90);
+      const maxLat = coord(bbox?.maxLat, 90);
+      const minLon = coord(bbox?.minLon, -180);
+      const maxLon = coord(bbox?.maxLon, 180);
 
       // Build filter clauses
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'cl_inst');

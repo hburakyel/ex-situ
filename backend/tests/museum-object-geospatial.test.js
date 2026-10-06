@@ -214,6 +214,13 @@ test('getClusteredData: missing bbox defaults to the whole world', async () => {
   assert.deepEqual(db.calls[0].bindings, { minLat: -90, maxLat: 90, minLon: -180, maxLon: 180 });
 });
 
+test('getClusteredData: 0 is a real bbox edge, not "missing"', async () => {
+  const db = makeDb({ mviews: ['mv_city_institution_stats'] });
+  const s = withDb(makeService(), db);
+  await s.getClusteredData(db, 5, { minLat: 0, maxLat: 10, minLon: '0', maxLon: 'x' }, {});
+  assert.deepEqual(db.calls[0].bindings, { minLat: 0, maxLat: 10, minLon: 0, maxLon: 180 });
+});
+
 test('getClusteredData: maps rows and keeps place_variants only when an array', async () => {
   const db = makeDb({
     mviews: ['mv_city_institution_stats'],
