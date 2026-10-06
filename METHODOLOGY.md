@@ -28,7 +28,7 @@ Object dates come from source institutions, shown at whatever precision they pro
 
 ## Geocoding
 
-Place names are resolved to coordinates through a lookup table of known variants, then fuzzy string matching as a last resort. Historical or ambiguous place names sometimes resolve imprecisely — corrections happen as they're found, not systematically.
+Place names are resolved to coordinates through a lookup table of known variants and a gazetteer. Fuzzy string matching is off by default and only used when explicitly enabled, because it produced false matches (Lagos → Laos, Delphi → Delhi); ambiguous places are flagged rather than guessed. Historical or ambiguous place names sometimes resolve imprecisely — corrections happen as they're found, not systematically.
 
 ## Titles
 

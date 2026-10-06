@@ -13,7 +13,7 @@
 
 ---
 
-**Status:** Actively developed. Started as an MA thesis in 2022, now indexing 145,000+ artifacts across 9 collections.
+**Status:** Actively developed. Started as an MA thesis in 2022, now indexing 180,000+ artifacts across 9 collections.
 
 ---
 
@@ -52,7 +52,7 @@ The map renders arcs at three zoom levels:
 | Backend | Strapi v4, Node.js |
 | Database | PostgreSQL 16 + PostGIS |
 | Maps | Protomaps (PMTiles) |
-| ETL | Python — geocoding, normalization, fuzzy matching |
+| ETL | Python — geocoding, normalization (fuzzy matching opt-in) |
 | Hosting | Hetzner (self-hosted) |
 
 ---
