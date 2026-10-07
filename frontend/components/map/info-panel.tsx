@@ -26,6 +26,24 @@ const PANEL_TOP_FADE_STYLE = {
   background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
 }
 
+const formatCount = (n: number) => n.toLocaleString("en-US")
+
+// Mobile drill-down section header (Places / Sites / Time / Collections): the whole
+// 44px row toggles, not just the chevron.
+function SectionToggle({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="flex w-full min-h-11 items-center justify-between text-left"
+      onClick={onToggle}
+      aria-expanded={open}
+    >
+      <span className="panel-text-muted">{children}</span>
+      {open ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+    </button>
+  )
+}
+
 function FadedAccordionList({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative">
@@ -187,7 +205,7 @@ export default function InfoPanel({
                 {!(totalCount === 0 && isLoading) && (
                   <>
                     <span className="inline-block whitespace-nowrap">
-                      <span className="text-black font-medium">{totalCount}</span>
+                      <span className="text-black font-medium">{formatCount(totalCount)}</span>
                       <span className="ml-1">artifact{totalCount !== 1 ? "s" : ""}</span>
                     </span>
                     <span>
@@ -201,7 +219,7 @@ export default function InfoPanel({
                   </>
                 )}
               </div>
-              {displayName && (
+              {displayName && !isMobile && (
                 <div className="truncate text-sm text-black leading-normal mt-0.5">
                   {displayName}
                 </div>
@@ -224,25 +242,18 @@ export default function InfoPanel({
               {/* Places (global) */}
               {drillLevel === "global" && groupedOrigins.length > 0 && (
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="panel-text-muted">
-                      Places
-                      {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                      onClick={() => setShowOrigins(!showOrigins)}
-                    >
-                      {showOrigins ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                    </Button>
-                  </div>
+                  <SectionToggle open={showOrigins} onToggle={() => setShowOrigins(!showOrigins)}>
+                    Places
+                    {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
+                  </SectionToggle>
                   {showOrigins && (
                     <FadedAccordionList>
                         {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{formatCount(origin.totalCount)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>
@@ -253,26 +264,19 @@ export default function InfoPanel({
               {/* Sites (country) */}
               {drillLevel !== "global" && groupedSites.length > 0 && (
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="panel-text-muted">
-                      Sites
-                      {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                      onClick={() => setShowSites(!showSites)}
-                    >
-                      {showSites ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                    </Button>
-                  </div>
+                  <SectionToggle open={showSites} onToggle={() => setShowSites(!showSites)}>
+                    Sites
+                    {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
+                  </SectionToggle>
                   {showSites && (
                     <FadedAccordionList>
                         {groupedSites.map((site, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{formatCount(site.totalCount)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>
@@ -283,16 +287,9 @@ export default function InfoPanel({
               {/* Time — shown at all drill levels */}
               {dateBuckets && (
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="panel-text-muted">
-                      Time
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                      onClick={() => setShowTime(!showTime)}
-                    >
-                      {showTime ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                    </Button>
-                  </div>
+                  <SectionToggle open={showTime} onToggle={() => setShowTime(!showTime)}>
+                    Time
+                  </SectionToggle>
                   {showTime && (
                     <FadedAccordionList>
                         {collapseContiguousBuckets(
@@ -303,11 +300,11 @@ export default function InfoPanel({
                           .filter((row) => row.count > 0)
                           .map((row) => (
                             <div key={row.id}
-                              className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
+                              className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
                               onClick={() => onToggleEra?.(row.era)}
                             >
                               <span className="truncate max-w-[70%]" title={row.label}>{row.label}</span>
-                              <span className="ml-2 text-gray-400 text-sm">{row.count}</span>
+                              <span className="ml-2 text-gray-400 text-sm">{formatCount(row.count)}</span>
                             </div>
                           ))}
                     </FadedAccordionList>
@@ -318,25 +315,18 @@ export default function InfoPanel({
               {/* Institutions — shown at all zoom levels */}
               {drillInstitutions.length > 0 && (
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="panel-text-muted">
-                      Collections
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                      onClick={() => setShowCollections(!showCollections)}
-                    >
-                      {showCollections ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                    </Button>
-                  </div>
+                  <SectionToggle open={showCollections} onToggle={() => setShowCollections(!showCollections)}>
+                    Collections
+                  </SectionToggle>
                   {showCollections && (
                     <FadedAccordionList>
                         {drillInstitutions.map((inst, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleInstitution?.(inst.name)}
                           >
                             <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{formatCount(inst.count)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>

@@ -659,7 +659,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       if (showControls) {
         mapInstance.addControl(new GlobeViewControl(), controlPosition)
         mapInstance.addControl(new InfoControl(), controlPosition)
-        mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), controlPosition)
+        // Phones pinch to zoom; the +/− buttons only take map space there.
+        if (!mobileNow) mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), controlPosition)
       }
 
       window.addEventListener("resize", handleResize)

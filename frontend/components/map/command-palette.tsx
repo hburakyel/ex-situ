@@ -337,12 +337,16 @@ export default function V3CommandPalette({
 
   // ── Active rows: search results when querying, full dataset otherwise ──
   const placeRows = search.hasQuery ? searchPlaceRows : allPlaceRows
-  // Sites always come from real arc data; when searching, filter to matching names
+  // Sites always come from real arc data; when searching, filter to matching names.
+  // A name already listed under Places isn't repeated here — one result, one row.
   const siteRows = useMemo(() => {
-    if (!search.hasQuery) return allSiteRows
-    const query = search.searchQuery.toLowerCase()
-    return allSiteRows.filter((s) => s.name.toLowerCase().includes(query))
-  }, [search.hasQuery, search.searchQuery, allSiteRows])
+    const placeNames = new Set(placeRows.map((p) => p.name.toLowerCase()))
+    const query = search.hasQuery ? search.searchQuery.toLowerCase() : ""
+    return allSiteRows.filter((s) => {
+      const name = s.name.toLowerCase()
+      return !placeNames.has(name) && (!query || name.includes(query))
+    })
+  }, [search.hasQuery, search.searchQuery, allSiteRows, placeRows])
   const collectionRows = search.hasQuery ? searchCollectionRows : allCollectionRows
   // Fly-to rows: geocoded results that don't match places or sites — only shown when typing
   const flyToRows = useMemo(() => {
@@ -534,7 +538,7 @@ export default function V3CommandPalette({
       <div className="fixed inset-0 z-[80] bg-black/25 backdrop-blur-[2px]" onClick={() => onOpenChange(false)} />
 
       {/* Palette */}
-      <div className="fixed inset-0 z-[80] flex items-start justify-center pt-[15vh] pointer-events-none">
+      <div className="fixed inset-0 z-[80] flex items-start justify-center pt-2 md:pt-[15vh] pointer-events-none">
         <div
           className="w-full max-w-lg bg-white rounded-[20px] shadow-2xl border border-gray-200 overflow-hidden pointer-events-auto"
           onKeyDown={handleKeyDown}
@@ -974,10 +978,10 @@ export default function V3CommandPalette({
                     )
                   })}
 
-                {/* ── Fly-to rows (headerless, only when searching) ── */}
+                {/* ── Fly-to rows: map locations outside the data (only when searching) ── */}
                 {hasQuery && flyToRows.length > 0 && (
                   <>
-                    <div className="px-4 py-1 border-t border-gray-100" />
+                    <div className="px-4 pt-3 pb-1 mt-1 border-t border-gray-100 text-sm font-medium text-gray-500">Go to</div>
                     {flyToRows.map((row, i) => {
                       const fi = flatIndexOf("flyto", i)
                       return (

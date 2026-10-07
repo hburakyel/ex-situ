@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons"
 import { IconSource, IconClose } from "@/components/icons"
+import { displayObjectDate } from "@/lib/object-date"
 import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
@@ -313,17 +314,22 @@ export default function ImageGallery({
               const at = currentObject.attributes
               const from = at.place_name_normalized || at.place_name
               const to = at.institution_city_en || INSTITUTION_CITIES[at.institution_name || ""] || at.institution_place
-              const time = at.object_date?.trim()
+              const time = displayObjectDate(at.object_date)
               const items: [string, string][] = []
               if (from) items.push(["From", from])
               if (to) items.push(["To", to])
               if (time) items.push(["Time", time])
               if (at.institution_name) items.push(["Collection", at.institution_name])
+              // Pairs are separated by a real space (a break point) and each label is held
+              // to its value; short pairs ("To: Berlin", "Time: 1–600 CE") never split.
               return items.map(([label, value], i) => (
-                <span key={label} className={i > 0 ? "ml-2" : undefined}>
-                  <span className="text-[#666]">{label}: </span>
-                  {value}
-                </span>
+                <React.Fragment key={label}>
+                  {i > 0 && " "}
+                  <span className={label === "To" || label === "Time" ? "whitespace-nowrap" : undefined}>
+                    <span className="text-[#666]">{label}:{"\u00a0"}</span>
+                    {value}
+                  </span>
+                </React.Fragment>
               ))
             })()}
           </span>
