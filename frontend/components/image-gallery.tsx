@@ -50,6 +50,16 @@ export default function ImageGallery({
 
   const currentObject = galleryObjects.length > 0 ? galleryObjects[currentIndex] : null
 
+  // Preload the neighbours' full-size images so next/previous swap instantly.
+  useEffect(() => {
+    const n = galleryObjects.length
+    if (n < 2) return
+    for (const step of [1, -1, 2]) {
+      const url = galleryObjects[(currentIndex + step + n) % n]?.attributes?.img_url
+      if (hasImageUrl(url)) new window.Image().src = resolveImageSrc(url!, LARGE_WIDTH)
+    }
+  }, [galleryObjects, currentIndex])
+
   // Reset image/loading state synchronously during render (not in an effect) so the
   // browser never paints a stale frame — e.g. the previous object's "no image" fallback
   // flashing before the new object's image is known to exist.
@@ -325,7 +335,9 @@ export default function ImageGallery({
               return items.map(([label, value], i) => (
                 <React.Fragment key={label}>
                   {i > 0 && " "}
-                  <span className={label === "To" || label === "Time" ? "whitespace-nowrap" : undefined}>
+                  {/* Short To/Time values stay on one line; long ones ("Qajar dynasty (1796–1925),
+                      dated …") wrap inside the frame instead of running off it. */}
+                  <span className={(label === "To" || label === "Time") && value.length <= 24 ? "whitespace-nowrap" : "break-words"}>
                     <span className="text-[#666]">{label}:{"\u00a0"}</span>
                     {value}
                   </span>
@@ -409,6 +421,7 @@ export default function ImageGallery({
              onLoad={handleImageLoad}
              loading="eager"
              width={LARGE_WIDTH}
+             fadeIn={false}
                />
             </div>
           ) : (

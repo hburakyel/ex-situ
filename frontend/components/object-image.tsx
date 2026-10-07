@@ -20,6 +20,9 @@ interface ObjectImageProps {
   fallbackText?: string
   /** Target width for proxied images (see resolveImageSrc). Use LARGE_WIDTH for full-size views. */
   width?: number
+  /** Fade the image in once loaded (grid). Off in the gallery, where stepping through
+      images should swap instantly instead of flashing white. */
+  fadeIn?: boolean
 }
 
 export default function ObjectImage({
@@ -35,6 +38,7 @@ export default function ObjectImage({
   fallbackSrc,
   fallbackText,
   width = THUMB_WIDTH,
+  fadeIn = true,
 }: ObjectImageProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
@@ -65,7 +69,8 @@ export default function ObjectImage({
         loading={loading}
         decoding="async"
         className={cn(
-          "relative block transition-opacity duration-500 ease-out",
+          "relative block",
+          fadeIn && "transition-opacity duration-500 ease-out",
           imgClassName,
           isLoaded ? "opacity-100" : "opacity-0",
         )}
