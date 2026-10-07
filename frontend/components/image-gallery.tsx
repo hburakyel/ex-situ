@@ -118,13 +118,8 @@ export default function ImageGallery({
     setIsLoading(false)
   }
 
+  // Image didn't load: show the inventory number in its place (same as the grid tile).
   const handleImageError = () => {
-    const n = galleryObjects.length
-    if (n > 1 && skippedRef.current < n - 1) {
-      skippedRef.current += 1
-      setCurrentIndex((prev) => (prev + directionRef.current + n) % n)
-      return
-    }
     setImageError(true)
   }
 
@@ -392,11 +387,8 @@ export default function ImageGallery({
                 backgroundColor: "white", // Added white background
               }}
             >
-              <span
-                className={isWithdrawn(currentObject) ? "font-mono text-sm text-[#111]" : undefined}
-                style={isWithdrawn(currentObject) ? undefined : { color: "#999", fontSize: "14px" }}
-              >
-                {currentObject.attributes.inventory_number || "No image available"}
+              <span className="font-mono text-sm text-[#111]">
+                {currentObject.attributes.inventory_number || "—"}
               </span>
             </div>
           )}

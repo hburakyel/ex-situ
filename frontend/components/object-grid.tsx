@@ -12,10 +12,11 @@ import { isWithdrawn } from "@/lib/withdrawn"
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 
 
-// A tile is only ever shown once its image has actually loaded — objects with
-// no image, or whose image fails, are left out of the grid entirely rather than
-// rendered as an empty/placeholder tile. Images are preloaded in list order and
-// revealed as a contiguous prefix, so tiles never shift once on screen.
+// A tile shows the object's image once it has actually loaded. Objects with no
+// image, a failing image, an unreachable image server, or a withdrawn record show
+// their inventory number instead (same tile, no image), so the grid always matches
+// the artifact count. Images are preloaded in list order and revealed as a
+// contiguous prefix, so tiles never shift once on screen.
 const PRELOAD_CONCURRENCY = 8
 const PRELOAD_LOOKAHEAD = 24
 const PRELOAD_TIMEOUT_MS = 8000
@@ -122,7 +123,7 @@ export default function ObjectGrid({
   const tileHeight = columnsOverride ? (columnsOverride <= 1 ? 320 : columnsOverride >= 5 ? 112 : 176) : null
 
   const imageObjects = useMemo(() => {
-    return objects.filter((object) => isWithdrawn(object) || hasImageUrl(object.attributes?.img_url))
+    return objects
   }, [objects])
 
   const markImage = useCallback((id: string, status: ImageStatus) => {
@@ -134,9 +135,10 @@ export default function ObjectGrid({
     const revealed: MuseumObject[] = []
     let frontier = imageObjects.length
     for (let i = 0; i < imageObjects.length; i++) {
-      const status = isWithdrawn(imageObjects[i]) ? "ok" : imageStatus[imageObjects[i].id]
-      if (status === "ok") revealed.push(imageObjects[i])
-      else if (status === undefined) {
+      const o = imageObjects[i]
+      const status = isWithdrawn(o) || !hasImageUrl(o.attributes?.img_url) ? "failed" : imageStatus[o.id]
+      if (status !== undefined) revealed.push(o) // "ok" → image tile, "failed" → inventory-number tile
+      else {
         frontier = i
         break
       }
@@ -151,7 +153,7 @@ export default function ObjectGrid({
     const end = Math.min(imageObjects.length, frontier + PRELOAD_LOOKAHEAD)
     for (let i = frontier; i < end && inflight.size < PRELOAD_CONCURRENCY; i++) {
       const object = imageObjects[i]
-      if (isWithdrawn(object) || imageStatus[object.id] || inflight.has(object.id)) continue
+      if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStatus[object.id] || inflight.has(object.id)) continue
       if (isSlowHost(object.attributes.img_url!)) {
         markImage(object.id, "failed")
         continue
@@ -192,9 +194,8 @@ export default function ObjectGrid({
       .some((o) => imageStatus[o.id] === "ok")
     const wait = startedAt + SLOW_SKIP_MS - Date.now()
     if (laterLoaded && wait <= 0) {
-      img.onload = null
-      img.onerror = null
-      img.src = ""
+      // Show its inventory number for now, but keep loading: if the image still
+      // arrives, it replaces the number in the same tile (no layout shift).
       inflightRef.current.delete(object.id)
       inflightStartRef.current.delete(object.id)
       addSlowHostStrike(object.attributes.img_url!)
@@ -343,8 +344,16 @@ export default function ObjectGrid({
       </div>
     ) : revealed.length === 0 ? (
       <div className={`flex flex-col justify-center items-center text-center ${header ? "py-16" : "h-full"}`}>
-        <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
-        <p className="text-xs text-gray-500">Try zooming out or panning to a different location on the map.</p>
+        {objects.length > 0 ? (
+          // There are artifacts here, but none has an image that loads (no image,
+          // or the museum's image server isn't answering) — don't claim there are none.
+          <p className="text-sm text-gray-500">No images available for {objects.length === 1 ? "this artifact" : "these artifacts"}.</p>
+        ) : (
+          <>
+            <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
+            <p className="text-xs text-gray-500">Try zooming out or panning to a different location on the map.</p>
+          </>
+        )}
       </div>
     ) : null
 
@@ -361,9 +370,9 @@ return (
       {visibleObjects.map((object, index) => {
         const isSelected = object.id === selectedImageId
 
-if (isWithdrawn(object)) {
-  // Same tile as an image, but empty: only the inventory number (no image is shown
-  // for records the museum withdrew). Opens the gallery like any other tile.
+if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStatus[object.id] === "failed") {
+  // Same tile as an image, but empty: only the inventory number. Opens the gallery
+  // like any other tile.
   return (
     <div
       key={object.id}
@@ -387,7 +396,7 @@ if (isWithdrawn(object)) {
         ].join(" ")}
       >
         <span className="font-mono text-sm text-[#111] text-center line-clamp-3 leading-tight">
-          {object.attributes.inventory_number}
+          {object.attributes.inventory_number || "—"}
         </span>
       </div>
     </div>

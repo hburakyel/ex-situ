@@ -21,14 +21,12 @@ import {
 import ObjectGrid from "@/components/object-grid"
 import ObjectImage from "@/components/object-image"
 import type { MuseumObject } from "@/types"
-import { isWithdrawn } from "@/lib/withdrawn"
 import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
 import type { EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 
-const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const EXPORT_ROW_CAP = 5000
 const EXPORT_TOOLTIP = "Select a place or artifact to export."
 const exportCountFormatter = new Intl.NumberFormat("en-US")
@@ -228,9 +226,9 @@ export default function ObjectPanel({
     ? `${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)}`
     : undefined
 
-  // The gallery steps through the same objects as the grid: those with an image,
-  // plus withdrawn records (shown with their inventory number instead).
-  const galleryObjects = useMemo(() => objects.filter((o) => isWithdrawn(o) || hasImageUrl(o.attributes?.img_url)), [objects])
+  // The gallery steps through the same objects as the grid — all of them; objects
+  // without a loadable image show their inventory number instead.
+  const galleryObjects = objects
 
   // ── Mobile bottom-sheet drag-to-resize ──
   const containerSizeRef = useRef<ContainerSize>(containerSize)
