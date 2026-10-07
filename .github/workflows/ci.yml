@@ -58,3 +58,69 @@ jobs:
       - name: Audit
         working-directory: backend
         run: npm audit --audit-level=high || true
+
+  # ── Deploy (push to main only, after both checks pass) ──
+  # Off until the repository variable DEPLOY_ENABLED is "true" (see docs/DEPLOY.md).
+  changes:
+    name: Detect database changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      db: ${{ steps.diff.outputs.db }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        name: Check for schema / migration changes
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+          else
+            files=$(git show --name-only --format= "$GITHUB_SHA")
+          fi
+          # Strapi alters tables from content-type/component schemas on start (a removed
+          # field can drop its column); SQL migrations are run by hand.
+          db=$(grep -E '^backend/(database/|src/api/[^/]+/content-types/|src/components/|config/database)' <<<"$files" || true)
+          if [ -n "$db" ]; then
+            echo "db=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Database-related changes: deploy waits for approval"
+              echo
+              echo "Run any new SQL migrations on the server first, then approve the deploy."
+              echo "A database backup is taken automatically before the backend restarts."
+              echo
+              echo '```'
+              echo "$db"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "db=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy
+    needs: [frontend, backend, changes]
+    runs-on: ubuntu-latest
+    # production-db has a required reviewer, so database-related pushes pause here.
+    environment: ${{ needs.changes.outputs.db == 'true' && 'production-db' || 'production' }}
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The key's forced command on the server only accepts "deploy <sha>".
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 "root@$DEPLOY_HOST" "deploy $GITHUB_SHA"

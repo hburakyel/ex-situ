@@ -19,6 +19,9 @@ const contentSecurityPolicy = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The deploy script builds into a separate directory and swaps it in, so the
+  // running site keeps serving the previous build until the new one is complete.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   webpack: (config, { isServer }) => {
     // Add fallbacks for node modules
     config.resolve.fallback = {
