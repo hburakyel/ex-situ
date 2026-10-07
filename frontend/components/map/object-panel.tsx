@@ -221,8 +221,14 @@ export default function ObjectPanel({
   const prefersReducedMotion = useRef(false)
   const [liveHeight, setLiveHeight] = useState<number | null>(null)
 
+  // No size animation right after mount: on mobile the page switches the sheet to
+  // "expanded" on first load, which otherwise plays as the sheet growing into place.
+  const [sheetAnimated, setSheetAnimated] = useState(false)
+
   useEffect(() => {
     prefersReducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const id = window.setTimeout(() => setSheetAnimated(true), 500)
+    return () => window.clearTimeout(id)
   }, [])
 
   // Keep containerSizeRef in sync
@@ -737,7 +743,7 @@ export default function ObjectPanel({
       const shadow = "0 -2px 20px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07)"
       // iOS-style spring: fast start, soft settle. 350ms feels natural without being heavy.
       const ease = "cubic-bezier(0.32,0.72,0,1)"
-      const transition = prefersReducedMotion.current
+      const transition = prefersReducedMotion.current || !sheetAnimated
         ? "none"
         : `height 0.35s ${ease}, border-radius 0.30s ${ease}, left 0.30s ${ease}, right 0.30s ${ease}, bottom 0.30s ${ease}`
       // Respect iPhone home indicator / notch
