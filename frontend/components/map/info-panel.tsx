@@ -201,13 +201,12 @@ export default function InfoPanel({
                     {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </>
                 )}
-                {displayName && (
-                  <span className="text-black">
-                    {!(totalCount === 0 && isLoading) && " · "}
-                    {displayName}
-                  </span>
-                )}
               </div>
+              {displayName && (
+                <div className="truncate text-sm text-black leading-normal mt-0.5">
+                  {displayName}
+                </div>
+              )}
             </div>
             {actionSlot && (
               <div className="flex-shrink-0">{actionSlot}</div>

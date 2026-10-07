@@ -196,14 +196,16 @@ export default function ObjectPanel({
       if (saved === 1 || saved === 3 || saved === 5) setGridColumns(saved)
     } catch {}
   }, [])
+  // Mobile toggles 3 ↔ 1, desktop full-screen toggles 3 ↔ 5. A saved value from the
+  // other context is ignored (null = the responsive default, shown as 3).
+  const gridOptions = isMobile ? [3, 1] : [3, 5]
+  const activeGridColumns = gridColumns !== null && gridOptions.includes(gridColumns) ? gridColumns : null
   const cycleGridColumns = useCallback(() => {
-    // From the responsive default (2 per row on phones, more on wide panels) the
-    // first tap goes to 3; after that 3 → 5 → 1 → 3.
-    const order = [3, 5, 1]
-    const next = gridColumns === null ? 3 : order[(order.indexOf(gridColumns) + 1) % order.length]
+    const cur = activeGridColumns ?? 3
+    const next = gridOptions.find((n) => n !== cur) ?? 3
     setGridColumns(next)
     try { localStorage.setItem("exsitu:grid-columns", String(next)) } catch {}
-  }, [gridColumns])
+  }, [activeGridColumns, isMobile])
   // Mobile header folds away while the expanded sheet's grid is scrolled down.
   const collapsed = !drillSectionsVisible && containerSize === "expanded"
   const gridSizeButton = (
@@ -212,10 +214,10 @@ export default function ObjectPanel({
       size="icon"
       className="h-8 w-8 flex-shrink-0"
       onClick={cycleGridColumns}
-      title={gridColumns ? `Grid size: ${gridColumns} per row` : "Grid size: automatic"}
-      aria-label={`Grid size: ${gridColumns ? `${gridColumns} per row` : "automatic"}. Change`}
+      title={activeGridColumns ? `Grid size: ${activeGridColumns} per row` : "Grid size: automatic"}
+      aria-label={`Grid size: ${activeGridColumns ? `${activeGridColumns} per row` : "automatic"}. Change`}
     >
-      <IconGridSize className="w-5 h-5 text-gray-500" columns={gridColumns ?? 3} />
+      <IconGridSize className="w-5 h-5 text-gray-500" columns={activeGridColumns ?? 3} />
     </Button>
   )
   const [isExporting, setIsExporting] = useState(false)
@@ -1605,7 +1607,7 @@ export default function ObjectPanel({
             isFullscreen={containerSize === "expanded"}
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
-            columns={isMobile || containerSize === "expanded" ? gridColumns : null}
+            columns={isMobile || containerSize === "expanded" ? activeGridColumns : null}
             onScroll={isMobile ? handleGridScroll : undefined}
           />
           {/* Links section — paired museum image + wiki link cards */}
