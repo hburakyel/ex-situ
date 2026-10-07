@@ -26,11 +26,13 @@ const PRELOAD_TIMEOUT_MS = 8000
 // Lone slowness (e.g. a slow connection, where nothing later has loaded either)
 // keeps waiting up to PRELOAD_TIMEOUT_MS as before.
 const SLOW_SKIP_MS = 1200
-// After this many slow/timed-out images in a row from one host (any image that
-// loads resets the count), stop requesting that host's images for the rest of the
-// session — e.g. a museum image server that is down.
+// After this many timed-out images in a row from one host (any image that loads
+// resets the count), stop requesting that host's images for a minute — e.g. a
+// museum image server that is down. Short, so a brief hiccup doesn't turn a
+// host's images into inventory numbers for the rest of the visit.
 const SLOW_HOST_STRIKES = 3
-const slowHostStrikes = new Map<string, number>()
+const SLOW_HOST_PAUSE_MS = 60_000
+const slowHostStrikes = new Map<string, { count: number; last: number }>()
 
 const imageHost = (url: string): string => {
   try {
@@ -39,10 +41,19 @@ const imageHost = (url: string): string => {
     return ""
   }
 }
-const isSlowHost = (url: string) => (slowHostStrikes.get(imageHost(url)) ?? 0) >= SLOW_HOST_STRIKES
+const isSlowHost = (url: string) => {
+  const host = imageHost(url)
+  const s = slowHostStrikes.get(host)
+  if (!s || s.count < SLOW_HOST_STRIKES) return false
+  if (Date.now() - s.last > SLOW_HOST_PAUSE_MS) {
+    slowHostStrikes.delete(host) // pause over: try the host again
+    return false
+  }
+  return true
+}
 const addSlowHostStrike = (url: string) => {
   const host = imageHost(url)
-  if (host) slowHostStrikes.set(host, (slowHostStrikes.get(host) ?? 0) + 1)
+  if (host) slowHostStrikes.set(host, { count: (slowHostStrikes.get(host)?.count ?? 0) + 1, last: Date.now() })
 }
 // Stop auto-fetching further pages after this many in a row reveal nothing new
 // (e.g. a filter whose objects are almost all imageless).
@@ -117,6 +128,11 @@ export default function ObjectGrid({
   useEffect(() => {
     if (containerRef.current) containerRef.current.scrollTop = 0
     setIsScrolled(false)
+    // Retry images that failed earlier (e.g. while a server was briefly down).
+    setImageStatus((prev) => {
+      const kept = Object.fromEntries(Object.entries(prev).filter(([, status]) => status === "ok"))
+      return Object.keys(kept).length === Object.keys(prev).length ? prev : kept
+    })
   }, [firstObjectId])
 
   // User-chosen density: tile height scales with the column count (3 = the original 11rem).
@@ -203,7 +219,6 @@ export default function ObjectGrid({
       img.src = ""
       inflightRef.current.delete(object.id)
       inflightStartRef.current.delete(object.id)
-      addSlowHostStrike(object.attributes.img_url!)
       markImage(object.id, "failed")
       return
     }
