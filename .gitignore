@@ -116,3 +116,4 @@ data/
 # Frontend builds made by scripts/deploy/deploy.sh
 frontend/.next-a/
 frontend/.next-b/
+docs/DEPLOY.md

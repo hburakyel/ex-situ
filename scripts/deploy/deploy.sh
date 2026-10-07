@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Deploys the checked-out commit on the server. Called by remote-entry.sh with
-# the previously deployed commit and the new one; only the parts that changed
-# are redeployed, backend first (the frontend build prerenders from the API).
+# Deploys the checked-out commit on the server, given the previously deployed
+# commit and the new one; only the parts that changed are redeployed, backend
+# first (the frontend build prerenders from the API). Usage, from the repo root:
+#
+#   old=$(git rev-parse HEAD) && git fetch origin main && git reset --hard origin/main \
+#     && bash scripts/deploy/deploy.sh "$old" "$(git rev-parse HEAD)"
 #
 #   backend changed  → database backup, npm ci if deps changed, restart Strapi,
 #                      wait until the map API answers again (~2 min: map views rebuild)
