@@ -108,6 +108,15 @@ export default function ObjectGrid({
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 })
   const containerRef = useRef<HTMLDivElement>(null)
   const wasInViewRef = useRef(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  // A new place/collection replaces the list: start it from the top (otherwise the
+  // old scroll position carries over and the info block opens half scrolled away).
+  const firstObjectId = objects[0]?.id
+  useEffect(() => {
+    if (containerRef.current) containerRef.current.scrollTop = 0
+    setIsScrolled(false)
+  }, [firstObjectId])
 
   // User-chosen density: tile height scales with the column count (3 = the original 11rem).
   const tileHeight = columnsOverride ? (columnsOverride <= 1 ? 320 : columnsOverride >= 5 ? 112 : 176) : null
@@ -248,6 +257,7 @@ export default function ObjectGrid({
 
     const { scrollTop, clientHeight, scrollHeight } = containerRef.current
     const scrollPosition = scrollTop + clientHeight
+    setIsScrolled(scrollTop > 4)
 
     onScroll?.(scrollTop, scrollHeight - clientHeight)
 
@@ -324,33 +334,26 @@ export default function ObjectGrid({
   }
 
   const isCheckingImages = frontier < imageObjects.length || (isLoading && hasMore)
-  if (revealed.length === 0 && (isCheckingImages || (isLoading && objects.length === 0))) {
-    return (
-      <div className="flex flex-col h-full bg-white">
-        {header}
-        <div className="flex flex-1 flex-col justify-center items-center p-4 text-center">
-          <Spinner size="2" />
-        </div>
+  // Loading / empty states render inside the same scroll container as the tiles,
+  // so the header (mobile info block) stays mounted and keeps its accordion state.
+  const emptyState =
+    revealed.length === 0 && (isCheckingImages || (isLoading && objects.length === 0)) ? (
+      <div className={`flex flex-col justify-center items-center text-center ${header ? "py-16" : "h-full"}`}>
+        <Spinner size="2" />
       </div>
-    )
-  }
-
-  if (revealed.length === 0) {
-    return (
-      <div className="flex flex-col h-full bg-white">
-        {header}
-        <div className="flex flex-1 flex-col justify-center items-center p-4 text-center">
+    ) : revealed.length === 0 ? (
+      <div className={`flex flex-col justify-center items-center text-center ${header ? "py-16" : "h-full"}`}>
         <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
         <p className="text-xs text-gray-500">Try zooming out or panning to a different location on the map.</p>
-        </div>
       </div>
-    )
-  }
+    ) : null
 
 return (
   <div className="relative h-full bg-white">
     <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
       {header && <div className="-mx-4 -mt-4 mb-2">{header}</div>}
+      {emptyState ?? (
+      <>
       <div
         className={`grid ${columnsOverride ? "" : gridClass} gap-3`}
         style={columnsOverride ? { gridTemplateColumns: `repeat(${columnsOverride}, minmax(0, 1fr))` } : undefined}
@@ -492,11 +495,15 @@ return (
           {revealed.length} artifact{revealed.length !== 1 ? "s" : ""}
         </div>
       )}
+      </>
+      )}
     </div>
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 top-0 h-8"
-      style={GRID_TOP_FADE_STYLE}
+      className="pointer-events-none absolute inset-x-0 top-0 h-8 transition-opacity duration-150"
+      // With the info block at the top of the scroll (mobile), fade only once scrolled,
+      // so it never covers the artifact count.
+      style={{ ...GRID_TOP_FADE_STYLE, opacity: header && !isScrolled ? 0 : 1 }}
     />
     <div
       aria-hidden="true"
