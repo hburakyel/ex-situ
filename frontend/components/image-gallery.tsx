@@ -9,6 +9,7 @@ import ObjectImage from "@/components/object-image"
 import { Check, Link2 } from "lucide-react"
 import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
+import { isWithdrawn, withdrawnSourceUrl } from "@/lib/withdrawn"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const MOBILE_CLOSE_SWIPE_THRESHOLD = 48
@@ -30,8 +31,10 @@ export default function ImageGallery({
 }: ImageGalleryProps) {
   const galleryObjects = objects
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
-  const [imageError, setImageError] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  // Start from the opening object's real state — it may have no image (withdrawn record).
+  const startsWithImage = hasImageUrl(objects[initialIndex]?.attributes?.img_url)
+  const [imageError, setImageError] = useState(!startsWithImage)
+  const [isLoading, setIsLoading] = useState(startsWithImage)
   const [linkCopied, setLinkCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef<number | null>(null)
@@ -164,6 +167,8 @@ export default function ImageGallery({
 
   // Get the correct URL to open
   const getLinkUrl = () => {
+    // Withdrawn record: its old link is dead — point to where it can still be found.
+    if (isWithdrawn(currentObject)) return withdrawnSourceUrl(currentObject)
     // Check if object_links exists and has items
     if (
       currentObject.attributes.object_links &&
@@ -387,7 +392,10 @@ export default function ImageGallery({
                 backgroundColor: "white", // Added white background
               }}
             >
-              <span style={{ color: "#999", fontSize: "14px" }}>
+              <span
+                className={isWithdrawn(currentObject) ? "font-mono text-sm text-[#111]" : undefined}
+                style={isWithdrawn(currentObject) ? undefined : { color: "#999", fontSize: "14px" }}
+              >
                 {currentObject.attributes.inventory_number || "No image available"}
               </span>
             </div>
@@ -442,9 +450,12 @@ export default function ImageGallery({
             }
             const institution = currentObject.attributes.institution_name || ""
             const sourceUrl = getLinkUrl()
-            const credit = SMB_COLLECTIONS.has(institution)
-              ? `© ${institution}, Staatliche Museen zu Berlin · CC BY-NC-SA`
-              : CREDITS[institution] || (institution ? `© ${institution}` : "")
+            const credit = isWithdrawn(currentObject)
+              // No image: the museum withdrew the record that stated its licence.
+              ? `© ${institution}${SMB_COLLECTIONS.has(institution) ? ", Staatliche Museen zu Berlin" : ""} · Image not shown: record withdrawn by the museum`
+              : SMB_COLLECTIONS.has(institution)
+                ? `© ${institution}, Staatliche Museen zu Berlin · CC BY-NC-SA`
+                : CREDITS[institution] || (institution ? `© ${institution}` : "")
             const style = { color: "#2a2a2a", fontSize: "0.875rem", textDecoration: "none" }
 
             if (sourceUrl) {

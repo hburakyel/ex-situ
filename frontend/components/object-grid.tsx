@@ -7,24 +7,10 @@ import { resolveImageSrc, THUMB_WIDTH } from "@/lib/image-src"
 import { useInView } from "react-intersection-observer"
 import { Spinner } from "@radix-ui/themes"
 import { formatOriginAttribution } from "@/lib/origin-attribution"
+import { isWithdrawn } from "@/lib/withdrawn"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 
-// Objects whose source record the museum withdrew keep a place in the grid as a
-// text card (inventory number, collection, link) instead of an image, so it stays
-// visible how many objects are affected. Papyri are now in the Berliner
-// Papyrusdatenbank; everything else is searched on SMB's own collection site.
-const isWithdrawn = (object: MuseumObject) => object.attributes?.source_withdrawn === true
-const withdrawnSearchUrl = (object: MuseumObject): string | null => {
-  // Exact BerlPap record when etl/resolve_berlpap_links.py found one.
-  const link = object.attributes?.source_link
-  if (link && link.startsWith("https://berlpap.smb.museum/")) return link
-  const inv = object.attributes?.inventory_number?.trim()
-  if (!inv) return null
-  return /^P\b/.test(inv)
-    ? `https://berlpap.smb.museum/?s=${encodeURIComponent(inv)}`
-    : `https://search.smb.museum/?q=${encodeURIComponent(inv)}`
-}
 
 // A tile is only ever shown once its image has actually loaded — objects with
 // no image, or whose image fails, are left out of the grid entirely rather than
@@ -76,6 +62,8 @@ interface ObjectGridProps {
   mobileColumns?: number
   /** Fixed column count chosen by the user; overrides the responsive layout. */
   columns?: number | null
+  /** Rendered above the tiles inside the scroll container, so it scrolls away with the grid (mobile info block). */
+  header?: React.ReactNode
   /** Fires on every scroll of the grid's internal container, with its scrollTop and how far it can scroll. */
   onScroll?: (scrollTop: number, maxScrollTop: number) => void
 }
@@ -101,6 +89,7 @@ export default function ObjectGrid({
   mobileColumns = 2,
   columns: columnsOverride = null,
   onScroll,
+  header,
 }: ObjectGridProps) {
   const { ref: observerRef, inView } = useInView({
     threshold: 0.1,
@@ -337,17 +326,23 @@ export default function ObjectGrid({
   const isCheckingImages = frontier < imageObjects.length || (isLoading && hasMore)
   if (revealed.length === 0 && (isCheckingImages || (isLoading && objects.length === 0))) {
     return (
-      <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
-        <Spinner size="2" />
+      <div className="flex flex-col h-full bg-white">
+        {header}
+        <div className="flex flex-1 flex-col justify-center items-center p-4 text-center">
+          <Spinner size="2" />
+        </div>
       </div>
     )
   }
 
   if (revealed.length === 0) {
     return (
-      <div className="flex flex-col justify-center items-center h-full p-4 text-center bg-white">
+      <div className="flex flex-col h-full bg-white">
+        {header}
+        <div className="flex flex-1 flex-col justify-center items-center p-4 text-center">
         <p className="text-sm text-gray-500 mb-4">No artifacts found in this area.</p>
         <p className="text-xs text-gray-500">Try zooming out or panning to a different location on the map.</p>
+        </div>
       </div>
     )
   }
@@ -355,6 +350,7 @@ export default function ObjectGrid({
 return (
   <div className="relative h-full bg-white">
     <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
+      {header && <div className="-mx-4 -mt-4 mb-2">{header}</div>}
       <div
         className={`grid ${columnsOverride ? "" : gridClass} gap-3`}
         style={columnsOverride ? { gridTemplateColumns: `repeat(${columnsOverride}, minmax(0, 1fr))` } : undefined}
@@ -363,33 +359,34 @@ return (
         const isSelected = object.id === selectedImageId
 
 if (isWithdrawn(object)) {
-  const href = withdrawnSearchUrl(object)
+  // Same tile as an image, but empty: only the inventory number (no image is shown
+  // for records the museum withdrew). Opens the gallery like any other tile.
   return (
     <div
       key={object.id}
-      className={`relative bg-white p-1 flex items-center justify-center ${tileHeight ? "" : "h-44"}`}
+      className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileHeight ? "" : "h-44"}`}
       style={tileHeight ? { height: tileHeight } : undefined}
-      onMouseEnter={() => onObjectHover(object.attributes.place_name || null)}
-      onMouseLeave={() => onObjectHover(null)}
+      onClick={() => handleImageClick(index)}
+      onMouseEnter={() => {
+        setSelectedImageId(object.id)
+        onObjectHover(object.attributes.place_name || null)
+      }}
+      onMouseLeave={() => {
+        setSelectedImageId(null)
+        onObjectHover(null)
+      }}
     >
-      <a
-        href={href || undefined}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="The museum withdrew this record from its online collection"
-        className="w-full h-full bg-white rounded-[10px] border border-gray-100 p-3 flex flex-col justify-between transition-colors hover:bg-[#f5f5f5]"
+      <div
+        className={[
+          "w-full h-full bg-white rounded-[4px] flex items-center justify-center px-2",
+          isSelected ? "ring-2 ring-blue-500" : "",
+          "group-hover:ring-2 group-hover:ring-blue-500",
+        ].join(" ")}
       >
-        <span className="text-gray-400 text-sm leading-none">{href ? "↗" : ""}</span>
-        <span className="flex-1 flex items-center justify-center px-1 font-mono text-sm text-[#111] text-center line-clamp-3 leading-tight">
+        <span className="font-mono text-sm text-[#111] text-center line-clamp-3 leading-tight">
           {object.attributes.inventory_number}
         </span>
-        <span className="flex items-end justify-between mt-1">
-          <span className="text-[9px] text-gray-400 leading-none">Record withdrawn</span>
-          <span className="text-[9px] text-gray-400 leading-none truncate ml-1 max-w-[60%] text-right">
-            © {object.attributes.institution_name}
-          </span>
-        </span>
-      </a>
+      </div>
     </div>
   )
 }

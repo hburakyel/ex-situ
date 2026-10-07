@@ -21,6 +21,7 @@ import {
 import ObjectGrid from "@/components/object-grid"
 import ObjectImage from "@/components/object-image"
 import type { MuseumObject } from "@/types"
+import { isWithdrawn } from "@/lib/withdrawn"
 import ImageGallery from "@/components/image-gallery"
 import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
@@ -206,8 +207,6 @@ export default function ObjectPanel({
     setGridColumns(next)
     try { localStorage.setItem("exsitu:grid-columns", String(next)) } catch {}
   }, [activeGridColumns, isMobile])
-  // Mobile header folds away while the expanded sheet's grid is scrolled down.
-  const collapsed = !drillSectionsVisible && containerSize === "expanded"
   const gridSizeButton = (
     <Button
       variant="ghost"
@@ -229,9 +228,9 @@ export default function ObjectPanel({
     ? `${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)}`
     : undefined
 
-  // The gallery steps only through objects that have an image — matching the
-  // grid, which never shows imageless objects.
-  const galleryObjects = useMemo(() => objects.filter((o) => hasImageUrl(o.attributes?.img_url)), [objects])
+  // The gallery steps through the same objects as the grid: those with an image,
+  // plus withdrawn records (shown with their inventory number instead).
+  const galleryObjects = useMemo(() => objects.filter((o) => isWithdrawn(o) || hasImageUrl(o.attributes?.img_url)), [objects])
 
   // ── Mobile bottom-sheet drag-to-resize ──
   const containerSizeRef = useRef<ContainerSize>(containerSize)
@@ -249,9 +248,7 @@ export default function ObjectPanel({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
-  const foldRef = useRef<HTMLDivElement>(null)
   const drillSectionsScrollTopRef = useRef(0)
-  const drillSectionsLockUntilRef = useRef(0)
   const prefersReducedMotion = useRef(false)
   const [liveHeight, setLiveHeight] = useState<number | null>(null)
 
@@ -543,39 +540,6 @@ export default function ObjectPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobile, setContainerSize])
 
-  // ── Hide drill-down sections (Places/Time/Collections) on grid scroll-down ──
-  // Frees up room for the object grid; a small scroll-up brings the block back.
-  // ObjectGrid owns the actual scrolling element internally (its own containerRef),
-  // so this listens via its onScroll callback rather than a ref on the wrapper div.
-  const handleGridScroll = useCallback((scrollTop: number, maxScrollTop: number) => {
-    const SCROLL_HYSTERESIS = 8
-    const LOCK_MS = 450
-    // Folding the header resizes the grid, which fires scroll events of its own;
-    // ignore them while the transition runs so it can't bounce back open.
-    if (Date.now() < drillSectionsLockUntilRef.current) {
-      drillSectionsScrollTopRef.current = scrollTop
-      return
-    }
-    const delta = scrollTop - drillSectionsScrollTopRef.current
-    if (scrollTop <= SCROLL_HYSTERESIS) {
-      setDrillSectionsVisible(true)
-    } else if (delta > SCROLL_HYSTERESIS) {
-      // Only fold when the grid stays scrollable with the header gone. With a few
-      // artifacts the grid would fit afterwards, leaving no scroll-up to bring the
-      // header back.
-      const headerHeight = foldRef.current?.offsetHeight ?? 0
-      if (maxScrollTop > headerHeight + 2 * SCROLL_HYSTERESIS) {
-        drillSectionsLockUntilRef.current = Date.now() + LOCK_MS
-        setDrillSectionsVisible(false)
-        // Scroll events during the lock are ignored; if the grid ended up back at
-        // the top (or can't scroll at all), no further event will come — re-check.
-        window.setTimeout(() => {
-          if (drillSectionsScrollTopRef.current <= SCROLL_HYSTERESIS) setDrillSectionsVisible(true)
-        }, LOCK_MS + 20)
-      }
-    }
-    drillSectionsScrollTopRef.current = scrollTop
-  }, [])
 
   // Reset when the grid (re)mounts (e.g. sheet leaves "minimized") since it starts at scrollTop 0.
   useEffect(() => {
@@ -1337,6 +1301,78 @@ export default function ObjectPanel({
 
   const containerStyle = getContainerStyle()
 
+  // Mobile info block (count, Places/Sites, Time, Collections). Rendered inside the
+  // grid's scroll container so it scrolls away with the tiles like a page, and back
+  // with them; the breadcrumb row above stays.
+  const renderMobileInfo = () => (
+    <InfoPanel
+        isMobile={isMobile}
+        containerSize={containerSize}
+        breadcrumb={[]}
+        onBreadcrumbClick={undefined}
+        onCommandPaletteOpen={undefined}
+        // Always rendered so the count row keeps its height while objects load.
+        actionSlot={(
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[160px]">
+              <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
+                {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4 text-gray-500" />}
+                {showCopied ? "Link copied!" : "Share link"}
+              </DropdownMenuItem>
+              {renderExportMenuItem({
+                label: "Download as CSV",
+                sublabel: exportCapNote,
+                onClick: downloadObjectsAsCSV,
+                disabled: isExporting || !hasExportScope,
+                icon: <IconDownloadCsv className="h-4 w-4 text-gray-500" />,
+              })}
+              {renderExportMenuItem({
+                label: "Download as JSON",
+                sublabel: exportCapNote,
+                onClick: exportAsJSON,
+                disabled: isExporting || !hasExportScope,
+                icon: <FileJson className="h-4 w-4 text-gray-500" />,
+              })}
+              {renderExportMenuItem({
+                label: "Download as MD",
+                onClick: downloadProvenanceReport,
+                disabled: isExporting || !hasExportScope,
+                icon: <FileText className="h-4 w-4 text-gray-500" />,
+              })}
+              {reportIssueMenuItem}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        totalCount={totalCount}
+        collectionCount={collectionCount}
+        isLoading={isLoading}
+        drillLevel={drillLevel}
+        groupedOrigins={groupedOrigins}
+        isLoadingOrigins={isLoadingOrigins}
+        onOriginClick={onOriginClick}
+        groupedSites={groupedSites}
+        activeSite={activeSite}
+        onToggleSite={onToggleSite}
+        isLoadingSubArcs={isLoadingSubArcs}
+        drillInstitutions={drillInstitutions}
+        activeInstitution={activeInstitution}
+        onToggleInstitution={onToggleInstitution}
+        onToggleEra={toggleEra}
+        dateBuckets={dateBuckets}
+        facetedFilters={facetedFilters}
+        removeFilter={removeFilter}
+        removeEraFilter={removeEraFilter}
+        removeMigrationFilter={removeMigrationFilter}
+        locationName={locationName}
+        activeCountry={activeCountry}
+      />
+  )
+
   const sheetInner = (
     <div className="h-full flex flex-col">
       {/* Mobile drag handle */}
@@ -1417,94 +1453,7 @@ export default function ObjectPanel({
                 )}
               </div>
             </div>
-            {/* Scroll-away bar (same pattern as a native collapsing nav bar): the height folds
-                and the content slides up with it — no fade — on the sheet's own easing curve.
-                The top row (breadcrumb, grid size, search) stays; the info below
-                hides on scroll-down and comes back when the grid is back at the top. */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr)",
-                gridTemplateRows: collapsed ? "0fr" : "1fr",
-                transition: "grid-template-rows 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
-              }}
-            >
-            <div
-              ref={foldRef}
-              className="overflow-hidden min-h-0 min-w-0 w-full"
-              style={{
-                transform: collapsed ? "translateY(-100%)" : "translateY(0)",
-                transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
-              }}
-            >
-            <InfoPanel
-                isMobile={isMobile}
-                containerSize={containerSize}
-                breadcrumb={[]}
-                onBreadcrumbClick={undefined}
-                onCommandPaletteOpen={undefined}
-                // Always rendered so the count row keeps its height while objects load.
-                actionSlot={(
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
-                        {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-[160px]">
-                      <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
-                        {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4 text-gray-500" />}
-                        {showCopied ? "Link copied!" : "Share link"}
-                      </DropdownMenuItem>
-                      {renderExportMenuItem({
-                        label: "Download as CSV",
-                        sublabel: exportCapNote,
-                        onClick: downloadObjectsAsCSV,
-                        disabled: isExporting || !hasExportScope,
-                        icon: <IconDownloadCsv className="h-4 w-4 text-gray-500" />,
-                      })}
-                      {renderExportMenuItem({
-                        label: "Download as JSON",
-                        sublabel: exportCapNote,
-                        onClick: exportAsJSON,
-                        disabled: isExporting || !hasExportScope,
-                        icon: <FileJson className="h-4 w-4 text-gray-500" />,
-                      })}
-                      {renderExportMenuItem({
-                        label: "Download as MD",
-                        onClick: downloadProvenanceReport,
-                        disabled: isExporting || !hasExportScope,
-                        icon: <FileText className="h-4 w-4 text-gray-500" />,
-                      })}
-                      {reportIssueMenuItem}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-                totalCount={totalCount}
-                collectionCount={collectionCount}
-                isLoading={isLoading}
-                drillLevel={drillLevel}
-                groupedOrigins={groupedOrigins}
-                isLoadingOrigins={isLoadingOrigins}
-                onOriginClick={onOriginClick}
-                groupedSites={groupedSites}
-                activeSite={activeSite}
-                onToggleSite={onToggleSite}
-                isLoadingSubArcs={isLoadingSubArcs}
-                drillInstitutions={drillInstitutions}
-                activeInstitution={activeInstitution}
-                onToggleInstitution={onToggleInstitution}
-                onToggleEra={toggleEra}
-                dateBuckets={dateBuckets}
-                facetedFilters={facetedFilters}
-                removeFilter={removeFilter}
-                removeEraFilter={removeEraFilter}
-                removeMigrationFilter={removeMigrationFilter}
-                locationName={locationName}
-                activeCountry={activeCountry}
-              />
-            </div>
-            </div>
+            {containerSize === "minimized" && renderMobileInfo()}
           </div>
         ) : (
           <div className="sticky top-0 z-30 flex flex-row items-start bg-white">
@@ -1621,7 +1570,7 @@ export default function ObjectPanel({
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
             columns={isMobile || containerSize === "expanded" ? activeGridColumns : null}
-            onScroll={isMobile ? handleGridScroll : undefined}
+            header={isMobile && containerSize !== "minimized" ? renderMobileInfo() : undefined}
           />
           {/* Links section — paired museum image + wiki link cards */}
           {wikiLinks.length > 0 && (
