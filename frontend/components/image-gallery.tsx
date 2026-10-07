@@ -421,63 +421,40 @@ export default function ImageGallery({
             })()}
           </span>
           <span className="ml-2">{(() => {
-            const LICENSE_MAP: Record<string, string> = {
-              "Ethnologisches Museum": "CC BY 4.0",
-              "The Metropolitan Museum of Art": "CC0",
-              "Antikensammlung": "CC BY 4.0",
-              "Museum für Islamische Kunst": "CC BY 4.0",
-              "Vorderasiatisches Museum": "CC BY 4.0",
-              "Ägyptisches Museum und Papyrussammlung": "CC BY 4.0",
-              "Museum für Asiatische Kunst": "CC BY 4.0",
-              "Art Institute of Chicago": "CC0",
-              "Victoria and Albert Museum": "CC0",
+            // Image credit as each museum states it for its images (audited 2026-10-07):
+            // - SMB (museum-digital object_images[].rights): CC BY-NC-SA for every collection
+            // - Met Open Access images are public domain: CC0
+            // - V&A image meta: "© Victoria and Albert Museum, London" (no open licence)
+            // - AIC: CC0 only for public-domain works, which isn't stored per object yet,
+            //   so no licence is claimed
+            const SMB_COLLECTIONS = new Set([
+              "Ethnologisches Museum",
+              "Antikensammlung",
+              "Museum für Islamische Kunst",
+              "Vorderasiatisches Museum",
+              "Ägyptisches Museum und Papyrussammlung",
+              "Museum für Asiatische Kunst",
+            ])
+            const CREDITS: Record<string, string> = {
+              "The Metropolitan Museum of Art": "The Metropolitan Museum of Art · CC0",
+              "Art Institute of Chicago": "© Art Institute of Chicago",
+              "Victoria and Albert Museum": "© Victoria and Albert Museum, London",
             }
             const institution = currentObject.attributes.institution_name || ""
             const sourceUrl = getLinkUrl()
-            const license = LICENSE_MAP[institution]
+            const credit = SMB_COLLECTIONS.has(institution)
+              ? `© ${institution}, Staatliche Museen zu Berlin · CC BY-NC-SA`
+              : CREDITS[institution] || (institution ? `© ${institution}` : "")
+            const style = { color: "#2a2a2a", fontSize: "0.875rem", textDecoration: "none" }
 
-            if (license && sourceUrl) {
+            if (sourceUrl) {
               return (
-                <a
-                  href={sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "#2a2a2a",
-                    fontSize: "0.875rem",
-                    textDecoration: "none",
-                  }}
-                >
-                  © {institution} · {license} ↗
-                </a>
-              )
-            } else if (license) {
-              return (
-                <span
-                  style={{
-                    color: "#2a2a2a",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  © {institution} · {license}
-                </span>
-              )
-            } else if (sourceUrl) {
-              return (
-                <a
-                  href={sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "#2a2a2a",
-                    fontSize: "0.875rem",
-                    textDecoration: "none",
-                  }}
-                >
-                  {institution ? `© ${institution} ↗` : "View source ↗"}
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={style}>
+                  {credit || "View source"} ↗
                 </a>
               )
             }
+            if (credit) return <span style={style}>{credit}</span>
             return null
           })()}</span>
         </div>
