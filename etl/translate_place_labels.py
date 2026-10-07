@@ -10,11 +10,12 @@ place_name_normalized (place_name and city_en stay as they are).
 
 A translation is only proposed when all of these hold:
   - the label is not already a GeoNames name in that country (then it isn't German)
-  - a Wikidata item has exactly this German label or alias
+  - a Wikidata item has exactly this as its German label (aliases are too loose)
   - the item has coordinates (P625) — a place, not a concept ("Grasland")
   - the item is in the row's country (P17, or is that country) — so "Unterstadt"
     does not become a district of Prague
-  - its English label differs from the German one
+  - its English label differs from the German one, and the name isn't also an
+    English alias of the place ("Sam'al" stays Sam'al)
 "Base (Tag)" labels are translated part by part ("San José (Kalifornien)" →
 "San José (California)"). Anything else is left alone — no guessing.
 
@@ -39,7 +40,7 @@ import audit_places as ap
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPORT = os.path.join(HERE, "reports", "place_label_translations.csv")
-CACHE = os.path.join(HERE, "reports", "wikidata_de_labels.json")
+CACHE = os.path.join(HERE, "reports", "wikidata_de_labels_v2.json")
 UA = {"User-Agent": "ExSitu/1.0 (+https://exsitu.app; place label translation)"}
 NOTE_TAG = "[label-translate]"
 API = "https://www.wikidata.org/w/api.php?"
@@ -60,11 +61,14 @@ def lookup(label):
     """Wikidata places whose German label/alias is exactly `label`: [(qid, english, iso_codes)]."""
     found = wd_get({"action": "wbsearchentities", "search": label, "language": "de", "uselang": "de",
                     "type": "item", "limit": 7, "format": "json"}).get("search", [])
+    # The main German label only — aliases are loose ("Abusir" is an alias of
+    # Taposiris Magna, "Pachacámac" of Quechua).
     ids = [h["id"] for h in found
-           if h.get("match", {}).get("type") in ("label", "alias") and ap.key(h["match"]["text"]) == ap.key(label)]
+           if h.get("match", {}).get("type") == "label" and h.get("match", {}).get("language") == "de"
+           and ap.key(h["match"]["text"]) == ap.key(label)]
     if not ids:
         return []
-    ents = wd_get({"action": "wbgetentities", "ids": "|".join(ids[:5]), "props": "labels|claims",
+    ents = wd_get({"action": "wbgetentities", "ids": "|".join(ids[:5]), "props": "labels|aliases|claims",
                    "languages": "en", "format": "json"})["entities"]
     out, country_ids = [], set()
     for qid in ids[:5]:
@@ -73,6 +77,9 @@ def lookup(label):
         if "P625" not in claims:
             continue
         en = e.get("labels", {}).get("en", {}).get("value")
+        # Already an English name of this place (e.g. "Sam'al") → nothing to translate.
+        if any(ap.key(a.get("value")) == ap.key(label) for a in e.get("aliases", {}).get("en", [])):
+            continue
         own_iso = [c["mainsnak"]["datavalue"]["value"] for c in claims.get("P297", []) if "datavalue" in c["mainsnak"]]
         countries = [c["mainsnak"]["datavalue"]["value"]["id"] for c in claims.get("P17", []) if "datavalue" in c["mainsnak"]]
         country_ids.update(countries)
