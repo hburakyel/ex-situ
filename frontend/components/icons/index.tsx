@@ -151,28 +151,28 @@ export const IconExpand: React.FC<IconProps> = ({
     {...props}
   >
     <path
-      d="M8 3H5C4.46957 3 3.96086 3.21071 3.58579 3.58579C3.21071 3.96086 3 4.46957 3 5V8"
+      d="M15 3H21V9"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M21 8V5C21 4.46957 20.7893 3.96086 20.4142 3.58579C20.0391 3.21071 19.5304 3 19 3H16"
+      d="M9 21H3V15"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M3 16V19C3 19.5304 3.21071 20.0391 3.58579 20.4142C3.96086 20.7893 4.46957 21 5 21H8"
+      d="M21 3L14 10"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M16 21H19C19.5304 21 20.0391 20.7893 20.4142 20.4142C20.7893 20.0391 21 19.5304 21 19V16"
+      d="M3 21L10 14"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
@@ -199,28 +199,28 @@ export const IconMinimize: React.FC<IconProps> = ({
     {...props}
   >
     <path
-      d="M8 3V6C8 6.53043 7.78929 7.03914 7.41421 7.41421C7.03914 7.78929 6.53043 8 6 8H3"
+      d="M4 14H10V20"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M21 8H18C17.4696 8 16.9609 7.78929 16.5858 7.41421C16.2107 7.03914 16 6.53043 16 6V3"
+      d="M20 10H14V4"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M3 16H6C6.53043 16 7.03914 16.2107 7.41421 16.5858C7.78929 16.9609 8 17.4696 8 18V21"
+      d="M14 10L21 3"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
-      d="M16 21V18C16 17.4696 16.2107 16.9609 16.5858 16.5858C16.9609 16.2107 17.4696 16 18 16H21"
+      d="M3 21L10 14"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
@@ -373,6 +373,53 @@ export const IconSource: React.FC<IconProps> = ({
 )
 IconSource.displayName = "IconSource"
 
+/* ── Grid size (density of the object grid: 1 / 3 / 5 columns) ───────────── */
+export const IconGridSize: React.FC<IconProps & { columns?: number }> = ({
+  width = 24,
+  height = 24,
+  className,
+  columns = 3,
+  ...props
+}) => {
+  // 1 → one large tile, 3 → 2×2, 5 → 3×3: the icon hints at how dense the grid is.
+  const n = columns <= 1 ? 1 : columns >= 5 ? 3 : 2
+  const gap = 4
+  const stroke = n === 1 ? 2 : n === 2 ? 1.5 : 1.25
+  const size = (18 - gap * (n - 1)) / n
+  const tiles: React.ReactNode[] = []
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      tiles.push(
+        <rect
+          key={`${r}-${c}`}
+          x={3 + c * (size + gap)}
+          y={3 + r * (size + gap)}
+          width={size}
+          height={size}
+          rx={n === 1 ? 2 : 1}
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinejoin="round"
+        />,
+      )
+    }
+  }
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      {...props}
+    >
+      {tiles}
+    </svg>
+  )
+}
+IconGridSize.displayName = "IconGridSize"
+
 /* ── Raw SVG strings for non-React contexts (Mapbox IControl) ───────────── */
 
 export const iconSvgStrings = {
@@ -382,9 +429,9 @@ export const iconSvgStrings = {
 
   downloadCsv: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 
-  expand: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3H5C4.46957 3 3.96086 3.21071 3.58579 3.58579C3.21071 3.96086 3 4.46957 3 5V8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 8V5C21 4.46957 20.7893 3.96086 20.4142 3.58579C20.0391 3.21071 19.5304 3 19 3H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16V19C3 19.5304 3.21071 20.0391 3.58579 20.4142C3.96086 20.7893 4.46957 21 5 21H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21H19C19.5304 21 20.0391 20.7893 20.4142 20.4142C20.7893 20.0391 21 19.5304 21 19V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  expand: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 3H21V9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 21H3V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3L14 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 
-  minimize: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V6C8 6.53043 7.78929 7.03914 7.41421 7.41421C7.03914 7.78929 6.53043 8 6 8H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 8H18C17.4696 8 16.9609 7.78929 16.5858 7.41421C16.2107 7.03914 16 6.53043 16 6V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16H6C6.53043 16 7.03914 16.2107 7.41421 16.5858C7.78929 16.9609 8 17.4696 8 18V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21V18C16 17.4696 16.2107 16.9609 16.5858 16.5858C16.9609 16.2107 17.4696 16 18 16H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  minimize: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 14H10V20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 10H14V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 10L21 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 
   panelClosed: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.3 3H5.7C4.20883 3 3 4.20883 3 5.7V18.3C3 19.7912 4.20883 21 5.7 21H18.3C19.7912 21 21 19.7912 21 18.3V5.7C21 4.20883 19.7912 3 18.3 3Z" stroke="currentColor" stroke-width="2"/><path d="M16.375 7H12.625C12.2798 7 12 7.3731 12 7.83333V16.1667C12 16.6269 12.2798 17 12.625 17H16.375C16.7202 17 17 16.6269 17 16.1667V7.83333C17 7.3731 16.7202 7 16.375 7Z" stroke="currentColor" stroke-width="2"/></svg>`,
 

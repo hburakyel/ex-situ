@@ -58,6 +58,8 @@ interface ObjectGridProps {
   isFullscreen?: boolean
   panelSize?: number
   mobileColumns?: number
+  /** Fixed column count chosen by the user; overrides the responsive layout. */
+  columns?: number | null
   /** Fires on every scroll of the grid's internal container, with its current scrollTop. */
   onScroll?: (scrollTop: number) => void
 }
@@ -81,6 +83,7 @@ export default function ObjectGrid({
   isFullscreen = false,
   panelSize = 50,
   mobileColumns = 2,
+  columns: columnsOverride = null,
   onScroll,
 }: ObjectGridProps) {
   const { ref: observerRef, inView } = useInView({
@@ -100,6 +103,9 @@ export default function ObjectGrid({
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 })
   const containerRef = useRef<HTMLDivElement>(null)
   const wasInViewRef = useRef(false)
+
+  // User-chosen density: tile height scales with the column count (3 = the original 11rem).
+  const tileHeight = columnsOverride ? (columnsOverride <= 1 ? 320 : columnsOverride >= 5 ? 112 : 176) : null
 
   const imageObjects = useMemo(() => {
     return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
@@ -333,14 +339,18 @@ export default function ObjectGrid({
 return (
   <div className="relative h-full bg-white">
     <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
-      <div className={`grid ${gridClass} gap-3`}>
+      <div
+        className={`grid ${columnsOverride ? "" : gridClass} gap-3`}
+        style={columnsOverride ? { gridTemplateColumns: `repeat(${columnsOverride}, minmax(0, 1fr))` } : undefined}
+      >
       {visibleObjects.map((object, index) => {
         const isSelected = object.id === selectedImageId
 
 return (
   <div
     key={object.id}
-    className="group relative cursor-pointer transition-all duration-200 bg-white p-1 h-44 flex items-center justify-center"
+    className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileHeight ? "" : "h-44"}`}
+    style={tileHeight ? { height: tileHeight } : undefined}
     onClick={() => handleImageClick(index)}
     onMouseEnter={() => {
       setSelectedImageId(object.id)
@@ -406,7 +416,8 @@ return (
         src={object.attributes.img_url!}
         alt={object.attributes?.title || "Museum object"}
         className="block"
-        imgClassName="block max-h-44 w-auto bg-white"
+        imgClassName={`block w-auto bg-white ${tileHeight ? "max-w-full" : "max-h-44"}`}
+        imgStyle={tileHeight ? { maxHeight: tileHeight } : undefined}
         onError={() => markImage(object.id, "failed")}
         // Already preloaded into the browser cache before the tile was revealed.
         loading="eager"

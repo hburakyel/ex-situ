@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
 import { Check, Link2 } from "lucide-react"
-import { COLLECTION_LABELS, INSTITUTION_CITIES } from "@/hooks/use-unified-search"
+import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
@@ -300,31 +300,6 @@ export default function ImageGallery({
           </div>
         </div>
 
-        {/* Subheader with object details */}
-        <div
-          style={{
-            padding: "8px 16px",
-            borderBottom: "none",
-            fontSize: "14px",
-            backgroundColor: "white",
-          }}
-        >
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
-            <div>
-              <span style={{ color: "var(--panel-text-muted, #666)" }}>From: </span>
-              <span>{currentObject.attributes.place_name_normalized || currentObject.attributes.place_name || "Unknown"}</span>
-            </div>
-            <div>
-              <span style={{ color: "var(--panel-text-muted, #666)" }}>To: </span>
-              <span>{currentObject.attributes.institution_city_en || INSTITUTION_CITIES[currentObject.attributes.institution_name || ""] || currentObject.attributes.institution_place || "Unknown"}</span>
-            </div>
-            <div>
-              <span style={{ color: "var(--panel-text-muted, #666)" }}>Collection: </span>
-              <span>{COLLECTION_LABELS[currentObject.attributes.institution_name || ""] || currentObject.attributes.institution_name || "Unknown"}</span>
-            </div>
-          </div>
-        </div>
-
         {/* Main image container */}
         <div
           style={{
@@ -341,13 +316,13 @@ export default function ImageGallery({
           onTouchEnd={handleImageTouchEnd}
           onTouchCancel={handleImageTouchCancel}
         >
-          {isMobile && galleryObjects.length > 1 && (
+          {galleryObjects.length > 1 && (
             <>
               <button
                 type="button"
                 aria-label="Previous image"
                 onClick={handlePrevious}
-                className="absolute inset-y-0 left-0 z-10 w-1/2 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-inset"
+                className="absolute inset-y-0 left-0 z-10 w-1/2 cursor-w-resize bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-inset"
               >
                 <span className="sr-only">Previous image</span>
               </button>
@@ -355,7 +330,7 @@ export default function ImageGallery({
                 type="button"
                 aria-label="Next image"
                 onClick={handleNext}
-                className="absolute inset-y-0 right-0 z-10 w-1/2 cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-inset"
+                className="absolute inset-y-0 right-0 z-10 w-1/2 cursor-e-resize bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-inset"
               >
                 <span className="sr-only">Next image</span>
               </button>
@@ -424,10 +399,28 @@ export default function ImageGallery({
           style={{
             padding: "4px 16px 6px",
             backgroundColor: "white",
-            textAlign: "right",
+            textAlign: "left",
           }}
         >
-          {(() => {
+          <span className="text-black" style={{ fontSize: "0.875rem" }}>
+            {(() => {
+              const at = currentObject.attributes
+              const from = at.place_name_normalized || at.place_name
+              const to = at.institution_city_en || INSTITUTION_CITIES[at.institution_name || ""] || at.institution_place
+              const time = at.object_date?.trim()
+              const items: [string, string][] = []
+              if (from) items.push(["From", from])
+              if (to) items.push(["To", to])
+              if (time) items.push(["Time", time])
+              return items.map(([label, value], i) => (
+                <span key={label} className={i > 0 ? "ml-2" : undefined}>
+                  <span className="text-[#666]">{label}: </span>
+                  {value}
+                </span>
+              ))
+            })()}
+          </span>
+          <span className="ml-2">{(() => {
             const LICENSE_MAP: Record<string, string> = {
               "Ethnologisches Museum": "CC BY 4.0",
               "The Metropolitan Museum of Art": "CC0",
@@ -451,8 +444,7 @@ export default function ImageGallery({
                   rel="noopener noreferrer"
                   style={{
                     color: "#2a2a2a",
-                    fontSize: "9px",
-                    fontFamily: "monospace",
+                    fontSize: "0.875rem",
                     textDecoration: "none",
                   }}
                 >
@@ -464,8 +456,7 @@ export default function ImageGallery({
                 <span
                   style={{
                     color: "#2a2a2a",
-                    fontSize: "9px",
-                    fontFamily: "monospace",
+                    fontSize: "0.875rem",
                   }}
                 >
                   © {institution} · {license}
@@ -479,8 +470,7 @@ export default function ImageGallery({
                   rel="noopener noreferrer"
                   style={{
                     color: "#2a2a2a",
-                    fontSize: "9px",
-                    fontFamily: "monospace",
+                    fontSize: "0.875rem",
                     textDecoration: "none",
                   }}
                 >
@@ -489,7 +479,7 @@ export default function ImageGallery({
               )
             }
             return null
-          })()}
+          })()}</span>
         </div>
       </div>
     </>

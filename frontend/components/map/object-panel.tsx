@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { ChevronDown, ChevronUp, Check, FileText, FileJson, Loader2 } from "lucide-react"
-import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconPanelOpen } from "@/components/icons"
+import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconPanelOpen, IconGridSize } from "@/components/icons"
 import { fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -188,6 +188,34 @@ export default function ObjectPanel({
   // scrolled down (frees up room for the grid), brought back on scroll-up.
   const [drillSectionsVisible, setDrillSectionsVisible] = useState(true)
   const [showCopied, setShowCopied] = useState(false)
+  // Grid density: null = the responsive default; otherwise 1 / 3 / 5 columns (remembered per browser).
+  const [gridColumns, setGridColumns] = useState<number | null>(null)
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem("exsitu:grid-columns"))
+      if (saved === 1 || saved === 3 || saved === 5) setGridColumns(saved)
+    } catch {}
+  }, [])
+  const cycleGridColumns = useCallback(() => {
+    const order = [3, 5, 1]
+    const next = order[(order.indexOf(gridColumns ?? 3) + 1) % order.length]
+    setGridColumns(next)
+    try { localStorage.setItem("exsitu:grid-columns", String(next)) } catch {}
+  }, [gridColumns])
+  // Mobile header folds away while the expanded sheet's grid is scrolled down.
+  const collapsed = !drillSectionsVisible && containerSize === "expanded"
+  const gridSizeButton = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8 flex-shrink-0"
+      onClick={cycleGridColumns}
+      title={`Grid size: ${gridColumns ?? 3} per row`}
+      aria-label={`Grid size: ${gridColumns ?? 3} per row. Change`}
+    >
+      <IconGridSize className="w-5 h-5 text-gray-500" columns={gridColumns ?? 3} />
+    </Button>
+  )
   const [isExporting, setIsExporting] = useState(false)
   const hasSiteExportScope = Boolean(activeSite)
   const hasTerritoryExportScope = Boolean(activeCountry) && !activeSite
@@ -218,6 +246,7 @@ export default function ObjectPanel({
   const handleRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const drillSectionsScrollTopRef = useRef(0)
+  const drillSectionsLockUntilRef = useRef(0)
   const prefersReducedMotion = useRef(false)
   const [liveHeight, setLiveHeight] = useState<number | null>(null)
 
@@ -515,12 +544,20 @@ export default function ObjectPanel({
   // so this listens via its onScroll callback rather than a ref on the wrapper div.
   const handleGridScroll = useCallback((scrollTop: number) => {
     const SCROLL_HYSTERESIS = 8
+    // Folding the header resizes the grid, which fires scroll events of its own;
+    // ignore them while the transition runs so it can't bounce back open.
+    if (Date.now() < drillSectionsLockUntilRef.current) {
+      drillSectionsScrollTopRef.current = scrollTop
+      return
+    }
     const delta = scrollTop - drillSectionsScrollTopRef.current
     if (scrollTop <= SCROLL_HYSTERESIS) {
       setDrillSectionsVisible(true)
     } else if (delta > SCROLL_HYSTERESIS) {
+      drillSectionsLockUntilRef.current = Date.now() + 450
       setDrillSectionsVisible(false)
     } else if (delta < -SCROLL_HYSTERESIS) {
+      drillSectionsLockUntilRef.current = Date.now() + 450
       setDrillSectionsVisible(true)
     }
     drillSectionsScrollTopRef.current = scrollTop
@@ -1325,6 +1362,24 @@ export default function ObjectPanel({
         {/* Header: Desktop and Mobile layouts */}
         {isMobile ? (
           <div ref={headerRef} className="sticky top-0 z-30 flex flex-col bg-white">
+            {/* Scroll-away bar (same pattern as a native collapsing nav bar): the height folds
+                and the content slides up with it — no fade — on the sheet's own easing curve.
+                Hidden on scroll-down, revealed on scroll-up. */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr)",
+                gridTemplateRows: collapsed ? "0fr" : "1fr",
+                transition: "grid-template-rows 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              }}
+            >
+            <div
+              className="overflow-hidden min-h-0 min-w-0 w-full"
+              style={{
+                transform: collapsed ? "translateY(-100%)" : "translateY(0)",
+                transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              }}
+            >
             <div className="flex items-center justify-between text-sm min-w-0 px-4 pt-0">
               <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                 {breadcrumb.map((seg, i) => {
@@ -1355,6 +1410,7 @@ export default function ObjectPanel({
                 })}
               </div>
               <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                {objects.length > 0 && gridSizeButton}
                 {onCommandPaletteOpen && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
                     <IconSearch className="w-5 h-5 text-gray-500" />
@@ -1420,7 +1476,6 @@ export default function ObjectPanel({
                 onToggleInstitution={onToggleInstitution}
                 onToggleEra={toggleEra}
                 dateBuckets={dateBuckets}
-                drillSectionsVisible={drillSectionsVisible}
                 facetedFilters={facetedFilters}
                 removeFilter={removeFilter}
                 removeEraFilter={removeEraFilter}
@@ -1428,6 +1483,8 @@ export default function ObjectPanel({
                 locationName={locationName}
                 activeCountry={activeCountry}
               />
+            </div>
+            </div>
           </div>
         ) : (
           <div className="sticky top-0 z-30 flex flex-row items-start bg-white">
@@ -1500,6 +1557,7 @@ export default function ObjectPanel({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
+              {objects.length > 0 && containerSize === "expanded" && gridSizeButton}
               {/* Expand/minimize — desktop only */}
               <Button
                 variant="ghost"
@@ -1542,6 +1600,7 @@ export default function ObjectPanel({
             isFullscreen={containerSize === "expanded"}
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
+            columns={isMobile || containerSize === "expanded" ? gridColumns : null}
             onScroll={isMobile ? handleGridScroll : undefined}
           />
           {/* Links section — paired museum image + wiki link cards */}
