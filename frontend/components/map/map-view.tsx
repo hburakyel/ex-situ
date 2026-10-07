@@ -275,6 +275,20 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       x: number; y: number
     } | null>(null)
 
+    // Touch screens have no "mouse leaves the arc", so a tapped arc's tooltip would
+    // stay on screen (over the object panel). Close it after a moment or on the next touch.
+    useEffect(() => {
+      if (!hoveredArc || !isMobile) return
+      const close = () => setHoveredArc(null)
+      const timer = window.setTimeout(close, 2500)
+      const onTouch = () => close()
+      window.addEventListener("touchstart", onTouch, { passive: true, once: true })
+      return () => {
+        window.clearTimeout(timer)
+        window.removeEventListener("touchstart", onTouch)
+      }
+    }, [hoveredArc, isMobile])
+
     const [hoveredDoc, setHoveredDoc] = useState<{
       title: string; description?: string; count?: number; x: number; y: number
     } | null>(null)

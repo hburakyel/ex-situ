@@ -384,7 +384,8 @@ export default function ImageGallery({
                 src={resolveImageSrc(currentObject.attributes.img_url!, THUMB_WIDTH)}
                 alt=""
                 aria-hidden="true"
-                className="max-h-full max-w-full object-contain"
+                // Same box as the full-size image below, so the swap only sharpens — no jump in size.
+                className="w-full h-full object-contain"
               />
             </div>
           )}
@@ -395,7 +396,7 @@ export default function ImageGallery({
               src={currentObject.attributes.img_url!}
               alt={currentObject.attributes.title || "Museum object"}
               className="w-full h-full flex items-center justify-center"
-              imgClassName="max-h-full max-w-full object-contain"
+              imgClassName="w-full h-full object-contain"
               imgStyle={{ backgroundColor: "white", margin: "0", padding: "0" }}
               wrapperStyle={{ backgroundColor: "white" }}
              onError={handleImageError}
