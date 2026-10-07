@@ -13,10 +13,10 @@ const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && im
 
 
 // A tile shows the object's image once it has actually loaded. Objects with no
-// image, a failing image, an unreachable image server, or a withdrawn record show
-// their inventory number instead (same tile, no image), so the grid always matches
-// the artifact count. Images are preloaded in list order and revealed as a
-// contiguous prefix, so tiles never shift once on screen.
+// image, a failing image, an unreachable image server, or a withdrawn record come
+// after all images, as their inventory number (same tile, no image), so the grid
+// always matches the artifact count. Images are preloaded in list order and
+// revealed as a contiguous prefix, so tiles never shift once on screen.
 const PRELOAD_CONCURRENCY = 8
 const PRELOAD_LOOKAHEAD = 24
 const PRELOAD_TIMEOUT_MS = 8000
@@ -130,20 +130,24 @@ export default function ObjectGrid({
     setImageStatus((prev) => (prev[id] === status ? prev : { ...prev, [id]: status }))
   }, [])
 
-  // revealed: loaded objects up to the first one still pending (the frontier).
+  // revealed: loaded images up to the first one still pending (the frontier), then —
+  // once every loaded image is settled — the objects without one (inventory-number
+  // tiles) at the end. The backend already lists objects with an image first.
   const { revealed, frontier } = useMemo(() => {
-    const revealed: MuseumObject[] = []
+    const images: MuseumObject[] = []
+    const numbers: MuseumObject[] = []
     let frontier = imageObjects.length
     for (let i = 0; i < imageObjects.length; i++) {
       const o = imageObjects[i]
       const status = isWithdrawn(o) || !hasImageUrl(o.attributes?.img_url) ? "failed" : imageStatus[o.id]
-      if (status !== undefined) revealed.push(o) // "ok" → image tile, "failed" → inventory-number tile
+      if (status === "ok") images.push(o)
+      else if (status === "failed") numbers.push(o)
       else {
         frontier = i
         break
       }
     }
-    return { revealed, frontier }
+    return { revealed: frontier === imageObjects.length ? [...images, ...numbers] : images, frontier }
   }, [imageObjects, imageStatus])
 
   // Preload images from the frontier onward, a bounded window ahead of what's shown.
@@ -194,8 +198,9 @@ export default function ObjectGrid({
       .some((o) => imageStatus[o.id] === "ok")
     const wait = startedAt + SLOW_SKIP_MS - Date.now()
     if (laterLoaded && wait <= 0) {
-      // Show its inventory number for now, but keep loading: if the image still
-      // arrives, it replaces the number in the same tile (no layout shift).
+      img.onload = null
+      img.onerror = null
+      img.src = ""
       inflightRef.current.delete(object.id)
       inflightStartRef.current.delete(object.id)
       addSlowHostStrike(object.attributes.img_url!)

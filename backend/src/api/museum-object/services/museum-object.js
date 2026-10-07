@@ -998,13 +998,16 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       // matching row (33k for AIC) and made each page take 1–2 s.
       const dataQuery = `
         WITH page AS (
-          SELECT id FROM (
-            SELECT DISTINCT ON (${dedupKey}) id
+          SELECT id, has_image FROM (
+            SELECT DISTINCT ON (${dedupKey}) id,
+              NULLIF(BTRIM(COALESCE(img_url, '')), '') IS NOT NULL AS has_image
             FROM museum_objects
             ${whereClause}
             ORDER BY ${dedupKey}, id
           ) deduped
-          ORDER BY id DESC
+          -- Objects with an image first, so the grid shows images before the
+          -- inventory-number tiles of objects without one.
+          ORDER BY has_image DESC, id DESC
           LIMIT :limit OFFSET :offset
         )
         SELECT
@@ -1060,7 +1063,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             COALESCE(geocoding_notes LIKE '%[source-withdrawn]%', false) AS source_withdrawn
         FROM museum_objects m
         JOIN page ON page.id = m.id
-        ORDER BY m.id DESC
+        ORDER BY page.has_image DESC, m.id DESC
       `;
 
       const dataResult = await db.raw(dataQuery, {

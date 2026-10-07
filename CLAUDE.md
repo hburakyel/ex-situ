@@ -44,7 +44,8 @@ Live integration tests against production:
 ## Conventions
 
 - MCP tools stay read-only, zod-validated, and never accept URLs.
-- Image grid: a tile shows the real image, or the inventory number when there is no loadable image
-  (none, failed, server down, record withdrawn) — never gray/placeholder graphics.
+- Image grid: images first; objects without a loadable image (none, failed, server down, withdrawn)
+  come after them as their inventory number — never gray/placeholder graphics. by-country sorts
+  objects with an image first.
 - Deploy backend before frontend (frontend build prerenders pages from the API).
 - Never commit secrets, `.env` files, or server details — this repo is public.
