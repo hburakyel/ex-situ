@@ -16,6 +16,9 @@ const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && im
 // Papyrusdatenbank; everything else is searched on SMB's own collection site.
 const isWithdrawn = (object: MuseumObject) => object.attributes?.source_withdrawn === true
 const withdrawnSearchUrl = (object: MuseumObject): string | null => {
+  // Exact BerlPap record when etl/resolve_berlpap_links.py found one.
+  const link = object.attributes?.source_link
+  if (link && link.startsWith("https://berlpap.smb.museum/")) return link
   const inv = object.attributes?.inventory_number?.trim()
   if (!inv) return null
   return /^P\b/.test(inv)
