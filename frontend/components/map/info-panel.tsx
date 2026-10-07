@@ -110,8 +110,7 @@ export default function InfoPanel({
   locationName,
   activeCountry,
 }: InfoPanelProps) {
-  // Places starts open (this block is mobile-only).
-  const [showOrigins, setShowOrigins] = React.useState(true)
+  const [showOrigins, setShowOrigins] = React.useState(false)
   const [showSites, setShowSites] = React.useState(false)
   // Display-only labels: "Kano (State)" shows as "Kano" unless another site shares the name.
   const siteLabels = React.useMemo(() => placeDisplayLabels(groupedSites.map((s) => s.name)), [groupedSites])

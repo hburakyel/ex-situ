@@ -10,6 +10,19 @@ import { formatOriginAttribution } from "@/lib/origin-attribution"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 
+// Objects whose source record the museum withdrew keep a place in the grid as a
+// text card (inventory number, collection, link) instead of an image, so it stays
+// visible how many objects are affected. Papyri are now in the Berliner
+// Papyrusdatenbank; everything else is searched on SMB's own collection site.
+const isWithdrawn = (object: MuseumObject) => object.attributes?.source_withdrawn === true
+const withdrawnSearchUrl = (object: MuseumObject): string | null => {
+  const inv = object.attributes?.inventory_number?.trim()
+  if (!inv) return null
+  return /^P\b/.test(inv)
+    ? `https://berlpap.smb.museum/?s=${encodeURIComponent(inv)}`
+    : `https://search.smb.museum/?q=${encodeURIComponent(inv)}`
+}
+
 // A tile is only ever shown once its image has actually loaded — objects with
 // no image, or whose image fails, are left out of the grid entirely rather than
 // rendered as an empty/placeholder tile. Images are preloaded in list order and
@@ -108,7 +121,7 @@ export default function ObjectGrid({
   const tileHeight = columnsOverride ? (columnsOverride <= 1 ? 320 : columnsOverride >= 5 ? 112 : 176) : null
 
   const imageObjects = useMemo(() => {
-    return objects.filter((object) => hasImageUrl(object.attributes?.img_url))
+    return objects.filter((object) => isWithdrawn(object) || hasImageUrl(object.attributes?.img_url))
   }, [objects])
 
   const markImage = useCallback((id: string, status: ImageStatus) => {
@@ -120,7 +133,7 @@ export default function ObjectGrid({
     const revealed: MuseumObject[] = []
     let frontier = imageObjects.length
     for (let i = 0; i < imageObjects.length; i++) {
-      const status = imageStatus[imageObjects[i].id]
+      const status = isWithdrawn(imageObjects[i]) ? "ok" : imageStatus[imageObjects[i].id]
       if (status === "ok") revealed.push(imageObjects[i])
       else if (status === undefined) {
         frontier = i
@@ -137,7 +150,7 @@ export default function ObjectGrid({
     const end = Math.min(imageObjects.length, frontier + PRELOAD_LOOKAHEAD)
     for (let i = frontier; i < end && inflight.size < PRELOAD_CONCURRENCY; i++) {
       const object = imageObjects[i]
-      if (imageStatus[object.id] || inflight.has(object.id)) continue
+      if (isWithdrawn(object) || imageStatus[object.id] || inflight.has(object.id)) continue
       if (isSlowHost(object.attributes.img_url!)) {
         markImage(object.id, "failed")
         continue
@@ -345,6 +358,38 @@ return (
       >
       {visibleObjects.map((object, index) => {
         const isSelected = object.id === selectedImageId
+
+if (isWithdrawn(object)) {
+  const href = withdrawnSearchUrl(object)
+  return (
+    <div
+      key={object.id}
+      className={`relative bg-white p-1 flex items-center justify-center ${tileHeight ? "" : "h-44"}`}
+      style={tileHeight ? { height: tileHeight } : undefined}
+      onMouseEnter={() => onObjectHover(object.attributes.place_name || null)}
+      onMouseLeave={() => onObjectHover(null)}
+    >
+      <a
+        href={href || undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="The museum withdrew this record from its online collection"
+        className="w-full h-full bg-white rounded-[10px] border border-gray-100 p-3 flex flex-col justify-between transition-colors hover:bg-[#f5f5f5]"
+      >
+        <span className="text-gray-400 text-sm leading-none">{href ? "↗" : ""}</span>
+        <span className="flex-1 flex items-center justify-center px-1 font-mono text-sm text-[#111] text-center line-clamp-3 leading-tight">
+          {object.attributes.inventory_number}
+        </span>
+        <span className="flex items-end justify-between mt-1">
+          <span className="text-[9px] text-gray-400 leading-none">Record withdrawn</span>
+          <span className="text-[9px] text-gray-400 leading-none truncate ml-1 max-w-[60%] text-right">
+            © {object.attributes.institution_name}
+          </span>
+        </span>
+      </a>
+    </div>
+  )
+}
 
 return (
   <div

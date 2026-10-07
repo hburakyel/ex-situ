@@ -249,6 +249,7 @@ export default function ObjectPanel({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
+  const foldRef = useRef<HTMLDivElement>(null)
   const drillSectionsScrollTopRef = useRef(0)
   const drillSectionsLockUntilRef = useRef(0)
   const prefersReducedMotion = useRef(false)
@@ -562,7 +563,7 @@ export default function ObjectPanel({
       // Only fold when the grid stays scrollable with the header gone. With a few
       // artifacts the grid would fit afterwards, leaving no scroll-up to bring the
       // header back.
-      const headerHeight = headerRef.current?.offsetHeight ?? 0
+      const headerHeight = foldRef.current?.offsetHeight ?? 0
       if (maxScrollTop > headerHeight + 2 * SCROLL_HYSTERESIS) {
         drillSectionsLockUntilRef.current = Date.now() + LOCK_MS
         setDrillSectionsVisible(false)
@@ -572,9 +573,6 @@ export default function ObjectPanel({
           if (drillSectionsScrollTopRef.current <= SCROLL_HYSTERESIS) setDrillSectionsVisible(true)
         }, LOCK_MS + 20)
       }
-    } else if (delta < -SCROLL_HYSTERESIS) {
-      drillSectionsLockUntilRef.current = Date.now() + LOCK_MS
-      setDrillSectionsVisible(true)
     }
     drillSectionsScrollTopRef.current = scrollTop
   }, [])
@@ -1381,24 +1379,6 @@ export default function ObjectPanel({
         {/* Header: Desktop and Mobile layouts */}
         {isMobile ? (
           <div ref={headerRef} className="sticky top-0 z-30 flex flex-col bg-white">
-            {/* Scroll-away bar (same pattern as a native collapsing nav bar): the height folds
-                and the content slides up with it — no fade — on the sheet's own easing curve.
-                Hidden on scroll-down, revealed on scroll-up. */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr)",
-                gridTemplateRows: collapsed ? "0fr" : "1fr",
-                transition: "grid-template-rows 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
-              }}
-            >
-            <div
-              className="overflow-hidden min-h-0 min-w-0 w-full"
-              style={{
-                transform: collapsed ? "translateY(-100%)" : "translateY(0)",
-                transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
-              }}
-            >
             <div className="flex items-center justify-between text-sm min-w-0 px-4 pt-0">
               <div className="flex items-center min-w-0 flex-1 overflow-hidden">
                 {breadcrumb.map((seg, i) => {
@@ -1429,7 +1409,7 @@ export default function ObjectPanel({
                 })}
               </div>
               <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                {objects.length > 0 && gridSizeButton}
+                {gridSizeButton}
                 {onCommandPaletteOpen && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
                     <IconSearch className="w-5 h-5 text-gray-500" />
@@ -1437,13 +1417,34 @@ export default function ObjectPanel({
                 )}
               </div>
             </div>
+            {/* Scroll-away bar (same pattern as a native collapsing nav bar): the height folds
+                and the content slides up with it — no fade — on the sheet's own easing curve.
+                The top row (breadcrumb, grid size, search) stays; the info below
+                hides on scroll-down and comes back when the grid is back at the top. */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr)",
+                gridTemplateRows: collapsed ? "0fr" : "1fr",
+                transition: "grid-template-rows 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              }}
+            >
+            <div
+              ref={foldRef}
+              className="overflow-hidden min-h-0 min-w-0 w-full"
+              style={{
+                transform: collapsed ? "translateY(-100%)" : "translateY(0)",
+                transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              }}
+            >
             <InfoPanel
                 isMobile={isMobile}
                 containerSize={containerSize}
                 breadcrumb={[]}
                 onBreadcrumbClick={undefined}
                 onCommandPaletteOpen={undefined}
-                actionSlot={objects.length > 0 ? (
+                // Always rendered so the count row keeps its height while objects load.
+                actionSlot={(
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
@@ -1478,7 +1479,7 @@ export default function ObjectPanel({
                       {reportIssueMenuItem}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                ) : undefined}
+                )}
                 totalCount={totalCount}
                 collectionCount={collectionCount}
                 isLoading={isLoading}
@@ -1576,7 +1577,7 @@ export default function ObjectPanel({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              {objects.length > 0 && containerSize === "expanded" && gridSizeButton}
+              {containerSize === "expanded" && gridSizeButton}
               {/* Expand/minimize — desktop only */}
               <Button
                 variant="ghost"

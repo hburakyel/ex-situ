@@ -1055,7 +1055,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             object_date_precision,
             object_date_display,
             acquisition_year_earliest,
-            acquisition_date_confidence
+            acquisition_date_confidence,
+            -- set by etl/check_withdrawn_sources.py when the source record was withdrawn
+            COALESCE(geocoding_notes LIKE '%[source-withdrawn]%', false) AS source_withdrawn
         FROM museum_objects m
         JOIN page ON page.id = m.id
         ORDER BY m.id DESC
@@ -1104,6 +1106,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             institution_longitude: row.institution_longitude ? parseFloat(row.institution_longitude) : null,
             object_date,
             acquisition_year,
+            source_withdrawn: row.source_withdrawn === true,
           }
           };
         }),

@@ -59,6 +59,8 @@ export interface MuseumObject {
     geocoding_confidence?: number
     geocoding_status?: GeocodingStatus
     geocoding_notes?: string
+    /** The source record was withdrawn by the museum; no image is shown (etl/check_withdrawn_sources.py). */
+    source_withdrawn?: boolean
     manual_latitude?: number
     manual_longitude?: number
     review_status?: ReviewStatus
