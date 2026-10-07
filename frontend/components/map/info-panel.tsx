@@ -29,12 +29,13 @@ const PANEL_TOP_FADE_STYLE = {
 const formatCount = (n: number) => n.toLocaleString("en-US")
 
 // Mobile drill-down section header (Places / Sites / Time / Collections): the whole
-// 44px row toggles, not just the chevron.
+// row toggles, not just the chevron. It keeps the old 32px look; an invisible
+// extension above and below makes the touch target 44px.
 function SectionToggle({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
-      className="flex w-full min-h-11 items-center justify-between text-left"
+      className="relative flex w-full h-8 items-center justify-between text-left before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-['']"
       onClick={onToggle}
       aria-expanded={open}
     >
@@ -249,7 +250,7 @@ export default function InfoPanel({
                   {showOrigins && (
                     <FadedAccordionList>
                         {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5"
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
@@ -272,7 +273,7 @@ export default function InfoPanel({
                     <FadedAccordionList>
                         {groupedSites.map((site, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
@@ -300,7 +301,7 @@ export default function InfoPanel({
                           .filter((row) => row.count > 0)
                           .map((row) => (
                             <div key={row.id}
-                              className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
+                              className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
                               onClick={() => onToggleEra?.(row.era)}
                             >
                               <span className="truncate max-w-[70%]" title={row.label}>{row.label}</span>
@@ -322,7 +323,7 @@ export default function InfoPanel({
                     <FadedAccordionList>
                         {drillInstitutions.map((inst, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-1.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleInstitution?.(inst.name)}
                           >
                             <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
