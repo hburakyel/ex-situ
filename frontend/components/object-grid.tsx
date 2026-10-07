@@ -17,6 +17,30 @@ const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && im
 const PRELOAD_CONCURRENCY = 8
 const PRELOAD_LOOKAHEAD = 24
 const PRELOAD_TIMEOUT_MS = 8000
+// The first pending image normally blocks everything behind it (that's what keeps
+// tiles from shifting). If it's still loading after this long while a later image
+// has already loaded, it's the slow one: drop it rather than hold the grid back.
+// Lone slowness (e.g. a slow connection, where nothing later has loaded either)
+// keeps waiting up to PRELOAD_TIMEOUT_MS as before.
+const SLOW_SKIP_MS = 1200
+// After this many slow/timed-out images in a row from one host (any image that
+// loads resets the count), stop requesting that host's images for the rest of the
+// session — e.g. a museum image server that is down.
+const SLOW_HOST_STRIKES = 3
+const slowHostStrikes = new Map<string, number>()
+
+const imageHost = (url: string): string => {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ""
+  }
+}
+const isSlowHost = (url: string) => (slowHostStrikes.get(imageHost(url)) ?? 0) >= SLOW_HOST_STRIKES
+const addSlowHostStrike = (url: string) => {
+  const host = imageHost(url)
+  if (host) slowHostStrikes.set(host, (slowHostStrikes.get(host) ?? 0) + 1)
+}
 // Stop auto-fetching further pages after this many in a row reveal nothing new
 // (e.g. a filter whose objects are almost all imageless).
 const MAX_EMPTY_AUTOLOADS = 5
@@ -66,6 +90,8 @@ export default function ObjectGrid({
 
   const [imageStatus, setImageStatus] = useState<Record<string, ImageStatus>>({})
   const inflightRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  const inflightStartRef = useRef<Map<string, number>>(new Map())
+  const [slowCheckTick, setSlowCheckTick] = useState(0)
   const emptyAutoloadsRef = useRef(0)
   const [gridClass, setGridClass] = useState("")
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
@@ -106,16 +132,23 @@ export default function ObjectGrid({
     for (let i = frontier; i < end && inflight.size < PRELOAD_CONCURRENCY; i++) {
       const object = imageObjects[i]
       if (imageStatus[object.id] || inflight.has(object.id)) continue
+      if (isSlowHost(object.attributes.img_url!)) {
+        markImage(object.id, "failed")
+        continue
+      }
       const img = new window.Image()
       const settle = (status: ImageStatus) => {
         clearTimeout(timer)
         img.onload = null
         img.onerror = null
         inflight.delete(object.id)
+        inflightStartRef.current.delete(object.id)
+        if (status === "ok") slowHostStrikes.delete(imageHost(object.attributes.img_url!))
         markImage(object.id, status)
       }
       const timer = setTimeout(() => {
         img.src = ""
+        addSlowHostStrike(object.attributes.img_url!)
         settle("failed")
       }, PRELOAD_TIMEOUT_MS)
       // naturalWidth guard: some hosts answer dead links with a 1px placeholder.
@@ -123,8 +156,35 @@ export default function ObjectGrid({
       img.onerror = () => settle("failed")
       img.src = resolveImageSrc(object.attributes.img_url!, THUMB_WIDTH)
       inflight.set(object.id, img)
+      inflightStartRef.current.set(object.id, Date.now())
     }
   }, [imageObjects, frontier, imageStatus, revealed.length, visibleRange.end, markImage])
+
+  // Skip a slow frontier image once a later one has loaded (see SLOW_SKIP_MS).
+  useEffect(() => {
+    const object = imageObjects[frontier]
+    if (!object) return
+    const img = inflightRef.current.get(object.id)
+    const startedAt = inflightStartRef.current.get(object.id)
+    if (!img || startedAt === undefined) return
+    const laterLoaded = imageObjects
+      .slice(frontier + 1, frontier + 1 + PRELOAD_LOOKAHEAD)
+      .some((o) => imageStatus[o.id] === "ok")
+    const wait = startedAt + SLOW_SKIP_MS - Date.now()
+    if (laterLoaded && wait <= 0) {
+      img.onload = null
+      img.onerror = null
+      img.src = ""
+      inflightRef.current.delete(object.id)
+      inflightStartRef.current.delete(object.id)
+      addSlowHostStrike(object.attributes.img_url!)
+      markImage(object.id, "failed")
+      return
+    }
+    // Re-check when the deadline passes (or soon, while waiting for a later load).
+    const id = window.setTimeout(() => setSlowCheckTick((t) => t + 1), Math.max(wait, 200))
+    return () => window.clearTimeout(id)
+  }, [imageObjects, frontier, imageStatus, slowCheckTick, markImage])
 
   // Abort in-flight preloads on unmount.
   useEffect(() => {
