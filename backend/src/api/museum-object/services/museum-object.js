@@ -992,11 +992,23 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         return { data: [], meta: { pagination: { page, pageSize, pageCount: Math.ceil(total / pageSize), total } } };
       }
 
-      // Data query — deduplicate (pick the lowest id per inv+institution group), then page
+      // Data query — dedupe (lowest id per inv+institution group) and page on ids
+      // alone, then fetch columns and the per-row component lookups for just this
+      // page. Running those lookups inside the DISTINCT ON evaluated them for every
+      // matching row (33k for AIC) and made each page take 1–2 s.
       const dataQuery = `
-        SELECT * FROM (
-          SELECT DISTINCT ON (${dedupKey})
-            id,
+        WITH page AS (
+          SELECT id FROM (
+            SELECT DISTINCT ON (${dedupKey}) id
+            FROM museum_objects
+            ${whereClause}
+            ORDER BY ${dedupKey}, id
+          ) deduped
+          ORDER BY id DESC
+          LIMIT :limit OFFSET :offset
+        )
+        SELECT
+            m.id,
             object_id,
             title,
             img_url,
@@ -1014,15 +1026,15 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             origin_person_name,
             (SELECT ti.time_name FROM museum_objects_components moc
              JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
-             WHERE moc.entity_id = museum_objects.id AND moc.field = 'time'
+             WHERE moc.entity_id = m.id AND moc.field = 'time'
              ORDER BY moc."order" LIMIT 1) as time_name,
             (SELECT ti.time_start FROM museum_objects_components moc
              JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
-             WHERE moc.entity_id = museum_objects.id AND moc.field = 'time'
+             WHERE moc.entity_id = m.id AND moc.field = 'time'
              ORDER BY moc."order" LIMIT 1) as time_start,
             (SELECT ti.time_end FROM museum_objects_components moc
              JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
-             WHERE moc.entity_id = museum_objects.id AND moc.field = 'time'
+             WHERE moc.entity_id = m.id AND moc.field = 'time'
              ORDER BY moc."order" LIMIT 1) as time_end,
             ${latExpr} as latitude,
             ${lonExpr} as longitude,
@@ -1030,11 +1042,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             institution_longitude,
             (SELECT ol.link_text FROM museum_objects_components moc
              JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
-             WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
+             WHERE moc.entity_id = m.id AND moc.field = 'object_links'
              ORDER BY moc."order" LIMIT 1) as object_link_url,
             (SELECT ol.link_display FROM museum_objects_components moc
              JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
-             WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
+             WHERE moc.entity_id = m.id AND moc.field = 'object_links'
              ORDER BY moc."order" LIMIT 1) as object_link_display,
             object_date,
             acquisition_year,
@@ -1044,12 +1056,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             object_date_display,
             acquisition_year_earliest,
             acquisition_date_confidence
-          FROM museum_objects
-          ${whereClause}
-          ORDER BY ${dedupKey}, id
-        ) deduped
-        ORDER BY id DESC
-        LIMIT :limit OFFSET :offset
+        FROM museum_objects m
+        JOIN page ON page.id = m.id
+        ORDER BY m.id DESC
       `;
 
       const dataResult = await db.raw(dataQuery, {
