@@ -197,8 +197,10 @@ export default function ObjectPanel({
     } catch {}
   }, [])
   const cycleGridColumns = useCallback(() => {
+    // From the responsive default (2 per row on phones, more on wide panels) the
+    // first tap goes to 3; after that 3 → 5 → 1 → 3.
     const order = [3, 5, 1]
-    const next = order[(order.indexOf(gridColumns ?? 3) + 1) % order.length]
+    const next = gridColumns === null ? 3 : order[(order.indexOf(gridColumns) + 1) % order.length]
     setGridColumns(next)
     try { localStorage.setItem("exsitu:grid-columns", String(next)) } catch {}
   }, [gridColumns])
@@ -210,8 +212,8 @@ export default function ObjectPanel({
       size="icon"
       className="h-8 w-8 flex-shrink-0"
       onClick={cycleGridColumns}
-      title={`Grid size: ${gridColumns ?? 3} per row`}
-      aria-label={`Grid size: ${gridColumns ?? 3} per row. Change`}
+      title={gridColumns ? `Grid size: ${gridColumns} per row` : "Grid size: automatic"}
+      aria-label={`Grid size: ${gridColumns ? `${gridColumns} per row` : "automatic"}. Change`}
     >
       <IconGridSize className="w-5 h-5 text-gray-500" columns={gridColumns ?? 3} />
     </Button>
@@ -813,7 +815,10 @@ export default function ObjectPanel({
       }
     }
 
-    const desktopTransition = prefersReducedMotion.current ? "none" : "width 0.26s cubic-bezier(0.4,0,0.2,1), height 0.26s cubic-bezier(0.4,0,0.2,1)"
+    // Desktop resize is instant: height goes between `auto` and a fixed value, which CSS
+    // can't interpolate, so only the width animated and the two jarred. Instant also
+    // avoids re-laying out the whole grid on every frame.
+    const desktopTransition = "none"
     switch (containerSize) {
       case "expanded":
         return {
