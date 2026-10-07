@@ -427,7 +427,7 @@ export default function ImageGallery({
               "Antikensammlung": "CC BY 4.0",
               "Museum für Islamische Kunst": "CC BY 4.0",
               "Vorderasiatisches Museum": "CC BY 4.0",
-              "Ägyptisches Museum": "CC BY 4.0",
+              "Ägyptisches Museum und Papyrussammlung": "CC BY 4.0",
               "Museum für Asiatische Kunst": "CC BY 4.0",
               "Art Institute of Chicago": "CC0",
               "Victoria and Albert Museum": "CC0",
@@ -474,7 +474,7 @@ export default function ImageGallery({
                     textDecoration: "none",
                   }}
                 >
-                  View source ↗
+                  {institution ? `© ${institution} ↗` : "View source ↗"}
                 </a>
               )
             }
