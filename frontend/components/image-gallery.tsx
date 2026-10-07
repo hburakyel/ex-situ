@@ -452,7 +452,7 @@ export default function ImageGallery({
             const sourceUrl = getLinkUrl()
             const credit = isWithdrawn(currentObject)
               // No image: the museum withdrew the record that stated its licence.
-              ? `© ${institution}${SMB_COLLECTIONS.has(institution) ? ", Staatliche Museen zu Berlin" : ""} · Image not shown: record withdrawn by the museum`
+              ? `© ${institution} · No image licence`
               : SMB_COLLECTIONS.has(institution)
                 ? `© ${institution}, Staatliche Museen zu Berlin · CC BY-NC-SA`
                 : CREDITS[institution] || (institution ? `© ${institution}` : "")
