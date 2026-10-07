@@ -250,7 +250,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const lastBounds = useRef<MapBounds | null>(null)
     const deckOverlay = useRef<MapboxOverlay | null>(null)
     const [mapError, setMapError] = useState<string | null>(null)
-    const [currentZoom, setCurrentZoom] = useState(2)
+    // Zoom bands, not the raw zoom: the map fires "zoom" every animation frame,
+    // and a raw-value state re-rendered this component (and rebuilt the arc
+    // layers) ~60×/s while zooming. The exact value lives in currentZoomRef.
+    const [isLowZoomArcView, setIsLowZoomArcView] = useState(true)
+    const [isStreetZoom, setIsStreetZoom] = useState(false)
     const currentZoomRef = useRef(2)
     const [isMapReady, setIsMapReady] = useState(false)
     const initialBoundsSet = useRef(false)
@@ -556,7 +560,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
       mapInstance.on("zoom", () => {
         const newZoom = mapInstance.getZoom()
-        setCurrentZoom(newZoom)
+        setIsLowZoomArcView(newZoom < 4)
+        setIsStreetZoom(newZoom >= 7)
         currentZoomRef.current = newZoom
         onZoomChangeRef.current?.(newZoom)
       })
@@ -750,9 +755,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Below zoom 4 (global view) hundreds of arcs overplot into a solid mass —
     // dim and thin unhighlighted arcs so overlap reads as density rather than a flat blob.
-    // Bucketed to a boolean (not raw currentZoom) so this only recomputes the layer
-    // when crossing the threshold, not on every zoom-gesture frame.
-    const isLowZoomArcView = currentZoom < 4
+    // Bucketed to a boolean (isLowZoomArcView, set in the zoom handler) so this only
+    // recomputes the layer when crossing the threshold, not on every zoom-gesture frame.
+
+    // Only the identity of the hovered arc matters for the layer (mobile width boost);
+    // the tooltip's x/y change on every mouse move and must not rebuild the layer.
+    const hoveredArcKey = isMobile && hoveredArc ? `${hoveredArc.fromName}-${hoveredArc.toName}` : null
 
     // ArcLayer: görsel ve etkileşim bir arada, mobilde hover/tıklama sırasında geçici olarak genişler
     const arcLayer = useMemo(() => {
@@ -808,7 +816,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         },
         getWidth: (d) => {
           const selectedOrActive = isSelectedOrActiveArc(d)
-          const isHovered = hoveredArc && hoveredArc.fromName === d.fromName && hoveredArc.toName === d.toName
+          const isHovered = hoveredArcKey === `${d.fromName}-${d.toName}`
           const baseWidth = dataSource === 'geospatial-country' || dataSource === 'geospatial-city'
             ? Math.max(0.5, Math.min(3, 0.5 + Math.log(d.count + 1) * 0.45))
             : Math.max(2, Math.min(6, 2 + Math.log(d.count + 1) * 0.9))
@@ -825,7 +833,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         highlightColor: [59, 130, 246],
         transitions: { getSourceColor: { duration: 300 }, getTargetColor: { duration: 300 }, getWidth: { duration: 300 } },
         updateTriggers: {
-          getSourceColor: [selectedArc?.key, activeSite, hoveredObjectPlace, isLowZoomArcView], getTargetColor: [selectedArc?.key, activeSite, hoveredObjectPlace, isLowZoomArcView], getWidth: [selectedArc?.key, activeSite, hoveredObjectPlace, hoveredArc, isMobile, isLowZoomArcView],
+          getSourceColor: [selectedArc?.key, activeSite, hoveredObjectPlace, isLowZoomArcView], getTargetColor: [selectedArc?.key, activeSite, hoveredObjectPlace, isLowZoomArcView], getWidth: [selectedArc?.key, activeSite, hoveredObjectPlace, hoveredArcKey, isMobile, isLowZoomArcView],
         },
         onHover: (info: any) => {
           if (info.object) {
@@ -859,7 +867,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           }
         },
       })
-    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArc, isLowZoomArcView])
+    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView])
 
     // ── Drill arc layer: persistent city-cluster arcs ──
     // Shown at city zoom (< 7) always. At zoom 7+, shown only when arcLayer has
@@ -870,7 +878,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       if (!isMapReady || drillLevel === "global" || drillArcs.length === 0) return null
       // At zoom 7+, only hide when the active arc layer is already rendering
       // individual object routes for the current viewport.
-      if (currentZoom >= 7 && processedArcs.dataSource === 'geospatial-objects' && processedArcs.arcLayerData.length > 0) return null
+      if (isStreetZoom && processedArcs.dataSource === 'geospatial-objects' && processedArcs.arcLayerData.length > 0) return null
       const validArcs = drillArcs.filter(a =>
         hasValidCoordinates(a.latitude, a.longitude) &&
         a.institution_latitude != null && a.institution_longitude != null &&
@@ -931,7 +939,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 1800 })
         },
       })
-    }, [isMapReady, drillLevel, drillArcs, activeSite, hoveredObjectPlace, isMobile, currentZoom, processedArcs.dataSource, processedArcs.arcLayerData.length])
+    }, [isMapReady, drillLevel, drillArcs, activeSite, hoveredObjectPlace, isMobile, isStreetZoom, processedArcs.dataSource, processedArcs.arcLayerData.length])
 
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({

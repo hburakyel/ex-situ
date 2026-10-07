@@ -134,7 +134,10 @@ function MapContent() {
   const [wikiDocs, setWikiDocs] = useState<any[]>([])
   const [initialGalleryArtifact, setInitialGalleryArtifact] = useState<MuseumObject | null>(null)
   const initialZoom = clamp(urlZoom ? parseFloat(urlZoom) : (isMobileInit ? 1.2 : 2), 0, 22, isMobileInit ? 1.2 : 2)
-  const [currentZoom, setCurrentZoom] = useState(initialZoom)
+  // Only the "below global threshold" bucket is state: the map fires a zoom event
+  // every animation frame, and storing the raw value re-rendered the whole page
+  // (object grid included) ~60×/s while zooming. The exact value lives in the ref.
+  const [isZoomedOutToGlobal, setIsZoomedOutToGlobal] = useState(initialZoom < 3)
   const currentZoomRef = useRef(initialZoom)
 
   // ── Unified search for global arc data (fastest initial data) ──
@@ -275,11 +278,11 @@ function MapContent() {
 
   const handleZoomChange = useCallback((zoom: number) => {
     currentZoomRef.current = zoom
-    setCurrentZoom(zoom)
+    setIsZoomedOutToGlobal(zoom < 3)
   }, [])
 
-  // Track previous zoom to detect zoom-out vs fly-to
-  const prevZoomRef = useRef(initialZoom)
+  // Track previous zoom bucket to detect zooming out past the global threshold
+  const prevZoomedOutRef = useRef(initialZoom < 3)
 
   // Arc cards from map-view
   const [mapArcCards, setMapArcCards] = useState<any[]>([])
@@ -1151,11 +1154,11 @@ function MapContent() {
   // Guard: skip during initial restore period (first 3s after mount with URL params)
   const mountTimeRef = useRef(Date.now())
   useEffect(() => {
-    const wasAbove = prevZoomRef.current >= 3
-    prevZoomRef.current = currentZoom
+    const wasAbove = !prevZoomedOutRef.current
+    prevZoomedOutRef.current = isZoomedOutToGlobal
     // Skip auto-clear during initial restore (map may animate through low zoom levels)
     if (urlCountry && Date.now() - mountTimeRef.current < 3000) return
-    if (currentZoom < 3 && wasAbove && drillLevel !== "global") {
+    if (isZoomedOutToGlobal && wasAbove && drillLevel !== "global") {
       setActiveCountry(null)
       setActiveSite(null)
       setActiveInstitution(null)
@@ -1167,7 +1170,7 @@ function MapContent() {
       setLocationName("")
       setGeocodedName("")
     }
-  }, [currentZoom, drillLevel, urlCountry])
+  }, [isZoomedOutToGlobal, drillLevel, urlCountry])
 
   // Handle wikipedia documents from map view
   const handleWikiDocumentsChange = useCallback((docs: any[]) => {
