@@ -13,15 +13,17 @@
  *      while city_en names something finer (keeps city-level precision).
  *   2. city_en
  *   3. country_en, else 'Unknown'
- * The octet_length = char_length guard (ASCII-only values) predates this and
- * applies to both name columns.
+ * Both name columns must be Latin script (accents included: "Fayûm", "Zincirli
+ * Höyük"); names in other scripts (Arabic, Persian, Japanese…) fall through to
+ * the next level. Mirrored by LATIN_ONLY in frontend/lib/site-label.ts.
  *
  * Group by PLACE_GROUP_KEY (case-insensitive) and display
  * mode() WITHIN GROUP (ORDER BY PLACE_GROUP_EXPR), the most common spelling.
  */
 
+const LATIN_ONLY = "^[\\u0001-\\u024F\\u02B0-\\u02FF\\u1E00-\\u1EFF\\u2018\\u2019]*$";
 const usable = (col) =>
-  `(NULLIF(BTRIM(${col}), '') IS NOT NULL AND octet_length(${col}) = char_length(${col}))`;
+  `(NULLIF(BTRIM(${col}), '') IS NOT NULL AND ${col} ~ '${LATIN_ONLY}')`;
 
 const CITY_EXPR = `CASE WHEN ${usable('city_en')} THEN BTRIM(city_en) END`;
 

@@ -21,8 +21,10 @@ describe("siteLabel", () => {
     expect(siteLabel({ place_name_normalized: "", city_en: "", country_en: "Nigeria" })).toBe("Nigeria")
     expect(siteLabel({})).toBe("Unknown")
   })
-  it("ignores non-ASCII values like the SQL guard does", () => {
-    expect(siteLabel({ place_name_normalized: null, city_en: "Fayûm", country_en: "Egypt" })).toBe("Egypt")
+  it("accepts Latin names with accents, skips other scripts like the SQL guard does", () => {
+    expect(siteLabel({ place_name_normalized: null, city_en: "Fayûm", country_en: "Egypt" })).toBe("Fayûm")
+    expect(siteLabel({ place_name_normalized: "Zincirli Höyük", city_en: "Sam'al", country_en: "Turkey" })).toBe("Zincirli Höyük")
+    expect(siteLabel({ place_name_normalized: null, city_en: "Mitsumine Jinja 三峰神社", country_en: "Japan" })).toBe("Japan")
   })
 })
 

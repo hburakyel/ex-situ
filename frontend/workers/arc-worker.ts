@@ -20,7 +20,8 @@
 // name as the zoom 4–6 clusters / Sites list (backend place-group.js), or a
 // clicked arc selects a "site" nothing else matches (empty Collections list).
 function siteLabel(o: { place_name_normalized?: string | null; city_en?: string | null; country_en?: string | null; country?: string | null }): string {
-  const usable = (v?: string | null): v is string => typeof v === "string" && v.trim() !== "" && /^[\x00-\x7F]*$/.test(v)
+  const usable = (v?: string | null): v is string =>
+    typeof v === "string" && v.trim() !== "" && /^[\u0001-\u024F\u02B0-\u02FF\u1E00-\u1EFF\u2018\u2019]*$/.test(v)
   const country = o.country_en ?? o.country ?? null
   const city = usable(o.city_en) ? o.city_en.trim() : null
   const normalized = usable(o.place_name_normalized) ? o.place_name_normalized.trim() : null

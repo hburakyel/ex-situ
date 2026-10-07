@@ -10,9 +10,11 @@ interface SiteFields {
   country?: string | null
 }
 
-// Same guard as the SQL: octet_length = char_length, i.e. ASCII only.
+// Same guard as the SQL (place-group.js LATIN_ONLY): Latin script incl. accents,
+// no other scripts.
+const LATIN_ONLY = /^[\u0001-\u024F\u02B0-\u02FF\u1E00-\u1EFF\u2018\u2019]*$/
 const usable = (value?: string | null): value is string =>
-  typeof value === "string" && value.trim() !== "" && /^[\x00-\x7F]*$/.test(value)
+  typeof value === "string" && value.trim() !== "" && LATIN_ONLY.test(value)
 
 export function siteLabel(o: SiteFields): string {
   const country = o.country_en ?? o.country ?? null
