@@ -127,6 +127,11 @@ function MapContent() {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [containerSize, setContainerSize] = useState<ContainerSize>("default")
+  // Mobile: open the object sheet full height on first load (map is one swipe away).
+  // Set after mount so server and client render the same initial markup.
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 768px)").matches) setContainerSize("expanded")
+  }, [])
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
   const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({ institutions: [], countries: [], cities: [] })
   const [selectedArc, setSelectedArc] = useState<SelectedArc | null>(null)
