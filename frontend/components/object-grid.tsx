@@ -60,8 +60,8 @@ interface ObjectGridProps {
   mobileColumns?: number
   /** Fixed column count chosen by the user; overrides the responsive layout. */
   columns?: number | null
-  /** Fires on every scroll of the grid's internal container, with its current scrollTop. */
-  onScroll?: (scrollTop: number) => void
+  /** Fires on every scroll of the grid's internal container, with its scrollTop and how far it can scroll. */
+  onScroll?: (scrollTop: number, maxScrollTop: number) => void
 }
 
 const GRID_BOTTOM_FADE_STYLE = {
@@ -244,7 +244,7 @@ export default function ObjectGrid({
     const { scrollTop, clientHeight, scrollHeight } = containerRef.current
     const scrollPosition = scrollTop + clientHeight
 
-    onScroll?.(scrollTop)
+    onScroll?.(scrollTop, scrollHeight - clientHeight)
 
     // If we're near the bottom of our current range, load more items into view
     if (scrollPosition > scrollHeight - 200 && visibleRange.end < revealed.length) {

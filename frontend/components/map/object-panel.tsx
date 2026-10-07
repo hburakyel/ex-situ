@@ -546,8 +546,9 @@ export default function ObjectPanel({
   // Frees up room for the object grid; a small scroll-up brings the block back.
   // ObjectGrid owns the actual scrolling element internally (its own containerRef),
   // so this listens via its onScroll callback rather than a ref on the wrapper div.
-  const handleGridScroll = useCallback((scrollTop: number) => {
+  const handleGridScroll = useCallback((scrollTop: number, maxScrollTop: number) => {
     const SCROLL_HYSTERESIS = 8
+    const LOCK_MS = 450
     // Folding the header resizes the grid, which fires scroll events of its own;
     // ignore them while the transition runs so it can't bounce back open.
     if (Date.now() < drillSectionsLockUntilRef.current) {
@@ -558,10 +559,21 @@ export default function ObjectPanel({
     if (scrollTop <= SCROLL_HYSTERESIS) {
       setDrillSectionsVisible(true)
     } else if (delta > SCROLL_HYSTERESIS) {
-      drillSectionsLockUntilRef.current = Date.now() + 450
-      setDrillSectionsVisible(false)
+      // Only fold when the grid stays scrollable with the header gone. With a few
+      // artifacts the grid would fit afterwards, leaving no scroll-up to bring the
+      // header back.
+      const headerHeight = headerRef.current?.offsetHeight ?? 0
+      if (maxScrollTop > headerHeight + 2 * SCROLL_HYSTERESIS) {
+        drillSectionsLockUntilRef.current = Date.now() + LOCK_MS
+        setDrillSectionsVisible(false)
+        // Scroll events during the lock are ignored; if the grid ended up back at
+        // the top (or can't scroll at all), no further event will come — re-check.
+        window.setTimeout(() => {
+          if (drillSectionsScrollTopRef.current <= SCROLL_HYSTERESIS) setDrillSectionsVisible(true)
+        }, LOCK_MS + 20)
+      }
     } else if (delta < -SCROLL_HYSTERESIS) {
-      drillSectionsLockUntilRef.current = Date.now() + 450
+      drillSectionsLockUntilRef.current = Date.now() + LOCK_MS
       setDrillSectionsVisible(true)
     }
     drillSectionsScrollTopRef.current = scrollTop
