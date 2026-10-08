@@ -22,7 +22,9 @@ const PRELOAD_LOOKAHEAD = 24
 const PRELOAD_TIMEOUT_MS = 8000
 // The first pending image normally blocks everything behind it (that's what keeps
 // tiles from shifting). If it's still loading after this long while a later image
-// has already loaded, it's the slow one: drop it rather than hold the grid back.
+// has already loaded, it's the slow one: stop waiting for it rather than hold the
+// grid back. It keeps loading in the background ("late") and, if it arrives, fills
+// its tile right after the images — museum servers like SMB's often answer in 2s.
 // Lone slowness (e.g. a slow connection, where nothing later has loaded either)
 // keeps waiting up to PRELOAD_TIMEOUT_MS as before.
 const SLOW_SKIP_MS = 1200
@@ -59,7 +61,7 @@ const addSlowHostStrike = (url: string) => {
 // (e.g. a filter whose objects are almost all imageless).
 const MAX_EMPTY_AUTOLOADS = 5
 
-type ImageStatus = "ok" | "failed"
+type ImageStatus = "ok" | "failed" | "late" | "lateOk"
 
 interface ObjectGridProps {
   objects: MuseumObject[]
@@ -111,6 +113,7 @@ export default function ObjectGrid({
   const [imageStatus, setImageStatus] = useState<Record<string, ImageStatus>>({})
   const inflightRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const inflightStartRef = useRef<Map<string, number>>(new Map())
+  const lateRef = useRef<Set<string>>(new Set())
   const [slowCheckTick, setSlowCheckTick] = useState(0)
   const emptyAutoloadsRef = useRef(0)
   const [gridClass, setGridClass] = useState("")
@@ -130,7 +133,7 @@ export default function ObjectGrid({
     setIsScrolled(false)
     // Retry images that failed earlier (e.g. while a server was briefly down).
     setImageStatus((prev) => {
-      const kept = Object.fromEntries(Object.entries(prev).filter(([, status]) => status === "ok"))
+      const kept = Object.fromEntries(Object.entries(prev).filter(([, status]) => status !== "failed"))
       return Object.keys(kept).length === Object.keys(prev).length ? prev : kept
     })
   }, [firstObjectId])
@@ -151,19 +154,21 @@ export default function ObjectGrid({
   // tiles) at the end. The backend already lists objects with an image first.
   const { revealed, frontier } = useMemo(() => {
     const images: MuseumObject[] = []
+    const late: MuseumObject[] = []
     const numbers: MuseumObject[] = []
     let frontier = imageObjects.length
     for (let i = 0; i < imageObjects.length; i++) {
       const o = imageObjects[i]
       const status = isWithdrawn(o) || !hasImageUrl(o.attributes?.img_url) ? "failed" : imageStatus[o.id]
       if (status === "ok") images.push(o)
+      else if (status === "late" || status === "lateOk") late.push(o)
       else if (status === "failed") numbers.push(o)
       else {
         frontier = i
         break
       }
     }
-    return { revealed: frontier === imageObjects.length ? [...images, ...numbers] : images, frontier }
+    return { revealed: frontier === imageObjects.length ? [...images, ...late, ...numbers] : images, frontier }
   }, [imageObjects, imageStatus])
 
   // Preload images from the frontier onward, a bounded window ahead of what's shown.
@@ -186,7 +191,7 @@ export default function ObjectGrid({
         inflight.delete(object.id)
         inflightStartRef.current.delete(object.id)
         if (status === "ok") slowHostStrikes.delete(imageHost(object.attributes.img_url!))
-        markImage(object.id, status)
+        markImage(object.id, status === "ok" && lateRef.current.has(object.id) ? "lateOk" : status)
       }
       const timer = setTimeout(() => {
         img.src = ""
@@ -214,12 +219,10 @@ export default function ObjectGrid({
       .some((o) => imageStatus[o.id] === "ok")
     const wait = startedAt + SLOW_SKIP_MS - Date.now()
     if (laterLoaded && wait <= 0) {
-      img.onload = null
-      img.onerror = null
-      img.src = ""
-      inflightRef.current.delete(object.id)
+      // Not cancelled: its onload/onerror and PRELOAD_TIMEOUT_MS still settle it.
       inflightStartRef.current.delete(object.id)
-      markImage(object.id, "failed")
+      lateRef.current.add(object.id)
+      markImage(object.id, "late")
       return
     }
     // Re-check when the deadline passes (or soon, while waiting for a later load).
@@ -390,7 +393,7 @@ return (
       {visibleObjects.map((object, index) => {
         const isSelected = object.id === selectedImageId
 
-if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStatus[object.id] === "failed") {
+if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStatus[object.id] === "failed" || imageStatus[object.id] === "late") {
   // Same tile as an image, but empty: only the inventory number. Opens the gallery
   // like any other tile.
   return (

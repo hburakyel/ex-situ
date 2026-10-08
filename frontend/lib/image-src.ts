@@ -9,11 +9,24 @@
 //   (It must live under /api/proxy/: production nginx sends every other
 //   /api/* path to Strapi, not Next.)
 // - id.smb.museum: hotlink-blocks headerless requests; proxied for the same reason.
+// - recherche.smb.museum: dead (301 to the homepage). Rows not yet remapped by
+//   etl/refetch_smb_image_urls.py point there; the same asset lives on
+//   search.smb.museum (see smbSearchUrl).
 
 const PROXIED_HOSTS = new Set(["id.smb.museum", "www.artic.edu"])
 
 export const THUMB_WIDTH = 300
 export const LARGE_WIDTH = 800
+
+// search.smb.museum buckets assets as dir1 = (id/1000) % 1000, dir2 = id/1e6
+// (left out when 0) — same layout as compute_search_url in the ETL.
+function smbSearchUrl(assetId: number): string {
+  const q1 = Math.floor(assetId / 1000)
+  const pad = (n: number) => String(n).padStart(3, "0")
+  const dir2 = Math.floor(q1 / 1000)
+  const dirs = dir2 === 0 ? pad(q1 % 1000) : `${pad(q1 % 1000)}/${pad(dir2)}`
+  return `https://search.smb.museum/media/images/thumbs/extra_large/${dirs}/${assetId}.jpg`
+}
 
 export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): string {
   let url: URL
@@ -21,6 +34,11 @@ export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): strin
     url = new URL(src)
   } catch {
     return src // relative or invalid — leave as-is
+  }
+
+  if (url.hostname === "recherche.smb.museum") {
+    const m = url.pathname.match(/\/(\d+)(?:_\d+x\d+)?\.jpe?g$/i)
+    if (m) return smbSearchUrl(Number(m[1]))
   }
 
   if (url.hostname === "images.metmuseum.org" && url.pathname.includes("/original/")) {

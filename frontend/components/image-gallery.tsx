@@ -474,7 +474,7 @@ export default function ImageGallery({
               : SMB_COLLECTIONS.has(institution)
                 ? `© ${institution}, Staatliche Museen zu Berlin · CC BY-NC-SA`
                 : CREDITS[institution] || (institution ? `© ${institution}` : "")
-            const style = { color: "#2a2a2a", fontSize: "0.875rem", textDecoration: "none" }
+            const style = { color: "#2a2a2a", fontSize: "9px", textDecoration: "none" }
 
             if (sourceUrl) {
               return (
