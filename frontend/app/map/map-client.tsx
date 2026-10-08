@@ -146,6 +146,16 @@ function MapContent() {
     () => (urlCountry || urlSite || urlInstitution || urlArtifactId ? "hidden" : "card"),
   )
   const [mobileGalleryOpen, setMobileGalleryOpen] = useState(false)
+  // Full-screen map: the browser's status/toolbar area takes the map's colour instead
+  // of the panel's white (theme-color + page background; see map/layout.tsx).
+  useEffect(() => {
+    const full = isMobile && mobileMap === "full" && !mobileGalleryOpen
+    const root = document.documentElement
+    if (full) root.dataset.mapFull = ""
+    else delete root.dataset.mapFull
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media]')
+    if (meta) meta.content = full ? "#111111" : "#ffffff"
+  }, [mobileMap, mobileGalleryOpen, isMobile])
   // Picking a place or site from the list brings the map card up (if put away) so
   // the fly-to is visible; it stays until closed — picking site after site keeps it.
   const mobileMapRef = useRef(mobileMap)
@@ -1477,7 +1487,9 @@ function MapContent() {
                     <IconClose className="h-5 w-5 text-gray-500" />
                   </Button>
                 </div>
-                <div className="-mx-3 mt-2 flex h-20 gap-2 overflow-x-auto px-3" style={{ overscrollBehaviorX: "contain" }}>
+                {/* Thumbnail row fades out at both edges, like the accordion lists. */}
+                <div className="relative -mx-3 mt-2">
+                <div className="flex h-20 gap-2 overflow-x-auto px-3" style={{ overscrollBehaviorX: "contain" }}>
                   {mapPreviewObjects.map((o) => (
                     <button
                       key={o.id}
@@ -1493,6 +1505,9 @@ function MapContent() {
                   {arcObjectsLoading && mapPreviewObjects.length === 0 && (
                     <div className="flex h-20 w-full items-center justify-center"><Spinner size="1" /></div>
                   )}
+                </div>
+                <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-5" style={{ background: "linear-gradient(to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)" }} />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-8" style={{ background: "linear-gradient(to left, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)" }} />
                 </div>
                 <Button
                   variant="outline"

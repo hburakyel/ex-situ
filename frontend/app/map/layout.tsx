@@ -26,7 +26,10 @@ export default function MapLayout({ children }: { children: React.ReactNode }) {
       {/* Only on the map route: the page behind the content (overscroll, safe areas). */}
       <style>{`
         html, body, .map-route-bg { background-color: ${MAP_BACKGROUND}; }
-        @media ${PHONE} { html, body, .map-route-bg { background-color: ${PANEL_BACKGROUND}; } }
+        @media ${PHONE} {
+          html, body, .map-route-bg { background-color: ${PANEL_BACKGROUND}; }
+          html[data-map-full], html[data-map-full] body, html[data-map-full] .map-route-bg { background-color: ${MAP_BACKGROUND}; }
+        }
       `}</style>
       <main className="flex-1 min-h-0 relative" suppressHydrationWarning>
         {children}

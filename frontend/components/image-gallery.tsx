@@ -446,7 +446,7 @@ export default function ImageGallery({
 
         {/* Site mark — bottom left; image credit — bottom right */}
         <div style={{ padding: "4px 16px 6px", backgroundColor: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
-          <span style={{ color: "#2a2a2a", fontSize: "9px" }}>Ex Situ 2022</span>
+          <span style={{ color: "#2a2a2a", fontSize: "9px", whiteSpace: "nowrap", flexShrink: 0 }}>Ex Situ 2022</span>
           <span style={{ textAlign: "right" }}>
           {(() => {
             // Image credit as each museum states it for its images (audited 2026-10-07):
@@ -474,7 +474,8 @@ export default function ImageGallery({
               // No image: the museum withdrew the record that stated its licence.
               ? `© ${institution} · No image licence`
               : SMB_COLLECTIONS.has(institution)
-                ? `© ${institution}, Staatliche Museen zu Berlin · CC BY-NC-SA`
+                // Phones: SMB's own abbreviation, so the credit fits one line next to the mark.
+                ? `© ${institution}, ${isMobile ? "SMB" : "Staatliche Museen zu Berlin"} · CC BY-NC-SA`
                 : CREDITS[institution] || (institution ? `© ${institution}` : "")
             const style = { color: "#2a2a2a", fontSize: "9px", textDecoration: "none" }
 
