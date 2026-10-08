@@ -14,9 +14,6 @@ export default function SearchBar({ onOpen }: { onOpen?: () => void }) {
     >
       <IconSearch className="w-4 h-4 flex-shrink-0" />
       <span className="flex-1 min-w-0 truncate">Search</span>
-      <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 text-[10px] text-gray-400">
-        ⌘K
-      </kbd>
     </button>
   )
 }

@@ -1147,9 +1147,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         <div className="absolute top-10 left-10 sm:w-80 z-20">
         <div className="bg-white rounded-2xl shadow-lg flex flex-col relative">
           {/* ── Breadcrumb header with controls ── */}
-          <div className="flex items-center justify-between px-4 pt-2 pb-2">
+          {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
+              so "Ex Situ" and "N artifacts" sit on one baseline. */}
+          <div className="flex items-center justify-between px-4 pt-3 pb-1">
             {/* Breadcrumb */}
-            <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm text-black">
+            <div className="flex items-center min-h-8 min-w-0 flex-1 overflow-hidden text-sm leading-normal text-black">
               {breadcrumb.map((seg, i) => {
                 const isLast = i === breadcrumb.length - 1
                 return (
