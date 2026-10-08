@@ -1,7 +1,9 @@
 // Maps a stored museum img_url to the URL the browser should actually load.
 //
 // - images.metmuseum.org: img_url points at /original/ (often 5–10 MB). The
-//   same path under /web-large/ is the Met's own ~1024px display rendition.
+//   same path under /web-large/ is the Met's own ~1024px display rendition, and
+//   /mobile-large/ its ~355px one — enough for a grid tile and ~2.5× smaller,
+//   which matters on a phone connection.
 // - www.artic.edu: AIC's IIIF server sits behind Cloudflare, which blocks
 //   hotlinked browser requests ("Sorry, you have been blocked"). It only lets
 //   through requests carrying AIC's documented AIC-User-Agent header, which a
@@ -42,7 +44,7 @@ export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): strin
   }
 
   if (url.hostname === "images.metmuseum.org" && url.pathname.includes("/original/")) {
-    url.pathname = url.pathname.replace("/original/", "/web-large/")
+    url.pathname = url.pathname.replace("/original/", width <= THUMB_WIDTH ? "/mobile-large/" : "/web-large/")
     return url.toString()
   }
 
