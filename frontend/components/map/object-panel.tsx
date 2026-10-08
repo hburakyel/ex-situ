@@ -199,8 +199,10 @@ export default function ObjectPanel({
   // Places/Time/Collections drill-down block: hidden while the object grid is
   // scrolled down (frees up room for the grid), brought back on scroll-up.
   const [drillSectionsVisible, setDrillSectionsVisible] = useState(true)
-  // Mobile: search box + Places/Time/Collections stay folded under the search icon.
-  const [mobileInfoOpen, setMobileInfoOpen] = useState(false)
+  // Mobile: the header icons unfold one block under the header at a time — the About
+  // text (info icon) or the search box + Places/Time/Collections (search icon).
+  const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"search" | "about" | null>(null)
+  const toggleMobileHeaderPanel = (panel: "search" | "about") => setMobileHeaderPanel((cur) => (cur === panel ? null : panel))
   const [showCopied, setShowCopied] = useState(false)
   // Grid density: null = the responsive default; otherwise 1 / 3 / 5 columns (remembered per browser).
   const [gridColumns, setGridColumns] = useState<number | null>(null)
@@ -1334,8 +1336,11 @@ export default function ObjectPanel({
         mobileVariant={variant}
         mapOpen={mapOpen}
         onMapToggle={variant === "drill" ? onMapToggle : undefined}
-        infoOpen={variant === "drill" && MOBILE_FULL_SCREEN ? mobileInfoOpen : undefined}
-        onInfoToggle={variant === "drill" && MOBILE_FULL_SCREEN ? () => setMobileInfoOpen((v) => !v) : undefined}
+        infoOpen={variant === "drill" && MOBILE_FULL_SCREEN ? mobileHeaderPanel === "search" : undefined}
+        onInfoToggle={variant === "drill" && MOBILE_FULL_SCREEN ? () => toggleMobileHeaderPanel("search") : undefined}
+        aboutOpen={variant === "drill" && MOBILE_FULL_SCREEN ? mobileHeaderPanel === "about" : undefined}
+        onAboutToggle={variant === "drill" && MOBILE_FULL_SCREEN ? () => toggleMobileHeaderPanel("about") : undefined}
+        headerSlot={variant === "drill" && MOBILE_FULL_SCREEN ? gridSizeButton : undefined}
         breadcrumb={variant === "drill" ? breadcrumb : []}
         onBreadcrumbClick={variant === "drill" ? onBreadcrumbClick : undefined}
         onCommandPaletteOpen={variant === "drill" ? onCommandPaletteOpen : undefined}
@@ -1376,7 +1381,7 @@ export default function ObjectPanel({
               {reportIssueMenuItem}
             </DropdownMenuContent>
           </DropdownMenu>
-          {gridSizeButton}
+          {!MOBILE_FULL_SCREEN && gridSizeButton}
           </div>
         )}
         totalCount={totalCount}
@@ -1674,7 +1679,7 @@ export default function ObjectPanel({
         isMobile
           ? "" // all positioning/sizing handled by inline style
           : "top-10 right-10 bottom-10 shadow-lg"
-      } bg-white z-20 overflow-hidden`}
+      } bg-white ${isMobile && MOBILE_FULL_SCREEN && galleryOpen ? "z-[60]" : "z-20"} overflow-hidden`}
       style={{
         ...containerStyle,
         ...(!isMobile ? { borderRadius: "1rem" } : {}),
@@ -1690,10 +1695,12 @@ export default function ObjectPanel({
             position: "absolute",
             inset: 0,
             zIndex: 59,
-            opacity: galleryVisible ? 1 : 0,
-            transform: galleryVisible ? "translateY(0)" : "translateY(6px)",
-            transition: "opacity 0.18s ease, transform 0.18s ease",
-            pointerEvents: galleryVisible ? "auto" : "none",
+            // Mobile (full-screen panel): the gallery opens above the map at once — a fade
+            // would show the panel or the map through it for a moment.
+            opacity: galleryVisible || (isMobile && MOBILE_FULL_SCREEN) ? 1 : 0,
+            transform: galleryVisible || (isMobile && MOBILE_FULL_SCREEN) ? "translateY(0)" : "translateY(6px)",
+            transition: isMobile && MOBILE_FULL_SCREEN ? "none" : "opacity 0.18s ease, transform 0.18s ease",
+            pointerEvents: galleryVisible || (isMobile && MOBILE_FULL_SCREEN) ? "auto" : "none",
           }}
         >
           <ImageGallery

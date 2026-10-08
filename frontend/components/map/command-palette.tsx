@@ -342,10 +342,20 @@ export default function V3CommandPalette({
   const searchSiteRows: SiteRow[] = useMemo(() => {
     if (!search.hasQuery) return []
     const placeNames = new Set(searchPlaceRows.map((p) => p.name.toLowerCase()))
+    // Search results carry no country; take it from the site's arcs. Without one,
+    // picking the site can't open it inside its country (it only became a filter
+    // chip at world level, with the grid showing a single preview object).
+    const knownSites = new Map(allSiteRows.map((s) => [s.name.toLowerCase(), s]))
     return search.places
       .filter((p) => !placeNames.has(p.name.toLowerCase()))
-      .map((p) => ({ name: p.name, type: p.type, objectCount: (p as any).object_count ?? 0, lat: p.latitude, lng: p.longitude, country: "" }))
-  }, [search.hasQuery, search.places, searchPlaceRows])
+      .map((p) => {
+        const known = knownSites.get(p.name.toLowerCase())
+        return {
+          name: p.name, type: p.type, objectCount: (p as any).object_count ?? known?.objectCount ?? 0,
+          lat: known?.lat ?? p.latitude, lng: known?.lng ?? p.longitude, country: known?.country ?? "",
+        }
+      })
+  }, [search.hasQuery, search.places, searchPlaceRows, allSiteRows])
 
   const searchCollectionRows: CollectionRow[] = useMemo(() => {
     if (!search.hasQuery) return []
@@ -437,9 +447,12 @@ export default function V3CommandPalette({
 
   const handleSelectSite = useCallback(
     (row: SiteRow) => {
-      toggleFilter("cities", row.name)
-      // Drill into country + site atomically so breadcrumb updates correctly
-      if (row.country && handlers.onNavigateSite) {
+      // Drill into country + site atomically so breadcrumb updates correctly. A row
+      // without its country (search result before the site list loaded) gets it
+      // looked up by the page, and no "cities" chip — at world level that chip showed
+      // the site's count over a single preview object.
+      if (row.country) toggleFilter("cities", row.name)
+      if (handlers.onNavigateSite) {
         handlers.onNavigateSite(row.country, row.name, row.lat, row.lng)
       } else {
         handlers.onNavigatePlace?.(row.lng, row.lat, row.name)

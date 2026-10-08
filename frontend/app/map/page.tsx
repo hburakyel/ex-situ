@@ -77,6 +77,12 @@ function matchesAnyFilter(value: string | null | undefined, filters: Set<string>
   return filters.has(normalizePlaceKey(value))
 }
 
+// Opening view, and where "Ex Situ" / the globe control return to. Mobile frames the
+// Arabian Peninsula / Red Sea, where arcs from Africa, Asia and Europe cross — the
+// whole world is unreadable at phone size.
+const MOBILE_HOME_VIEW = { lng: 47.2257, lat: 19.7517, zoom: 3.1 }
+const DESKTOP_HOME_VIEW = { lng: 0, lat: 20, zoom: 2 }
+
 export default function MapPage() {
   return (
     <Suspense fallback={<div className="h-full w-full bg-white" />}>
@@ -112,9 +118,7 @@ function MapContent() {
   const isMobileInit = typeof window !== 'undefined' && window.innerWidth < 768
 
   const [objects, setObjects] = useState<MuseumObject[]>([])
-  // Mobile opens on the map card, framed on the Arabian Peninsula / Red Sea, where
-  // arcs from Africa, Asia and Europe cross — the whole world is unreadable at card size.
-  const defaultView = isMobileInit ? { lng: 47.2257, lat: 19.7517, zoom: 3.1 } : { lng: 0, lat: 20, zoom: 2 }
+  const defaultView = isMobileInit ? MOBILE_HOME_VIEW : DESKTOP_HOME_VIEW
   const [viewState, setViewState] = useState({
     longitude: clamp(urlLng ? parseFloat(urlLng) : defaultView.lng, -180, 180, defaultView.lng),
     latitude: clamp(urlLat ? parseFloat(urlLat) : defaultView.lat, -90, 90, defaultView.lat),
@@ -946,11 +950,13 @@ function MapContent() {
       setArcObjectsPage(1)
       setSubArcs([])
       setLocationName("")
-      // Reset map view to globe level (same as globe icon)
+      // Back to the opening view (same as the globe control) — further out, the
+      // arcs pile up into a mass.
       if (mapRef.current) {
-        mapRef.current.flyToLocation(0, 20, 1, 1800)
-        setViewState({ longitude: 0, latitude: 20, zoom: 1, name: "" })
-        debouncedGeocode(0, 20)
+        const home = isMobile ? MOBILE_HOME_VIEW : DESKTOP_HOME_VIEW
+        mapRef.current.flyToLocation(home.lng, home.lat, home.zoom, 1800)
+        setViewState({ longitude: home.lng, latitude: home.lat, zoom: home.zoom, name: "" })
+        debouncedGeocode(home.lng, home.lat)
       }
     } else if (level === "country") {
       setSelectedArc(null)
@@ -975,7 +981,7 @@ function MapContent() {
         }
       }
     }
-  }, [activeCountry, groupedOrigins, debouncedGeocode])
+  }, [activeCountry, groupedOrigins, debouncedGeocode, isMobile])
 
   // ── Command palette navigation handlers ──
   const commandPaletteHandlers: CommandPaletteHandlers = useMemo(() => ({
@@ -988,7 +994,19 @@ function MapContent() {
         debouncedGeocode(longitude, latitude)
       }
     },
-    onNavigateSite: (country: string, site: string, lat: number, lng: number) => {
+    onNavigateSite: (rawCountry: string, site: string, lat: number, lng: number) => {
+      // A search result can arrive without its country (the site list wasn't loaded
+      // yet): take it from the site's arcs. Still unknown → just fly there.
+      const siteArc = rawCountry ? null : cityArcData.find((a) => normalizePlaceKey(a.place_name) === normalizePlaceKey(site) && a.country)
+      const country = rawCountry || siteArc?.country || ""
+      if (!country) {
+        if (mapRef.current && hasValidCoordinates(lat, lng)) {
+          mapRef.current.flyToLocation(lng, lat, 10, 1400)
+          setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom: 10 }))
+          debouncedGeocode(lng, lat)
+        }
+        return
+      }
       // Reopen only for a genuinely new site — re-selecting the site that's
       // already active respects a deliberate close.
       if (normalizePlaceKey(activeSiteRef.current) !== normalizePlaceKey(site)) {
@@ -1015,7 +1033,7 @@ function MapContent() {
     onOriginClick: handleOriginClick,
     onToggleSite: handleToggleSite,
     onToggleInstitution: handleToggleInstitution,
-  }), [handleOriginClick, handleToggleSite, handleToggleInstitution])
+  }), [handleOriginClick, handleToggleSite, handleToggleInstitution, cityArcData, debouncedGeocode])
 
   // Bbox fetch for zoomed-in objects
   const fetchObjects = useCallback(async (bounds: MapBounds, page: number, reset = false) => {
@@ -1365,7 +1383,11 @@ function MapContent() {
       <div className="h-full w-full relative">
         <div
           className={isMobile
-            ? `fixed z-40 overflow-hidden bg-[#111] transition-[left,right,bottom,height,border-radius,transform,opacity] duration-300 ease-out ${
+            ? `fixed z-40 overflow-hidden bg-[#111] ${
+                // Putting the map away (Done, See all, gallery) is instant: animating it out
+                // while it also changes size, with the gallery fading in, read as a flicker.
+                mobileMap === "hidden" || mobileGalleryOpen ? "transition-none" : "transition-[left,right,bottom,height,border-radius,transform,opacity] duration-300 ease-out"
+              } ${
                 mobileMap === "full" ? "left-0 right-0 bottom-0 h-dvh rounded-none" : "left-3 right-3 h-[40dvh] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
               } ${mobileMap === "hidden" || mobileGalleryOpen ? "translate-y-[calc(100%+24px)] opacity-0 pointer-events-none" : ""}`
             : "absolute inset-0"}

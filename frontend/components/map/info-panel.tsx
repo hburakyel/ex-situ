@@ -107,6 +107,11 @@ interface InfoPanelProps {
   /** Mobile: the search icon shows/hides the search box and the Places/Time/Collections lists. */
   onInfoToggle?: () => void
   infoOpen?: boolean
+  /** Mobile: the info icon unfolds the About text under the header (instead of a popover). */
+  onAboutToggle?: () => void
+  aboutOpen?: boolean
+  /** Mobile: extra header buttons after the icons (grid size). */
+  headerSlot?: React.ReactNode
 }
 
 export default function InfoPanel({
@@ -144,6 +149,9 @@ export default function InfoPanel({
   mapOpen,
   onInfoToggle,
   infoOpen,
+  onAboutToggle,
+  aboutOpen,
+  headerSlot,
 }: InfoPanelProps) {
   // Mobile sections are an accordion: one list open at a time keeps the card short
   // enough to fit above the half-height sheet without scrolling.
@@ -171,7 +179,7 @@ export default function InfoPanel({
   return (
     <div className={`${
       mobileVariant === "summary" ? "px-4 py-0"
-        : mobileVariant === "drill" ? "px-4 pt-1 pb-3"
+        : mobileVariant === "drill" ? (onInfoToggle ? "px-4 pt-1 pb-0" : "px-4 pt-1 pb-3")
         : isMobile ? "px-4 pt-0 pb-4" : "p-4 pt-2"
     } flex flex-col bg-white`}>
       {/* Mobile breadcrumb + search row — always visible */}
@@ -208,7 +216,14 @@ export default function InfoPanel({
             })}
           </div>
           {/* About — on phones this replaces the map's info control */}
-          {mobileVariant === "drill" && (
+          {mobileVariant === "drill" && onAboutToggle && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onAboutToggle}
+              title="About" aria-label="About" aria-expanded={aboutOpen}
+            >
+              <Info className={`w-5 h-5 ${aboutOpen ? "text-black" : "text-gray-500"}`} />
+            </Button>
+          )}
+          {mobileVariant === "drill" && !onAboutToggle && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" title="About" aria-label="About">
@@ -243,6 +258,22 @@ export default function InfoPanel({
               <Search className={`w-5 h-5 ${infoOpen ? "text-black" : "text-gray-500"}`} />
             </Button>
           )}
+          {mobileVariant === "drill" && headerSlot}
+        </div>
+      )}
+
+      {mobileVariant === "drill" && aboutOpen && (
+        <div className="pt-1 pb-2 text-[13px] leading-normal text-[#333]">
+                <p className="mb-2.5 text-[#555]">
+                  Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact&apos;s origin and current repository, it refuses problematic taxonomies and routes researchers directly to the source.
+                </p>
+                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block text-[#333]">
+                  GitHub ↗
+                </a>
+                <p className="mt-1.5 font-mono text-[11px] text-[#999]">
+                  Data may be incomplete.{" "}
+                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-[#999]">Report issue ↗</a>
+                </p>
         </div>
       )}
 
