@@ -396,6 +396,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     useImperativeHandle(ref, () => ({
       map: map.current,
+      // True while a flight started by code (flyToLocation, arc click) is still running.
+      isProgrammaticMove: (): boolean => isProgrammaticMove.current,
       // Returns false while the map isn't created yet (the call did nothing).
       flyToLocation: (lng: number, lat: number, zoom: number = 10, duration: number = 800): boolean => {
         if (!map.current) return false
