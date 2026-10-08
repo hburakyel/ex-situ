@@ -759,8 +759,6 @@ export default function ObjectPanel({
       const transition = prefersReducedMotion.current || !sheetAnimated
         ? "none"
         : `height 0.35s ${ease}, transform 0.35s ${ease}, border-radius 0.30s ${ease}, left 0.30s ${ease}, right 0.30s ${ease}, bottom 0.30s ${ease}`
-      // Respect iPhone home indicator / notch
-      const safeBottom = "max(16px, env(safe-area-inset-bottom))"
 
       if (liveHeight !== null) {
         // During drag: always bottom-anchored so sheet grows/shrinks upward
@@ -770,11 +768,12 @@ export default function ObjectPanel({
           transition: "none",
           transform: "none",
           height: liveHeight,
-          bottom: isNearExpanded ? 0 : safeBottom,
-          left: isNearExpanded ? 0 : 12,
-          right: isNearExpanded ? 0 : 12,
-          borderRadius: isNearExpanded ? 0 : 24,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderRadius: isNearExpanded ? 0 : "24px 24px 0 0",
           boxShadow: isNearExpanded ? "none" : shadow,
+          paddingBottom: "env(safe-area-inset-bottom)",
         }
       }
 
@@ -785,10 +784,12 @@ export default function ObjectPanel({
         case "minimized":
           // Mobile has no peek state: the sheet slides fully off screen and comes back
           // on the next map selection (page.tsx).
-          return { transition, transform: "translateY(calc(100% + 32px))", pointerEvents: "none", top: "auto", bottom: safeBottom, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: "none" }
+          return { transition, transform: "translateY(calc(100% + 32px))", pointerEvents: "none", top: "auto", bottom: 0, left: 0, right: 0, height: "44dvh", borderRadius: "24px 24px 0 0", boxShadow: "none" }
         case "default":
         default:
-          return { transition, transform: "none", top: "auto", bottom: safeBottom, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: shadow }
+          // Bottom sheet: flush with the screen edges, rounded on top only; the home
+          // indicator area is padded inside (paddingBottom) instead of a gap below.
+          return { transition, transform: "none", top: "auto", bottom: 0, left: 0, right: 0, height: "44dvh", borderRadius: "24px 24px 0 0", boxShadow: shadow, paddingBottom: "env(safe-area-inset-bottom)" }
       }
     }
 
