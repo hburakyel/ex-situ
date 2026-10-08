@@ -120,7 +120,7 @@ function hasValidCoordinatePair(position?: [number, number] | number[]): boolean
 function HeaderAccordionList({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative">
-      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-4">
+      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-1">
         {children}
       </div>
       <div
@@ -1149,7 +1149,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. */}
-          <div className="flex items-center justify-between px-4 pt-3 pb-1">
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
             {/* Breadcrumb */}
             <div className="flex items-center min-h-8 min-w-0 flex-1 overflow-hidden text-sm leading-normal text-black">
               {breadcrumb.map((seg, i) => {

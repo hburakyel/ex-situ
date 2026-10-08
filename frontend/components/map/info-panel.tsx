@@ -8,7 +8,7 @@ import { ChevronDown, ChevronUp, Info } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { IconClose } from "@/components/icons"
 import SearchBar from "./search-bar"
-import { ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
+import { type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import type {
   BreadcrumbSegment,
@@ -144,8 +144,6 @@ export default function InfoPanel({
   const [showSites, setShowSites] = sectionState("sites")
   // Display-only labels: "Kano (State)" shows as "Kano" unless another site shares the name.
   const siteLabels = React.useMemo(() => placeDisplayLabels(groupedSites.map((s) => s.name)), [groupedSites])
-  const [showTime, setShowTime] = sectionState("time")
-  const [showCollections, setShowCollections] = sectionState("collections")
 
   const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
     (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
@@ -325,55 +323,8 @@ export default function InfoPanel({
                 </div>
               )}
 
-              {/* Time — shown at all drill levels */}
-              {dateBuckets && (
-                <div>
-                  <SectionToggle open={showTime} onToggle={() => setShowTime(!showTime)}>
-                    Time
-                  </SectionToggle>
-                  {showTime && (
-                    <FadedAccordionList>
-                        {collapseContiguousBuckets(
-                            ERA_BUCKETS,
-                            Object.fromEntries(dateBuckets.objectDateBuckets.map((b) => [b.id, b.count])),
-                            dateBuckets.objectDateSpans,
-                          )
-                          .filter((row) => row.count > 0)
-                          .map((row) => (
-                            <div key={row.id}
-                              className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
-                              onClick={() => onToggleEra?.(row.era)}
-                            >
-                              <span className="truncate max-w-[70%]" title={row.label}>{row.label}</span>
-                              <span className="ml-2 text-gray-400 text-sm">{formatCount(row.count)}</span>
-                            </div>
-                          ))}
-                    </FadedAccordionList>
-                  )}
-                </div>
-              )}
-
-              {/* Institutions — shown at all zoom levels */}
-              {drillInstitutions.length > 0 && (
-                <div>
-                  <SectionToggle open={showCollections} onToggle={() => setShowCollections(!showCollections)}>
-                    Collections
-                  </SectionToggle>
-                  {showCollections && (
-                    <FadedAccordionList>
-                        {drillInstitutions.map((inst, index) => (
-                          <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
-                            onClick={() => onToggleInstitution?.(inst.name)}
-                          >
-                            <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{formatCount(inst.count)}</span>
-                          </div>
-                        ))}
-                    </FadedAccordionList>
-                  )}
-                </div>
-              )}
+              {/* Time and Collections aren't listed on mobile — they took too much of the
+                  small card. Their filters still show as chips below; desktop lists both. */}
             </div>
           )}
 
