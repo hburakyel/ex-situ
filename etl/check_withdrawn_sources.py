@@ -19,12 +19,19 @@ their image until a new source is found.
            Never touches review_status = 'verified'. --dry-run rolls back.
   restore  puts the image back for rows whose record is live again (or for all
            tagged rows with --all), using the URL kept in the note.
+  relink   keeps the image and only replaces the dead source link: papyri ("P …")
+           → BerlPap search, everything else → SMB's collection search
+           (search.smb.museum). Old link kept in geocoding_notes ([source-relinked]
+           tag — not [source-withdrawn], so the grid still shows the image).
+           Verified rows untouched. --dry-run rolls back.
 
 Usage (from etl/):
     python check_withdrawn_sources.py check [--institution "Ägyptisches Museum und Papyrussammlung"]
     python check_withdrawn_sources.py apply --dry-run
     python check_withdrawn_sources.py apply
     python check_withdrawn_sources.py restore [--all] [--dry-run]
+    python check_withdrawn_sources.py relink --dry-run
+    python check_withdrawn_sources.py relink
 """
 
 import argparse
@@ -33,6 +40,7 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import urllib.request
 from collections import Counter
 from datetime import date
@@ -202,6 +210,52 @@ def cmd_restore(args):
         conn.close()
 
 
+RELINK_TAG = "[source-relinked]"
+
+
+def search_link(inventory):
+    inv = (inventory or "").strip()
+    if re.match(r"^P\b", inv):
+        return "https://berlpap.smb.museum/?s=" + urllib.parse.quote_plus(inv)
+    return "https://search.smb.museum/?q=" + urllib.parse.quote_plus(inv)
+
+
+def cmd_relink(args):
+    with open(REPORT, encoding="utf-8") as f:
+        rows = [r for r in csv.DictReader(f) if r["verified"] != "True" and r["inventory_number"].strip()]
+    checked = date.fromtimestamp(os.path.getmtime(REPORT)).isoformat()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            changed = 0
+            per_inst = Counter()
+            for r in rows:
+                new = search_link(r["inventory_number"])
+                cur.execute(
+                    r"""UPDATE museum_objects SET
+                          geocoding_notes = concat_ws(' | ', NULLIF(geocoding_notes, ''),
+                            %s || ' museum-digital ' || %s || ' withdrawn (checked ' || %s || '); source_link was ' || source_link),
+                          source_link = %s
+                        WHERE id = %s AND source_link ~ ('museum-digital\.de/object/' || %s || '$')
+                          AND COALESCE(review_status, '') <> 'verified'""",
+                    (RELINK_TAG, r["md_id"], checked, new, int(r["id"]), r["md_id"]),
+                )
+                changed += cur.rowcount
+                per_inst[r["institution"]] += cur.rowcount
+            print(f"Source link replaced on {changed} of {len(rows)} withdrawn objects (images kept): {dict(per_inst)}")
+        if args.dry_run:
+            conn.rollback()
+            print("Dry run — rolled back, nothing written.")
+        else:
+            conn.commit()
+            print("Committed.")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True)
@@ -212,8 +266,10 @@ def main():
     r = sub.add_parser("restore")
     r.add_argument("--all", action="store_true", help="restore every tagged row, not only ones live again")
     r.add_argument("--dry-run", action="store_true")
+    rl = sub.add_parser("relink")
+    rl.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
-    {"check": cmd_check, "apply": cmd_apply, "restore": cmd_restore}[args.command](args)
+    {"check": cmd_check, "apply": cmd_apply, "restore": cmd_restore, "relink": cmd_relink}[args.command](args)
 
 
 if __name__ == "__main__":
