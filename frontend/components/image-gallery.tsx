@@ -444,8 +444,10 @@ export default function ImageGallery({
         </div>
 
 
-        {/* Image credit — bottom right */}
-        <div style={{ padding: "4px 16px 6px", backgroundColor: "white", textAlign: "right" }}>
+        {/* Site mark — bottom left; image credit — bottom right */}
+        <div style={{ padding: "4px 16px 6px", backgroundColor: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
+          <span style={{ color: "#2a2a2a", fontSize: "9px" }}>Ex Situ 2022</span>
+          <span style={{ textAlign: "right" }}>
           {(() => {
             // Image credit as each museum states it for its images (audited 2026-10-07):
             // - SMB (museum-digital object_images[].rights): CC BY-NC-SA for every collection
@@ -486,6 +488,7 @@ export default function ImageGallery({
             if (credit) return <span style={style}>{credit}</span>
             return null
           })()}
+          </span>
         </div>
       </div>
     </>

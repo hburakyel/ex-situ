@@ -146,28 +146,21 @@ function MapContent() {
     () => (urlCountry || urlSite || urlInstitution || urlArtifactId ? "hidden" : "card"),
   )
   const [mobileGalleryOpen, setMobileGalleryOpen] = useState(false)
-  // Picking a place or site from the list while the map is put away "peeks" it: the
-  // card comes up so the fly-to is visible, then goes away again — unless the map
-  // is touched in the meantime (then it stays, as if opened by hand).
-  const mapPeekTimer = useRef<number | null>(null)
-  const cancelMapPeek = useCallback(() => {
-    if (mapPeekTimer.current !== null) window.clearTimeout(mapPeekTimer.current)
-    mapPeekTimer.current = null
-  }, [])
+  // Picking a place or site from the list brings the map card up (if put away) so
+  // the fly-to is visible; it stays until closed — picking site after site keeps it.
   const mobileMapRef = useRef(mobileMap)
   useEffect(() => { mobileMapRef.current = mobileMap }, [mobileMap])
-  const peekMap = useCallback(() => {
-    if (mobileMapRef.current !== "hidden") return
-    cancelMapPeek()
-    setMobileMap("card")
-    mapPeekTimer.current = window.setTimeout(() => {
-      mapPeekTimer.current = null
-      setMobileMap((cur) => (cur === "card" ? "hidden" : cur))
-    }, 3500)
-  }, [cancelMapPeek])
-  useEffect(() => cancelMapPeek, [cancelMapPeek])
+  const showMapCard = useCallback(() => {
+    if (mobileMapRef.current === "hidden") setMobileMap("card")
+  }, [])
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
-  const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({ institutions: [], countries: [], cities: [] })
+  // A museum opened from the URL alone (?institution=, no place) starts as if it had been picked
+  // in the left panel: the arc layer filters to it, like handleToggleInstitution does.
+  const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({
+    institutions: urlInstitution && !urlCountry ? [urlInstitution] : [],
+    countries: [],
+    cities: [],
+  })
   const [selectedArc, setSelectedArc] = useState<SelectedArc | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [wikiDocs, setWikiDocs] = useState<any[]>([])
@@ -748,9 +741,9 @@ function MapContent() {
     }
   }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id])
 
-  // Trigger object fetch when drill-down filters change
+  // Trigger object fetch when drill-down filters change (also a museum picked at global level)
   useEffect(() => {
-    if (drillLevel === "country" || drillLevel === "objects") {
+    if (drillLevel === "country" || drillLevel === "objects" || (drillLevel === "global" && activeInstitution && !activeCountry)) {
       setArcObjects([])
       setArcObjectsPage(1)
       fetchDrillObjects(1)
@@ -1264,6 +1257,10 @@ function MapContent() {
     prevZoomedOutRef.current = isZoomedOutToGlobal
     // Skip auto-clear during initial restore (map may animate through low zoom levels)
     if (urlCountry && Date.now() - mountTimeRef.current < 3000) return
+    // Only a zoom-out by the user goes back to the world. A flight started by code
+    // can dip below the threshold on its way (flyTo zooms out, then in) — e.g. from
+    // the mobile opening view at zoom 3.1 to a country at 5.
+    if (mapRef.current?.isProgrammaticMove?.()) return
     if (isZoomedOutToGlobal && wasAbove && drillLevel !== "global") {
       setActiveCountry(null)
       setActiveSite(null)
@@ -1393,7 +1390,6 @@ function MapContent() {
             : "absolute inset-0"}
           style={isMobile && mobileMap !== "full" ? { bottom: "calc(12px + env(safe-area-inset-bottom))" } : undefined}
           aria-hidden={isMobile && (mobileMap === "hidden" || mobileGalleryOpen) ? true : undefined}
-          onPointerDown={isMobile ? cancelMapPeek : undefined}
         >
         <MapView
           ref={mapRef}
@@ -1447,7 +1443,7 @@ function MapContent() {
           <>
             <button
               type="button"
-              onClick={() => { cancelMapPeek(); setMobileMap((m) => (m === "full" ? "card" : "full")) }}
+              onClick={() => setMobileMap((m) => (m === "full" ? "card" : "full"))}
               className="absolute top-3 left-3 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 shadow-md"
               style={mobileMap === "full" ? { top: "calc(12px + env(safe-area-inset-top))" } : undefined}
               aria-label={mobileMap === "full" ? "Shrink map" : "Full-screen map"}
@@ -1456,7 +1452,7 @@ function MapContent() {
             </button>
             <button
               type="button"
-              onClick={() => { cancelMapPeek(); setMobileMap("hidden") }}
+              onClick={() => setMobileMap("hidden")}
               className="absolute top-3 right-3 z-50 flex h-10 items-center rounded-xl bg-white/95 px-3.5 text-sm text-gray-700 shadow-md"
               style={mobileMap === "full" ? { top: "calc(12px + env(safe-area-inset-top))" } : undefined}
             >
@@ -1502,7 +1498,7 @@ function MapContent() {
                   variant="outline"
                   size="sm"
                   className="mt-3 h-8 w-full rounded-md text-sm"
-                  onClick={() => { cancelMapPeek(); setMobileMap("hidden") }}
+                  onClick={() => setMobileMap("hidden")}
                 >
                   See all
                 </Button>
@@ -1542,13 +1538,13 @@ function MapContent() {
             groupedOrigins={groupedOrigins}
             sitesByCountry={sitesByCountry}
             isLoadingOrigins={isLoadingArcData}
-            onOriginClick={(...args: Parameters<typeof handleOriginClick>) => { if (isMobile) peekMap(); handleOriginClick(...args) }}
+            onOriginClick={(...args: Parameters<typeof handleOriginClick>) => { if (isMobile) showMapCard(); handleOriginClick(...args) }}
             groupedSites={groupedSites}
             drillInstitutions={institutions}
             activeSite={activeSite}
             activeCountry={activeCountry}
             activeInstitution={activeInstitution}
-            onToggleSite={(...args: Parameters<typeof handleToggleSite>) => { if (isMobile) peekMap(); handleToggleSite(...args) }}
+            onToggleSite={(...args: Parameters<typeof handleToggleSite>) => { if (isMobile) showMapCard(); handleToggleSite(...args) }}
             onToggleInstitution={handleToggleInstitution}
             isLoadingSubArcs={isLoadingSubArcs}
             locationName={effectiveLocationName}
@@ -1564,7 +1560,7 @@ function MapContent() {
             initialGalleryArtifact={initialGalleryArtifact}
             onCloseContainer={() => setIsObjectContainerVisible(false)}
             mapOpen={mobileMap !== "hidden"}
-            onMapToggle={() => { cancelMapPeek(); setMobileMap((m) => (m === "hidden" ? "card" : "hidden")) }}
+            onMapToggle={() => setMobileMap((m) => (m === "hidden" ? "card" : "hidden"))}
             onGalleryOpenChange={setMobileGalleryOpen}
           />
         )}
