@@ -1573,10 +1573,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
   /**
    * Review queue (admin panel → Review). One row per place label still waiting for a
-   * person: flagged by the ETL (review_status 'pending' / geocoding_status 'ambiguous')
-   * or still sitting on its country's centroid under a label that isn't the country
-   * (hedged "probably Isfahan", regions, names no gazetteer resolved). Verified rows
-   * are done and never listed.
+   * person: flagged by the ETL (review_status 'pending' / geocoding_status 'ambiguous'),
+   * still sitting on its country's centroid under a label that isn't the country
+   * (hedged "probably Isfahan", regions, names no gazetteer resolved), or decided in a
+   * desk review ([desk-review] moved/kept note) and waiting for a person to confirm.
+   * Verified rows are done and never listed.
    */
   async getReviewQueue() {
     const db = strapi.db.connection;
@@ -1594,11 +1595,12 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         GROUP BY 1, 2, 3 HAVING count(*) >= 5
       ), queued AS (
         SELECT e.*,
-               CASE WHEN e.review_status = 'pending' OR e.geocoding_status = 'ambiguous' THEN 'flagged'
+               CASE WHEN e.desk_reviewed THEN 'desk reviewed'
+                    WHEN e.review_status = 'pending' OR e.geocoding_status = 'ambiguous' THEN 'flagged'
                     ELSE 'country centroid' END AS reason
-        FROM eff e
+        FROM (SELECT *, geocoding_notes ~ '\\[desk-review\\] [0-9-]+ (moved|kept)' AS desk_reviewed FROM eff) e
         LEFT JOIN centroid c ON c.country_en = e.country_en AND c.la = e.la AND c.lo = e.lo
-        WHERE (e.review_status = 'pending' OR e.geocoding_status = 'ambiguous'
+        WHERE (e.desk_reviewed OR e.review_status = 'pending' OR e.geocoding_status = 'ambiguous'
                OR (c.country_en IS NOT NULL AND lower(COALESCE(e.place_name_normalized, e.place_name, '')) <> lower(e.country_en)))
           AND COALESCE(e.place_name_normalized, e.place_name, '') <> ''
       )

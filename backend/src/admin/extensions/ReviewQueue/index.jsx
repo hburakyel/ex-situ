@@ -16,7 +16,7 @@ import {
 import { useFetchClient, useNotification } from '@strapi/helper-plugin';
 
 const SITE = 'https://exsitu.app';
-const REASONS = ['all', 'flagged', 'country centroid'];
+const REASONS = ['all', 'desk reviewed', 'flagged', 'country centroid'];
 
 // "40.43, 29.72" (as copied from Wikidata, GeoNames or a map) → [40.43, 29.72]
 function parseCoords(text) {
@@ -176,8 +176,10 @@ const ReviewQueue = () => {
             <Box paddingTop={2}>
               <Typography variant="epsilon" textColor="neutral600">
                 Places waiting for a person: flagged by the ETL, or still on their country&apos;s centre under a
-                label that names somewhere else. Set writes the coordinates you looked up (Wikidata, GeoNames…)
-                to every record with that label; Keep as is accepts the records as they stand. Both mark the records
+                label that names somewhere else. "desk reviewed" rows were already decided in a desk review
+                (the note says what was moved or kept, and the source) and wait for you to confirm.
+                Set writes the coordinates you looked up (Wikidata, GeoNames…) to every record with that
+                label; Keep as is accepts the records as they stand. Both mark the records
                 verified, so scripts no longer change them. Never guess — leave a row if the place is unclear.
               </Typography>
             </Box>
