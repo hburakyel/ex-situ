@@ -109,10 +109,13 @@ function MapContent() {
   const isMobileInit = typeof window !== 'undefined' && window.innerWidth < 768
 
   const [objects, setObjects] = useState<MuseumObject[]>([])
+  // Mobile opens on the map card, framed on the Arabian Peninsula / Red Sea, where
+  // arcs from Africa, Asia and Europe cross — the whole world is unreadable at card size.
+  const defaultView = isMobileInit ? { lng: 47.2257, lat: 19.7517, zoom: 3.1 } : { lng: 0, lat: 20, zoom: 2 }
   const [viewState, setViewState] = useState({
-    longitude: clamp(urlLng ? parseFloat(urlLng) : (isMobileInit ? 15 : 0), -180, 180, isMobileInit ? 15 : 0),
-    latitude: clamp(urlLat ? parseFloat(urlLat) : (isMobileInit ? 15 : 20), -90, 90, isMobileInit ? 15 : 20),
-    zoom: clamp(urlZoom ? parseFloat(urlZoom) : (isMobileInit ? 1.2 : 2), 0, 22, isMobileInit ? 1.2 : 2),
+    longitude: clamp(urlLng ? parseFloat(urlLng) : defaultView.lng, -180, 180, defaultView.lng),
+    latitude: clamp(urlLat ? parseFloat(urlLat) : defaultView.lat, -90, 90, defaultView.lat),
+    zoom: clamp(urlZoom ? parseFloat(urlZoom) : defaultView.zoom, 0, 22, defaultView.zoom),
     name: "",
   })
   const [error, setError] = useState<string | null>(null)
@@ -162,7 +165,7 @@ function MapContent() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [wikiDocs, setWikiDocs] = useState<any[]>([])
   const [initialGalleryArtifact, setInitialGalleryArtifact] = useState<MuseumObject | null>(null)
-  const initialZoom = clamp(urlZoom ? parseFloat(urlZoom) : (isMobileInit ? 1.2 : 2), 0, 22, isMobileInit ? 1.2 : 2)
+  const initialZoom = clamp(urlZoom ? parseFloat(urlZoom) : defaultView.zoom, 0, 22, defaultView.zoom)
   // Only the "below global threshold" bucket is state: the map fires a zoom event
   // every animation frame, and storing the raw value re-rendered the whole page
   // (object grid included) ~60×/s while zooming. The exact value lives in the ref.
