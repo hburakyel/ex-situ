@@ -19,6 +19,7 @@ import type {
   FacetedFilters
 } from "./object-panel"
 import { placeDisplayLabels } from "@/lib/place-label"
+import { arcRows } from "@/lib/arc-rows"
 
 const PANEL_BOTTOM_FADE_STYLE = {
   background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
@@ -30,7 +31,7 @@ const PANEL_TOP_FADE_STYLE = {
 
 const formatCount = (n: number) => n.toLocaleString("en-US")
 
-// Mobile drill-down section header (Places / Sites / Time / Collections): the whole
+// Mobile drill-down section header (Arcs / Time / Collections): the whole
 // row toggles, not just the chevron. It keeps the old 32px look; an invisible
 // extension above and below makes the touch target 44px.
 function SectionToggle({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: React.ReactNode }) {
@@ -141,7 +142,8 @@ export default function InfoPanel({
   const sectionState = (key: "origins" | "sites" | "time" | "collections") =>
     [openSection === key, (open: boolean) => setOpenSection(open ? key : null)] as const
   const [showOrigins, setShowOrigins] = sectionState("origins")
-  const [showSites, setShowSites] = sectionState("sites")
+  // Global and country levels both list arcs: one open state, so drilling in keeps the list open.
+  const [showSites, setShowSites] = sectionState("origins")
   // Display-only labels: "Kano (State)" shows as "Kano" unless another site shares the name.
   const siteLabels = React.useMemo(() => placeDisplayLabels(groupedSites.map((s) => s.name)), [groupedSites])
 
@@ -282,17 +284,17 @@ export default function InfoPanel({
               {drillLevel === "global" && groupedOrigins.length > 0 && (
                 <div>
                   <SectionToggle open={showOrigins} onToggle={() => setShowOrigins(!showOrigins)}>
-                    Places
+                    Arcs
                     {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </SectionToggle>
                   {showOrigins && (
                     <FadedAccordionList>
-                        {groupedOrigins.map((origin, index) => (
+                        {arcRows(groupedOrigins).map(({ group: origin, to, count }, index) => (
                           <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
-                            <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{formatCount(origin.totalCount)}</span>
+                            <span className="truncate max-w-[70%]" title={to ? `${origin.country} → ${to}` : origin.country}>{origin.country}{to && ` → ${to}`}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{formatCount(count)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>
@@ -304,18 +306,18 @@ export default function InfoPanel({
               {drillLevel !== "global" && groupedSites.length > 0 && (
                 <div>
                   <SectionToggle open={showSites} onToggle={() => setShowSites(!showSites)}>
-                    Sites
+                    Arcs
                     {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </SectionToggle>
                   {showSites && (
                     <FadedAccordionList>
-                        {groupedSites.map((site, index) => (
+                        {arcRows(groupedSites).map(({ group: site, to, count }, index) => (
                           <div key={index}
                             className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
-                            <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{formatCount(site.totalCount)}</span>
+                            <span className="truncate max-w-[70%]" title={to ? `${site.name} → ${to}` : site.name}>{siteLabels.get(site.name) ?? site.name}{to && ` → ${to}`}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{formatCount(count)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>

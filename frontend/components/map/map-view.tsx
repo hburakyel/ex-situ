@@ -27,6 +27,7 @@ import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucke
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
 import { placeDisplayLabels } from "@/lib/place-label"
+import { arcRows, type Destination } from "@/lib/arc-rows"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -76,6 +77,7 @@ interface GroupedOrigin {
   country: string
   totalCount: number
   institutions: string[]
+  destinations?: Destination[]
   lat: number
   lng: number
 }
@@ -84,6 +86,7 @@ interface GroupedSite {
   name: string
   totalCount: number
   institutions: string[]
+  destinations?: Destination[]
   lat: number
   lng: number
 }
@@ -1192,19 +1195,19 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
           <TooltipProvider delayDuration={150}>
           <div className="px-4 pb-3 text-sm">
-            {/* ── Places Section (drill-down) — header renders unconditionally
+            {/* ── Arcs Section (global: country → city) — header renders unconditionally
                 (like Time/Collections) so it appears during the loading window
                 instead of popping in only once groupedOrigins is non-empty. ── */}
             {drillLevel === "global" && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
-                    Places
+                    Arcs
                   </span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowArcs(!showArcs)}
-                    title={showArcs ? "Collapse Places" : "Expand Places"}
-                    aria-label={showArcs ? "Collapse Places" : "Expand Places"}
+                    title={showArcs ? "Collapse Arcs" : "Expand Arcs"}
+                    aria-label={showArcs ? "Collapse Arcs" : "Expand Arcs"}
                   >
                     {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
@@ -1213,17 +1216,17 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 {showArcs && (
                   <div className="mt-1">
                     <HeaderAccordionList>
-                      {groupedOrigins.map((origin, index) => (
+                      {arcRows(groupedOrigins).map(({ group: origin, to, count }, index) => (
                           <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="truncate max-w-[70%]">{origin.country}</span>
+                                <span className="truncate max-w-[70%]">{origin.country}{to && ` → ${to}`}</span>
                               </TooltipTrigger>
-                              <TooltipContent side="top">{origin.country}</TooltipContent>
+                              <TooltipContent side="top">{origin.country}{to && ` → ${to}`}</TooltipContent>
                             </Tooltip>
-                            <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
+                            <span className="ml-2 text-gray-400 text-sm">{count}</span>
                           </div>
                       ))}
                     </HeaderAccordionList>
@@ -1232,18 +1235,18 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
-            {/* ── Sites Section (country drill-down) — hidden when there is nothing to list ── */}
+            {/* ── Arcs Section (country drill-down: site → city) — hidden when there is nothing to list ── */}
             {drillLevel !== "global" && (groupedSites.length > 0 || isLoadingSubArcs) && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
-                    Sites
+                    Arcs
                     {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
                     onClick={() => setShowArcs(!showArcs)}
-                    title={showArcs ? "Collapse Sites" : "Expand Sites"}
-                    aria-label={showArcs ? "Collapse Sites" : "Expand Sites"}
+                    title={showArcs ? "Collapse Arcs" : "Expand Arcs"}
+                    aria-label={showArcs ? "Collapse Arcs" : "Expand Arcs"}
                   >
                     {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                   </Button>
@@ -1252,18 +1255,18 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 {showArcs && (
                   <div className="mt-1 pl-0">
                     <HeaderAccordionList>
-                      {groupedSites.map((site, index) => (
+                      {arcRows(groupedSites).map(({ group: site, to, count }, index) => (
                         <div key={index}
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                         >
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="truncate max-w-[70%]">{siteLabels.get(site.name) ?? site.name}</span>
+                              <span className="truncate max-w-[70%]">{siteLabels.get(site.name) ?? site.name}{to && ` → ${to}`}</span>
                             </TooltipTrigger>
-                            <TooltipContent side="top">{site.name}</TooltipContent>
+                            <TooltipContent side="top">{site.name}{to && ` → ${to}`}</TooltipContent>
                           </Tooltip>
-                          <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
+                          <span className="ml-2 text-gray-400 text-sm">{count}</span>
                         </div>
                       ))}
                     </HeaderAccordionList>

@@ -26,6 +26,7 @@ import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
 import type { EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
+import type { Destination } from "@/lib/arc-rows"
 
 const EXPORT_ROW_CAP = 5000
 const EXPORT_TOOLTIP = "Select a place or artifact to export."
@@ -53,6 +54,7 @@ export interface GroupedOrigin {
   country: string
   totalCount: number
   institutions: string[]
+  destinations?: Destination[]
   lat: number
   lng: number
 }
@@ -63,6 +65,7 @@ export interface GroupedSite {
   rawNames: string[]
   totalCount: number
   institutions: string[]
+  destinations?: Destination[]
   lat: number
   lng: number
 }

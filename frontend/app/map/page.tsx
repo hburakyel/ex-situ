@@ -17,6 +17,7 @@ import { useUnifiedSearch, type ArcData } from "@/hooks/use-unified-search"
 import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/command-palette"
 import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
+import { addDestination, destinationCity, sortedDestinations } from "@/lib/arc-rows"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -430,6 +431,10 @@ function MapContent() {
         country: data.displayName,
         totalCount: data.totalCount,
         institutions: [...new Set(data.arcs.map((a) => a.institution_name))],
+        destinations: sortedDestinations(data.arcs.reduce((tally, a) => {
+          addDestination(tally, a.institution_name, a.object_count)
+          return tally
+        }, new Map<string, number>())),
         lat: data.arcs[0].latitude,
         lng: data.arcs[0].longitude,
       }))
@@ -450,7 +455,7 @@ function MapContent() {
       ? filteredSubArcs.filter((a) => a.institution_name.toLowerCase() === activeInstitution.toLowerCase())
       : filteredSubArcs
     // Prefer place_name_normalized for display if available
-    const map = new Map<string, { totalCount: number; institutions: Set<string>; lat: number; lng: number; displayName: string; rawNames: Set<string>; hasImage: boolean }>()
+    const map = new Map<string, { totalCount: number; institutions: Set<string>; destinations: Map<string, number>; lat: number; lng: number; displayName: string; rawNames: Set<string>; hasImage: boolean }>()
     source.forEach((arc) => {
       const displayName = (arc.place_name_normalized || arc.place_name || "").trim()
       const placeKey = normalizePlaceKey(displayName)
@@ -459,6 +464,7 @@ function MapContent() {
       if (existing) {
         existing.totalCount += arc.object_count
         existing.institutions.add(arc.institution_name)
+        addDestination(existing.destinations, arc.institution_name, arc.object_count)
         existing.rawNames.add(arc.place_name)
         existing.rawNames.add(displayName)
         existing.hasImage = existing.hasImage || !!arc.sample_img_url
@@ -469,6 +475,7 @@ function MapContent() {
         map.set(placeKey, {
           totalCount: arc.object_count,
           institutions: new Set([arc.institution_name]),
+          destinations: new Map([[destinationCity(arc.institution_name), arc.object_count]]),
           lat: arc.latitude,
           lng: arc.longitude,
           displayName,
@@ -483,6 +490,7 @@ function MapContent() {
         name: data.displayName,
         totalCount: data.totalCount,
         institutions: Array.from(data.institutions),
+        destinations: sortedDestinations(data.destinations),
         lat: data.lat,
         lng: data.lng,
         displayName: data.displayName,
