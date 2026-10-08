@@ -127,11 +127,6 @@ function MapContent() {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [containerSize, setContainerSize] = useState<ContainerSize>("default")
-  // Mobile: open the object sheet full height on first load (map is one swipe away).
-  // Set after mount so server and client render the same initial markup.
-  useEffect(() => {
-    if (window.matchMedia("(max-width: 768px)").matches) setContainerSize("expanded")
-  }, [])
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
   const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({ institutions: [], countries: [], cities: [] })
   const [selectedArc, setSelectedArc] = useState<SelectedArc | null>(null)
@@ -222,6 +217,18 @@ function MapContent() {
   const activeSiteRef = useRef<string | null>(urlSite || null)
   useEffect(() => { activeSiteRef.current = activeSite }, [activeSite])
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
+
+  // Mobile: picking an arc, place, site or collection brings the object sheet up to
+  // half height when it is minimized or hidden (a full-screen sheet is left as is).
+  const selectionKey = `${selectedArc?.key ?? ""}|${drillLevel}|${activeCountry ?? ""}|${activeSite ?? ""}|${activeInstitution ?? ""}`
+  const prevSelectionKey = useRef(selectionKey)
+  useEffect(() => {
+    if (prevSelectionKey.current === selectionKey) return
+    prevSelectionKey.current = selectionKey
+    if (!isMobile) return
+    setIsObjectContainerVisible(true)
+    setContainerSize(prev => prev === "minimized" ? "default" : prev)
+  }, [selectionKey, isMobile])
   // Transient hover-only highlight — mirrors an object card's origin onto the
   // matching map arc without triggering the navigation/fetch side effects of setActiveSite.
   const [hoveredObjectPlace, setHoveredObjectPlace] = useState<string | null>(null)

@@ -289,7 +289,7 @@ export default function ObjectPanel({
     const sizeToHeight = (size: ContainerSize): number => {
       const vh = window.innerHeight
       if (size === "expanded") return vh
-      if (size === "minimized") return 88
+      if (size === "minimized") return 0 // mobile: "minimized" = sheet hidden
       return Math.round(vh * 0.44)
     }
 
@@ -300,7 +300,7 @@ export default function ObjectPanel({
       const snapH: Record<ContainerSize, number> = {
         expanded: window.innerHeight,
         default: Math.round(window.innerHeight * 0.44),
-        minimized: 88,
+        minimized: 0,
       }
       const idx = order.indexOf(dragStartSize.current)
       const currentH = sizeToHeight(dragStartSize.current) - deltaY
@@ -758,7 +758,7 @@ export default function ObjectPanel({
       const ease = "cubic-bezier(0.32,0.72,0,1)"
       const transition = prefersReducedMotion.current || !sheetAnimated
         ? "none"
-        : `height 0.35s ${ease}, border-radius 0.30s ${ease}, left 0.30s ${ease}, right 0.30s ${ease}, bottom 0.30s ${ease}`
+        : `height 0.35s ${ease}, transform 0.35s ${ease}, border-radius 0.30s ${ease}, left 0.30s ${ease}, right 0.30s ${ease}, bottom 0.30s ${ease}`
       // Respect iPhone home indicator / notch
       const safeBottom = "max(16px, env(safe-area-inset-bottom))"
 
@@ -768,6 +768,7 @@ export default function ObjectPanel({
         return {
           top: "auto",
           transition: "none",
+          transform: "none",
           height: liveHeight,
           bottom: isNearExpanded ? 0 : safeBottom,
           left: isNearExpanded ? 0 : 12,
@@ -780,12 +781,14 @@ export default function ObjectPanel({
       switch (containerSize) {
         case "expanded":
           // Keep top:"auto" + bottom:0 so height animation always grows upward from bottom
-          return { transition, top: "auto", bottom: 0, left: 0, right: 0, height: "100dvh", borderRadius: 0, boxShadow: "none" }
+          return { transition, transform: "none", top: "auto", bottom: 0, left: 0, right: 0, height: "100dvh", borderRadius: 0, boxShadow: "none" }
         case "minimized":
-          return { transition, top: "auto", bottom: safeBottom, left: 12, right: 12, height: 88, borderRadius: 24, boxShadow: shadow }
+          // Mobile has no peek state: the sheet slides fully off screen and comes back
+          // on the next map selection (page.tsx).
+          return { transition, transform: "translateY(calc(100% + 32px))", pointerEvents: "none", top: "auto", bottom: safeBottom, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: "none" }
         case "default":
         default:
-          return { transition, top: "auto", bottom: safeBottom, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: shadow }
+          return { transition, transform: "none", top: "auto", bottom: safeBottom, left: 12, right: 12, height: "44dvh", borderRadius: 24, boxShadow: shadow }
       }
     }
 
@@ -1299,18 +1302,20 @@ export default function ObjectPanel({
 
   const containerStyle = getContainerStyle()
 
-  // Mobile info block (count, Places/Sites, Time, Collections). Rendered inside the
-  // grid's scroll container so it scrolls away with the tiles like a page, and back
-  // with them; the breadcrumb row above stays.
-  const renderMobileInfo = () => (
+  // Mobile is split like desktop: a "drill" card at the top of the map (breadcrumb,
+  // search, Places/Sites, Time, Collections) and a "summary" row (count, Export,
+  // grid size) heading the bottom sheet.
+  const renderMobileInfo = (variant: "summary" | "drill") => (
     <InfoPanel
         isMobile={isMobile}
         containerSize={containerSize}
-        breadcrumb={[]}
-        onBreadcrumbClick={undefined}
-        onCommandPaletteOpen={undefined}
+        mobileVariant={variant}
+        breadcrumb={variant === "drill" ? breadcrumb : []}
+        onBreadcrumbClick={variant === "drill" ? onBreadcrumbClick : undefined}
+        onCommandPaletteOpen={variant === "drill" ? onCommandPaletteOpen : undefined}
         // Always rendered so the count row keeps its height while objects load.
-        actionSlot={(
+        actionSlot={variant === "drill" ? undefined : (
+          <div className="flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
@@ -1345,6 +1350,8 @@ export default function ObjectPanel({
               {reportIssueMenuItem}
             </DropdownMenuContent>
           </DropdownMenu>
+          {gridSizeButton}
+          </div>
         )}
         totalCount={totalCount}
         collectionCount={collectionCount}
@@ -1413,45 +1420,7 @@ export default function ObjectPanel({
         {/* Header: Desktop and Mobile layouts */}
         {isMobile ? (
           <div ref={headerRef} className="sticky top-0 z-30 flex flex-col bg-white">
-            <div className="flex items-center justify-between text-sm min-w-0 px-4 pt-0">
-              <div className="flex items-center min-w-0 flex-1 overflow-hidden">
-                {breadcrumb.map((seg, i) => {
-                  const isLast = i === breadcrumb.length - 1
-                  return (
-                    <span
-                      key={i}
-                      className={`flex items-center ${isLast ? "min-w-0 overflow-hidden" : "flex-shrink-0"}`}
-                    >
-                      {i > 0 && <span className="text-black/30 mx-1 flex-shrink-0">/</span>}
-                      {isLast ? (
-                        <span
-                          className="text-black font-medium truncate"
-                          title={seg.label}
-                        >
-                          {seg.label}
-                        </span>
-                      ) : (
-                        <button
-                          className="text-black/60 hover:text-black underline-offset-2 hover:underline transition-colors whitespace-nowrap"
-                          onClick={() => onBreadcrumbClick?.(seg.level)}
-                        >
-                          {seg.label}
-                        </button>
-                      )}
-                    </span>
-                  )
-                })}
-              </div>
-              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                {gridSizeButton}
-                {onCommandPaletteOpen && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
-                    <IconSearch className="w-5 h-5 text-gray-500" />
-                  </Button>
-                )}
-              </div>
-            </div>
-            {containerSize === "minimized" && renderMobileInfo()}
+            {renderMobileInfo("summary")}
           </div>
         ) : (
           <div className="sticky top-0 z-30 flex flex-row items-start bg-white">
@@ -1568,7 +1537,6 @@ export default function ObjectPanel({
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
             columns={isMobile || containerSize === "expanded" ? activeGridColumns : null}
-            header={isMobile && containerSize !== "minimized" ? renderMobileInfo() : undefined}
           />
           {/* Links section — paired museum image + wiki link cards */}
           {wikiLinks.length > 0 && (
@@ -1651,6 +1619,19 @@ export default function ObjectPanel({
   )
 
   return (
+    <>
+    {/* Mobile info card — top of the map, separate from the object sheet (as on desktop).
+        Hidden while the sheet is full screen. */}
+    {isMobile && containerSize !== "expanded" && !galleryOpen && (
+      <div
+        role="region"
+        aria-label="Info panel"
+        className="fixed top-3 left-3 right-3 z-20 bg-white rounded-2xl shadow-lg overflow-y-auto"
+        style={{ maxHeight: "calc(50dvh - 12px)", overscrollBehaviorY: "contain" }}
+      >
+        {renderMobileInfo("drill")}
+      </div>
+    )}
     <div
       ref={containerRef}
       role={isMobile ? "complementary" : undefined}
@@ -1692,5 +1673,6 @@ export default function ObjectPanel({
         </div>
       )}
     </div>
+    </>
   )
 }

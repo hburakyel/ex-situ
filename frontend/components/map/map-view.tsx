@@ -10,7 +10,8 @@ import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
-import { IconSearch, iconSvgStrings } from "@/components/icons"
+import { iconSvgStrings } from "@/components/icons"
+import SearchBar from "./search-bar"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ArcLayer, ScatterplotLayer } from "@deck.gl/layers"
@@ -583,7 +584,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       // Nav controls – read media query synchronously so the value is correct
       // even if the React `isMobile` hook hasn't hydrated yet.
       const mobileNow = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
-      const controlPosition = mobileNow ? "top-right" : "bottom-left"
+      const controlPosition = "bottom-left"
       const ctrlPrefix = "maplibregl"
       // Info control
       class InfoControl {
@@ -601,13 +602,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             const rect = btn.getBoundingClientRect()
             this._popup = document.createElement("div")
             this._popup.style.cssText = `position:fixed;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);padding:14px 16px;width:220px;font-family:system-ui,sans-serif;z-index:9999;font-size:13px;line-height:1.5;color:#333`
-            if (mobileNow) {
-              this._popup.style.top = `${rect.top}px`
-              this._popup.style.right = `${window.innerWidth - rect.left + 8}px`
-            } else {
-              this._popup.style.bottom = `${window.innerHeight - rect.bottom}px`
-              this._popup.style.left = `${rect.right + 8}px`
-            }
+            this._popup.style.bottom = `${window.innerHeight - rect.bottom}px`
+            this._popup.style.left = `${rect.right + 8}px`
             this._popup.innerHTML = `
               <div style="margin-bottom:10px;color:#555">Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact's origin and current repository, it refuses problematic taxonomies and routes researchers directly to the source.</div>
               <div style="display:flex;flex-direction:column;gap:6px">
@@ -656,11 +652,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         onRemove() { if (this._container?.parentNode) this._container.parentNode.removeChild(this._container); this._map = null }
       }
 
-      if (showControls) {
+      // Phones get no map controls: pinch zooms, the breadcrumb root goes back to the
+      // globe, and About sits next to search in the info card (info-panel.tsx).
+      if (showControls && !mobileNow) {
         mapInstance.addControl(new GlobeViewControl(), controlPosition)
         mapInstance.addControl(new InfoControl(), controlPosition)
-        // Phones pinch to zoom; the +/− buttons only take map space there.
-        if (!mobileNow) mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), controlPosition)
+        mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), controlPosition)
       }
 
       window.addEventListener("resize", handleResize)
@@ -1172,16 +1169,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 )
               })}
             </div>
-            {/* Controls */}
-            <div className="flex items-center gap-2 ml-2">
-              {/* Search */}
-              <Button variant="ghost" size="icon" className="h-8 w-8"
-                onClick={() => onCommandPaletteOpen?.()}
-                title="Search (⌘K)"
-              >
-                <IconSearch className="w-5 h-5" />
-              </Button>
-            </div>
+          </div>
+          <div className="px-4 pb-2">
+            <SearchBar onOpen={() => onCommandPaletteOpen?.()} />
           </div>
 
           {/* ── Artifact count (only when object container is closed) ── */}

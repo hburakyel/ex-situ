@@ -59,6 +59,18 @@ interface V3CommandPaletteProps {
 }
 
 type SectionKey = "places" | "sites" | "collections" | "flyto" | "time" | "migration"
+type TabKey = "all" | "places" | "sites" | "time" | "migration" | "collections"
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "places", label: "Places" },
+  { key: "sites", label: "Sites" },
+  { key: "time", label: "Time" },
+  { key: "migration", label: "Migration" },
+  { key: "collections", label: "Collections" },
+]
+// Rows per section on the "All" tab before "Show all" (browsing only; search results list in full).
+const ALL_TAB_PREVIEW = 5
 
 interface PlaceRow {
   name: string
@@ -98,7 +110,7 @@ export default function V3CommandPalette({
     minChars: 2,
     dateFilters: eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
   })
-  const [expanded, setExpanded] = useState<Set<SectionKey>>(new Set())
+  const [tab, setTab] = useState<TabKey>("all")
   const [selectedIdx, setSelectedIdx] = useState(-1)
   const [timeYearInput, setTimeYearInput] = useState("")
   const [migrationYearInput, setMigrationYearInput] = useState("")
@@ -169,7 +181,7 @@ export default function V3CommandPalette({
       return () => clearTimeout(t)
     } else {
       search.clearSearch()
-      setExpanded(new Set())
+      setTab("all")
       setSelectedIdx(-1)
       setPathMode(false)
       setPathFrom("")
@@ -363,32 +375,31 @@ export default function V3CommandPalette({
     [placeRows, siteRows, flyToRows],
   )
 
-  // ── Auto-expand matching sections on search, collapse non-matching ──
+  // ── Visible rows for the active tab ──
+  const hasQueryNow = search.hasQuery
+  const browsingAll = tab === "all" && !hasQueryNow
+  const preview = <T,>(rows: T[]) => (browsingAll ? rows.slice(0, ALL_TAB_PREVIEW) : rows)
+  const visPlaceRows = tab === "all" || tab === "places" ? preview(placeRows) : []
+  const visSiteRows = tab === "all" || tab === "sites" ? preview(siteRows) : []
+  const visCollectionRows = tab === "all" || tab === "collections" ? preview(collectionRows) : []
+  const visFlyToRows = tab === "all" ? flyToRows : []
+  // Time/Migration aren't text-searchable: on "All" they only show while browsing.
+  const showTime = tab === "time" || browsingAll
+  const showMigration = tab === "migration" || browsingAll
+
   useEffect(() => {
-    if (!search.hasQuery) {
-      setExpanded(new Set())
-      setSelectedIdx(-1)
-      return
-    }
-    const next = new Set<SectionKey>()
-    if (searchPlaceRows.length > 0) next.add("places")
-    if (siteRows.length > 0) next.add("sites")
-    if (searchCollectionRows.length > 0) next.add("collections")
-    if (flyToRows.length > 0) next.add("flyto")
-    setExpanded(next)
-    setSelectedIdx(0)
-  }, [search.hasQuery, searchPlaceRows.length, siteRows.length, searchCollectionRows.length, flyToRows.length])
+    setSelectedIdx(search.hasQuery ? 0 : -1)
+  }, [search.hasQuery, search.searchQuery, tab])
 
   // ── Flat selectable list for keyboard navigation ──
   const flatItems = useMemo(() => {
     const list: { section: SectionKey; index: number }[] = []
-    if (expanded.has("places")) placeRows.forEach((_, i) => list.push({ section: "places", index: i }))
-    if (expanded.has("sites")) siteRows.forEach((_, i) => list.push({ section: "sites", index: i }))
-    if (expanded.has("collections")) collectionRows.forEach((_, i) => list.push({ section: "collections", index: i }))
-    // Fly-to rows are always expanded when present (no header to toggle)
-    flyToRows.forEach((_, i) => list.push({ section: "flyto", index: i }))
+    visPlaceRows.forEach((_, i) => list.push({ section: "places", index: i }))
+    visSiteRows.forEach((_, i) => list.push({ section: "sites", index: i }))
+    visCollectionRows.forEach((_, i) => list.push({ section: "collections", index: i }))
+    visFlyToRows.forEach((_, i) => list.push({ section: "flyto", index: i }))
     return list
-  }, [expanded, placeRows, siteRows, collectionRows, flyToRows])
+  }, [visPlaceRows, visSiteRows, visCollectionRows, visFlyToRows])
 
   // ── Filter toggle helpers (adds/removes chip, does NOT close palette) ──
   const toggleFilter = useCallback(
@@ -462,15 +473,6 @@ export default function V3CommandPalette({
     [flatItems, placeRows, siteRows, collectionRows, flyToRows, handleSelectPlace, handleSelectSite, handleSelectFlyTo, handleSelectCollection],
   )
 
-  const toggleSection = useCallback((key: SectionKey) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }, [])
-
   // Flat-index lookup for a section row
   const flatIndexOf = useCallback(
     (section: SectionKey, rowIndex: number) =>
@@ -538,20 +540,22 @@ export default function V3CommandPalette({
       <div className="fixed inset-0 z-[80] bg-black/25 backdrop-blur-[2px]" onClick={() => onOpenChange(false)} />
 
       {/* Palette */}
-      <div className="fixed inset-0 z-[80] flex items-start justify-center pt-2 md:pt-[15vh] pointer-events-none">
+      <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 pointer-events-none">
         <div
           className="w-full max-w-lg bg-white rounded-[20px] shadow-2xl border border-gray-200 overflow-hidden pointer-events-auto"
           onKeyDown={handleKeyDown}
         >
           {/* Search input */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-            <Search className="w-[18px] h-[18px] text-gray-400 flex-shrink-0" />
+            {/* [&_*]:text-inherit beats the global `* { color }` reset so the strokes stay gray */}
+            <Search className="w-4 h-4 text-gray-400 flex-shrink-0 [&_*]:text-inherit" />
             <input
               ref={inputRef}
               type="text"
               value={search.searchQuery}
               onChange={(e) => search.setSearchQuery(e.target.value)}
-              placeholder="Search places, sites, collections…"
+              placeholder="Search"
+              aria-label="Search places, sites, collections"
               className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
             />
             {search.isSearching && <Spinner size="1" />}
@@ -563,6 +567,30 @@ export default function V3CommandPalette({
             <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 text-[10px] text-gray-400">
               ESC
             </kbd>
+          </div>
+
+          {/* Tabs */}
+          <div role="tablist" aria-label="Result type" className="flex items-center gap-1 px-3 py-2 border-b border-gray-100 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {TABS.map(({ key, label }) => {
+              const empty = hasQuery && (
+                (key === "places" && placeRows.length === 0) ||
+                (key === "sites" && siteRows.length === 0) ||
+                (key === "collections" && collectionRows.length === 0)
+              )
+              return (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={tab === key}
+                  onClick={() => setTab(key)}
+                  className={`flex-shrink-0 rounded-md px-2.5 py-1 text-sm transition-colors ${
+                    tab === key ? "bg-gray-100 text-black" : "text-gray-500 hover:text-black"
+                  } ${empty ? "opacity-35" : ""}`}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Active filter chips */}
@@ -671,7 +699,7 @@ export default function V3CommandPalette({
             </div>
           )}
 
-          <div ref={listRef} className="max-h-[50vh] overflow-y-auto">
+          <div ref={listRef} className="h-[min(50dvh,420px)] overflow-y-auto">
             {/* Typing hint */}
             {search.searchQuery.length > 0 && search.searchQuery.length < 2 && (
               <div className="px-4 py-6 text-center text-sm text-gray-400">Type at least 2 characters…</div>
@@ -684,26 +712,28 @@ export default function V3CommandPalette({
               </div>
             )}
 
-            {/* Accordion sections — always visible once data is loaded */}
+            {/* Nothing for this tab while other tabs have matches */}
+            {hasQuery && matchCount > 0 && flatItems.length === 0 && tab !== "time" && tab !== "migration" && (
+              <div className="px-4 py-6 text-center text-sm text-gray-400">
+                No {TABS.find((t) => t.key === tab)?.label.toLowerCase()} for &ldquo;{search.searchQuery}&rdquo;
+              </div>
+            )}
+
+            {/* Sections for the active tab — visible once data is loaded */}
             {(!search.searchQuery || matchCount > 0 || search.searchQuery.length < 2) && (allPlaceRows.length > 0 || allCollectionRows.length > 0) && (
               <div className="py-1">
                 {/* ── Places ── */}
-                <SectionHeader
-                  label="Places"
-                  count={placeRows.length}
-                  isOpen={expanded.has("places")}
-                  onToggle={() => toggleSection("places")}
-                  dimmed={hasQuery && searchPlaceRows.length === 0}
-                />
-                {expanded.has("places") &&
-                  placeRows.map((row, i) => {
+                {tab === "all" && visPlaceRows.length > 0 && (
+                  <GroupLabel label="Places" total={placeRows.length} truncated={visPlaceRows.length < placeRows.length} onShowAll={() => setTab("places")} />
+                )}
+                {visPlaceRows.map((row, i) => {
                     const fi = flatIndexOf("places", i)
                     const active = isFilterActive("countries", row.name)
                     return (
                       <button
                         key={`p-${row.name}`}
                         data-flat={fi}
-                        className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                        className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                           active
                             ? "bg-blue-50 text-blue-800"
                             : fi === selectedIdx
@@ -724,22 +754,17 @@ export default function V3CommandPalette({
                   })}
 
                 {/* ── Sites ── */}
-                <SectionHeader
-                  label="Sites"
-                  count={siteRows.length}
-                  isOpen={expanded.has("sites")}
-                  onToggle={() => toggleSection("sites")}
-                  dimmed={hasQuery && siteRows.length === 0}
-                />
-                {expanded.has("sites") &&
-                  siteRows.map((row, i) => {
+                {tab === "all" && visSiteRows.length > 0 && (
+                  <GroupLabel label="Sites" total={siteRows.length} truncated={visSiteRows.length < siteRows.length} onShowAll={() => setTab("sites")} />
+                )}
+                {visSiteRows.map((row, i) => {
                     const fi = flatIndexOf("sites", i)
                     const active = isFilterActive("cities", row.name)
                     return (
                       <button
                         key={`s-${row.name}`}
                         data-flat={fi}
-                        className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                        className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                           active
                             ? "bg-blue-50 text-blue-800"
                             : fi === selectedIdx
@@ -760,16 +785,13 @@ export default function V3CommandPalette({
                   })}
 
                 {/* ── Time (object creation date) ── */}
-                <SectionHeader
-                  label="Time"
-                  count={dateBuckets ? (dateBuckets.objectDateExactCount ?? 0) : null}
-                  isOpen={expanded.has("time")}
-                  onToggle={() => toggleSection("time")}
-                  dimmed={false}
-                />
-                {expanded.has("time") && (
+                {showTime && (
                   <>
-                    <div className="pl-7 pr-4 py-1 flex items-center gap-1.5">
+                    {tab === "all" && (
+                      <GroupLabel label="Time" truncated onShowAll={() => setTab("time")} />
+                    )}
+                    {tab === "time" && (
+                    <div className="px-4 py-1 flex items-center gap-1.5">
                       <input
                         type="text"
                         inputMode="numeric"
@@ -787,6 +809,7 @@ export default function V3CommandPalette({
                         Go
                       </button>
                     </div>
+                    )}
                     {dateBuckets && collapseContiguousBuckets(
                         ERA_BUCKETS,
                         Object.fromEntries(dateBuckets.objectDateBuckets.map((b) => [b.id, b.count])),
@@ -794,6 +817,7 @@ export default function V3CommandPalette({
                       )
                       // Hide empty buckets now that we have a real (non-null) result.
                       .filter((row) => row.count > 0)
+                      .slice(0, tab === "all" ? ALL_TAB_PREVIEW : undefined)
                       .map((row) => {
                       const bucket = row.era
                       const count = row.count
@@ -835,7 +859,7 @@ export default function V3CommandPalette({
                           {drillable && isExpanded && (
                             <div className="pl-8">
                               {isLoadingDecades && !decades && (
-                                <div className="flex items-center gap-2 pl-7 pr-4 py-1.5 text-sm text-gray-400">
+                                <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-gray-400">
                                   <Spinner size="1" /> Loading decades…
                                 </div>
                               )}
@@ -846,7 +870,7 @@ export default function V3CommandPalette({
                                   return (
                                     <button
                                       key={`decade-${decade.id}`}
-                                      className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                                      className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                                         decadeActive ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
                                       }`}
                                       onClick={() => toggleDecadeEra(decade as any)}
@@ -873,18 +897,15 @@ export default function V3CommandPalette({
                     (non-undated) acquisition records, since an "Undated"-only
                     list has nothing to browse. While dateBuckets is still
                     loading (null), show it rather than flashing it away. ── */}
-                {(!dateBuckets || (dateBuckets.acquisitionExactCount ?? 0) > 0) && (
+                {showMigration && (!dateBuckets || (dateBuckets.acquisitionExactCount ?? 0) > 0) && (
                   <>
-                    <SectionHeader
-                      label="Migration"
-                      count={dateBuckets ? (dateBuckets.acquisitionExactCount ?? 0) : null}
-                      isOpen={expanded.has("migration")}
-                      onToggle={() => toggleSection("migration")}
-                      dimmed={false}
-                    />
-                    {expanded.has("migration") && (
+                    {tab === "all" && (
+                      <GroupLabel label="Migration" truncated onShowAll={() => setTab("migration")} />
+                    )}
+                    {(
                       <>
-                        <div className="pl-7 pr-4 py-1 flex items-center gap-1.5">
+                        {tab === "migration" && (
+                        <div className="px-4 py-1 flex items-center gap-1.5">
                           <input
                             type="text"
                             inputMode="numeric"
@@ -902,10 +923,12 @@ export default function V3CommandPalette({
                             Go
                           </button>
                         </div>
+                        )}
                         {(dateBuckets?.acquisitionBuckets ?? [])
                           // Undated is expected to dwarf every real year (most institutions
                           // have no acquisition data at all) — keep it pinned first regardless.
                           .filter((bucket) => bucket.count > 0 || bucket.id === 'undated')
+                          .slice(0, tab === "all" ? ALL_TAB_PREVIEW : undefined)
                           .map((bucket) => {
                             const yearMatch = /^year-(-?\d+)$/.exec(bucket.id)
                             const migrationBucket: EraBucket = yearMatch
@@ -915,7 +938,7 @@ export default function V3CommandPalette({
                             return (
                               <button
                                 key={`migration-${bucket.id}`}
-                                className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                                className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                                   active ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
                                 }`}
                                 onClick={() => toggleMigrationEra(migrationBucket)}
@@ -935,22 +958,17 @@ export default function V3CommandPalette({
                 )}
 
                 {/* ── Collections ── */}
-                <SectionHeader
-                  label="Collections"
-                  count={collectionRows.length}
-                  isOpen={expanded.has("collections")}
-                  onToggle={() => toggleSection("collections")}
-                  dimmed={hasQuery && searchCollectionRows.length === 0}
-                />
-                {expanded.has("collections") &&
-                  collectionRows.map((row, i) => {
+                {tab === "all" && visCollectionRows.length > 0 && (
+                  <GroupLabel label="Collections" total={collectionRows.length} truncated={visCollectionRows.length < collectionRows.length} onShowAll={() => setTab("collections")} />
+                )}
+                {visCollectionRows.map((row, i) => {
                     const fi = flatIndexOf("collections", i)
                     const active = isFilterActive("institutions", row.name)
                     return (
                       <button
                         key={`c-${row.name}`}
                         data-flat={fi}
-                        className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                        className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                           active
                             ? "bg-orange-50 text-orange-800"
                             : fi === selectedIdx
@@ -979,16 +997,16 @@ export default function V3CommandPalette({
                   })}
 
                 {/* ── Fly-to rows: map locations outside the data (only when searching) ── */}
-                {hasQuery && flyToRows.length > 0 && (
+                {hasQuery && visFlyToRows.length > 0 && (
                   <>
-                    <div className="px-4 pt-3 pb-1 mt-1 border-t border-gray-100 text-sm font-medium text-gray-500">Go to</div>
-                    {flyToRows.map((row, i) => {
+                    <GroupLabel label="Go to" />
+                    {visFlyToRows.map((row, i) => {
                       const fi = flatIndexOf("flyto", i)
                       return (
                         <button
                           key={`ft-${i}-${row.name}`}
                           data-flat={fi}
-                          className={`group w-full flex items-center gap-3 pl-7 pr-4 py-1.5 text-left transition-colors ${
+                          className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                             fi === selectedIdx
                               ? "bg-gray-50 text-gray-900"
                               : "hover:bg-gray-50 text-gray-500"
@@ -1019,44 +1037,28 @@ export default function V3CommandPalette({
   )
 }
 
-// ── Accordion section header ──
+// ── Section label on the "All" tab ──
 
-function SectionHeader({
+function GroupLabel({
   label,
-  count,
-  isOpen,
-  onToggle,
-  dimmed,
-  countLabel,
+  total,
+  truncated = false,
+  onShowAll,
 }: {
   label: string
-  /** null means "still loading" — omits the count entirely rather than showing a misleading zero. */
-  count: number | null
-  isOpen: boolean
-  onToggle: () => void
-  dimmed: boolean
-  /** When set (e.g. "Exact"), renders "Exact: N" instead of a bare number —
-   * for sections (Time) where this count is a narrower metric than "how many
-   * rows are in the list below", so a bare 0 would misread as "nothing here"
-   * even while range-dated buckets have real counts. */
-  countLabel?: string
+  /** Row count in the full list; omitted where the rows aren't a simple count (Time, Migration). */
+  total?: number
+  truncated?: boolean
+  onShowAll?: () => void
 }) {
   return (
-    <button
-      onClick={onToggle}
-      className={`w-full flex items-center gap-2 px-4 py-2 text-left transition-colors hover:bg-gray-50 ${
-        dimmed ? "opacity-35" : ""
-      }`}
-    >
-      <ChevronRight
-        className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
-      />
-      <span className="text-sm font-medium text-gray-500 flex-1">{label}</span>
-      {count !== null && (
-        <span className="text-sm text-gray-400 tabular-nums">
-          {countLabel && `${countLabel}: `}{count.toLocaleString()}
-        </span>
+    <div className="flex items-center justify-between px-4 pt-3 pb-1">
+      <span className="text-sm font-medium text-gray-500">{label}</span>
+      {truncated && onShowAll && (
+        <button onClick={onShowAll} className="text-sm text-gray-400 hover:text-black transition-colors">
+          {total !== undefined ? `Show all ${total.toLocaleString()}` : "Show all"}
+        </button>
       )}
-    </button>
+    </div>
   )
 }

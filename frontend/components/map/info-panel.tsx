@@ -4,8 +4,10 @@
 import React from "react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp } from "lucide-react"
-import { IconClose, IconSearch } from "@/components/icons"
+import { ChevronDown, ChevronUp, Info } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { IconClose } from "@/components/icons"
+import SearchBar from "./search-bar"
 import { ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import type {
@@ -96,6 +98,9 @@ interface InfoPanelProps {
   removeMigrationFilter?: () => void
   locationName?: string
   activeCountry?: string | null
+  /** Mobile only: "drill" is the top card (breadcrumb, Places/Sites/Time/Collections, filter chips);
+   *  "summary" is the bottom sheet's count row. Omitted, everything renders together. */
+  mobileVariant?: "summary" | "drill"
 }
 
 export default function InfoPanel({
@@ -128,14 +133,19 @@ export default function InfoPanel({
   removeMigrationFilter,
   locationName,
   activeCountry,
+  mobileVariant,
 }: InfoPanelProps) {
-  // Places starts open on first load (this block is mobile-only).
-  const [showOrigins, setShowOrigins] = React.useState(true)
-  const [showSites, setShowSites] = React.useState(false)
+  // Mobile sections are an accordion: one list open at a time keeps the card short
+  // enough to fit above the half-height sheet without scrolling.
+  const [openSection, setOpenSection] = React.useState<"origins" | "sites" | "time" | "collections" | null>("origins")
+  const sectionState = (key: "origins" | "sites" | "time" | "collections") =>
+    [openSection === key, (open: boolean) => setOpenSection(open ? key : null)] as const
+  const [showOrigins, setShowOrigins] = sectionState("origins")
+  const [showSites, setShowSites] = sectionState("sites")
   // Display-only labels: "Kano (State)" shows as "Kano" unless another site shares the name.
   const siteLabels = React.useMemo(() => placeDisplayLabels(groupedSites.map((s) => s.name)), [groupedSites])
-  const [showTime, setShowTime] = React.useState(false)
-  const [showCollections, setShowCollections] = React.useState(false)
+  const [showTime, setShowTime] = sectionState("time")
+  const [showCollections, setShowCollections] = sectionState("collections")
 
   const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
     (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
@@ -148,7 +158,11 @@ export default function InfoPanel({
     : (activeCountry || '')
 
   return (
-    <div className={`${isMobile ? "px-4 pt-0 pb-4" : "p-4 pt-2"} flex flex-col bg-white`}>
+    <div className={`${
+      mobileVariant === "summary" ? "px-4 py-0"
+        : mobileVariant === "drill" ? "px-4 pt-1 pb-3"
+        : isMobile ? "px-4 pt-0 pb-4" : "p-4 pt-2"
+    } flex flex-col bg-white`}>
       {/* Mobile breadcrumb + search row — always visible */}
 
       {breadcrumb.length > 0 && (
@@ -182,15 +196,38 @@ export default function InfoPanel({
               )
             })}
           </div>
-          {onCommandPaletteOpen && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onCommandPaletteOpen} title="Search (⌘K)">
-              <IconSearch className="w-5 h-5 text-gray-500" />
-            </Button>
+          {/* About — on phones this replaces the map's info control */}
+          {mobileVariant === "drill" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" title="About" aria-label="About">
+                  <Info className="w-5 h-5 text-gray-500" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 rounded-xl text-[13px] leading-normal text-[#333]">
+                <p className="mb-2.5 text-[#555]">
+                  Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact&apos;s origin and current repository, it refuses problematic taxonomies and routes researchers directly to the source.
+                </p>
+                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block text-[#333]">
+                  GitHub ↗
+                </a>
+                <p className="mt-1.5 font-mono text-[11px] text-[#999]">
+                  Data may be incomplete.{" "}
+                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-[#999]">Report issue ↗</a>
+                </p>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       )}
 
-      {isMobile && containerSize === "minimized" && actionSlot && (
+      {onCommandPaletteOpen && (
+        <div className="pt-1 pb-2">
+          <SearchBar onOpen={onCommandPaletteOpen} />
+        </div>
+      )}
+
+      {!mobileVariant && isMobile && containerSize === "minimized" && actionSlot && (
         <div className="flex items-center justify-between py-1">
           <span className="text-sm text-black/60 truncate min-w-0 flex-1">
             {displayName || locationName || ""}
@@ -199,8 +236,9 @@ export default function InfoPanel({
         </div>
       )}
 
-      {!(isMobile && containerSize === "minimized") && (
+      {(mobileVariant || !(isMobile && containerSize === "minimized")) && (
         <>
+          {mobileVariant !== "drill" && (
           <div className="flex py-1 items-center justify-between gap-2">
             <div className="text-sm min-w-0 flex-1">
               <div className="leading-normal text-left">
@@ -231,11 +269,12 @@ export default function InfoPanel({
               <div className="flex-shrink-0">{actionSlot}</div>
             )}
           </div>
+          )}
 
           {/* Mobile: Drill-down sections (after artifact count) — collapses while the
               object grid below is scrolled down, to free up room for it, and comes
               back on scroll-up (see drillSectionsVisible in object-panel.tsx). */}
-          {isMobile && (
+          {isMobile && mobileVariant !== "summary" && (
             <div
               className={`overflow-hidden transition-[max-height,opacity] ease-in-out ${
                 drillSectionsVisible ? "duration-700 max-h-[1000px] opacity-100" : "duration-400 max-h-0 opacity-0"
@@ -339,7 +378,7 @@ export default function InfoPanel({
           )}
 
           {/* Filter chips */}
-          {activeFilterCount > 0 && (
+          {activeFilterCount > 0 && mobileVariant !== "summary" && (
             <div className="flex flex-wrap items-center gap-1 pt-1">
               {facetedFilters.countries.map(c => (
                 <span key={`c-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-sm">
