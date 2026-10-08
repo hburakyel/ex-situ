@@ -4,7 +4,7 @@
 import React from "react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp, Globe, Info } from "lucide-react"
+import { ChevronDown, ChevronUp, Globe, Info, Search } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { IconClose } from "@/components/icons"
 import SearchBar from "./search-bar"
@@ -104,6 +104,9 @@ interface InfoPanelProps {
   /** Mobile: shows/puts away the map card; its button takes the About button's place. */
   onMapToggle?: () => void
   mapOpen?: boolean
+  /** Mobile: the search icon shows/hides the search box and the Places/Time/Collections lists. */
+  onInfoToggle?: () => void
+  infoOpen?: boolean
 }
 
 export default function InfoPanel({
@@ -139,6 +142,8 @@ export default function InfoPanel({
   mobileVariant,
   onMapToggle,
   mapOpen,
+  onInfoToggle,
+  infoOpen,
 }: InfoPanelProps) {
   // Mobile sections are an accordion: one list open at a time keeps the card short
   // enough to fit above the half-height sheet without scrolling.
@@ -202,15 +207,8 @@ export default function InfoPanel({
               )
             })}
           </div>
-          {mobileVariant === "drill" && onMapToggle && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onMapToggle}
-              title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
-            >
-              <Globe className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
-            </Button>
-          )}
           {/* About — on phones this replaces the map's info control */}
-          {mobileVariant === "drill" && !onMapToggle && (
+          {mobileVariant === "drill" && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" title="About" aria-label="About">
@@ -231,10 +229,24 @@ export default function InfoPanel({
               </PopoverContent>
             </Popover>
           )}
+          {mobileVariant === "drill" && onMapToggle && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onMapToggle}
+              title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
+            >
+              <Globe className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
+            </Button>
+          )}
+          {mobileVariant === "drill" && onInfoToggle && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onInfoToggle}
+              title={infoOpen ? "Hide search and lists" : "Search and lists"} aria-label={infoOpen ? "Hide search and lists" : "Search and lists"} aria-pressed={infoOpen}
+            >
+              <Search className={`w-5 h-5 ${infoOpen ? "text-black" : "text-gray-500"}`} />
+            </Button>
+          )}
         </div>
       )}
 
-      {onCommandPaletteOpen && (
+      {onCommandPaletteOpen && infoOpen !== false && (
         <div className="pt-1 pb-2">
           <SearchBar onOpen={onCommandPaletteOpen} />
         </div>
@@ -287,7 +299,7 @@ export default function InfoPanel({
           {/* Mobile: Drill-down sections (after artifact count) — collapses while the
               object grid below is scrolled down, to free up room for it, and comes
               back on scroll-up (see drillSectionsVisible in object-panel.tsx). */}
-          {isMobile && mobileVariant !== "summary" && (
+          {isMobile && mobileVariant !== "summary" && infoOpen !== false && (
             <div
               className={`overflow-hidden transition-[max-height,opacity] ease-in-out ${
                 drillSectionsVisible ? "duration-700 max-h-[1000px] opacity-100" : "duration-400 max-h-0 opacity-0"

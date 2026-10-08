@@ -199,6 +199,8 @@ export default function ObjectPanel({
   // Places/Time/Collections drill-down block: hidden while the object grid is
   // scrolled down (frees up room for the grid), brought back on scroll-up.
   const [drillSectionsVisible, setDrillSectionsVisible] = useState(true)
+  // Mobile: search box + Places/Time/Collections stay folded under the search icon.
+  const [mobileInfoOpen, setMobileInfoOpen] = useState(false)
   const [showCopied, setShowCopied] = useState(false)
   // Grid density: null = the responsive default; otherwise 1 / 3 / 5 columns (remembered per browser).
   const [gridColumns, setGridColumns] = useState<number | null>(null)
@@ -1332,6 +1334,8 @@ export default function ObjectPanel({
         mobileVariant={variant}
         mapOpen={mapOpen}
         onMapToggle={variant === "drill" ? onMapToggle : undefined}
+        infoOpen={variant === "drill" && MOBILE_FULL_SCREEN ? mobileInfoOpen : undefined}
+        onInfoToggle={variant === "drill" && MOBILE_FULL_SCREEN ? () => setMobileInfoOpen((v) => !v) : undefined}
         breadcrumb={variant === "drill" ? breadcrumb : []}
         onBreadcrumbClick={variant === "drill" ? onBreadcrumbClick : undefined}
         onCommandPaletteOpen={variant === "drill" ? onCommandPaletteOpen : undefined}

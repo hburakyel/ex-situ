@@ -396,14 +396,15 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     useImperativeHandle(ref, () => ({
       map: map.current,
-      flyToLocation: (lng: number, lat: number, zoom: number = 10, duration: number = 800) => {
-        if (map.current) {
-          isProgrammaticMove.current = true
-          setViewportState({ longitude: lng, latitude: lat, zoom })
-          lastViewRef.current = { lng, lat, zoom }
-          prevViewStateRef.current = { longitude: lng, latitude: lat, zoom } as any
-          map.current.flyTo({ center: [lng, lat], zoom, essential: true, duration })
-        }
+      // Returns false while the map isn't created yet (the call did nothing).
+      flyToLocation: (lng: number, lat: number, zoom: number = 10, duration: number = 800): boolean => {
+        if (!map.current) return false
+        isProgrammaticMove.current = true
+        setViewportState({ longitude: lng, latitude: lat, zoom })
+        lastViewRef.current = { lng, lat, zoom }
+        prevViewStateRef.current = { longitude: lng, latitude: lat, zoom } as any
+        map.current.flyTo({ center: [lng, lat], zoom, essential: true, duration })
+        return true
       },
       jumpToLocation: (lng: number, lat: number, zoom: number = 10) => {
         if (map.current) {

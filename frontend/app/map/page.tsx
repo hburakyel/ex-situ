@@ -645,6 +645,42 @@ function MapContent() {
     return () => clearTimeout(restoreTimer)
   }, [urlCountry, urlSite, urlInstitution, urlLat, urlLng, urlZoom])
 
+  // A link with a place but no lat/lng (shared, or from the research pages) has
+  // nothing to fly to on mount — fly once the place's coordinates arrive with the
+  // arc data: the site at zoom 10, else the country at zoom 5 (as when picked from the list).
+  const hasFlownToUrlPlaceRef = useRef(!urlCountry || !!(urlLat && urlLng))
+  const [urlFlyRetry, setUrlFlyRetry] = useState(0)
+  useEffect(() => {
+    if (hasFlownToUrlPlaceRef.current) return
+    // Navigated elsewhere before the data came in: leave the map alone.
+    if (normalizePlaceKey(activeCountry) !== normalizePlaceKey(urlCountry)) {
+      hasFlownToUrlPlaceRef.current = true
+      return
+    }
+    const siteKey = normalizePlaceKey(urlSite)
+    const site = siteKey
+      ? groupedSites.find((s) => normalizePlaceKey(s.name) === siteKey || s.rawNames.some((n) => normalizePlaceKey(n) === siteKey))
+      : undefined
+    const origin = groupedOrigins.find((o) => normalizePlaceKey(o.country) === normalizePlaceKey(urlCountry))
+    // Wait for the site list when a site is asked for (it loads after the countries).
+    if (siteKey && !site && (isLoadingSubArcs || groupedSites.length === 0)) return
+    if (!mapRef.current) {
+      const id = window.setTimeout(() => setUrlFlyRetry((n) => n + 1), 300)
+      return () => window.clearTimeout(id)
+    }
+    const target = site && hasValidCoordinates(site.lat, site.lng)
+      ? { lng: site.lng, lat: site.lat, zoom: 10 }
+      : origin && hasValidCoordinates(origin.lat, origin.lng) ? { lng: origin.lng, lat: origin.lat, zoom: 5 } : null
+    if (!target) return
+    // The map instance is created asynchronously; until then the call is a no-op — retry shortly.
+    if (!mapRef.current.flyToLocation(target.lng, target.lat, target.zoom, 1400)) {
+      const id = window.setTimeout(() => setUrlFlyRetry((n) => n + 1), 300)
+      return () => window.clearTimeout(id)
+    }
+    hasFlownToUrlPlaceRef.current = true
+    setViewState((prev) => ({ ...prev, longitude: target.lng, latitude: target.lat, zoom: target.zoom }))
+  }, [activeCountry, urlCountry, urlSite, groupedSites, groupedOrigins, isLoadingSubArcs, urlFlyRetry])
+
   // ── Fetch sub-arcs when country is selected (or the Time/Migration filter changes) ──
   useEffect(() => {
     if (!activeCountry) { setSubArcs([]); return }
