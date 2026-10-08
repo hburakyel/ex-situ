@@ -4,7 +4,7 @@
 import React from "react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp, Info, Map as MapIcon } from "lucide-react"
+import { ChevronDown, ChevronUp, Globe, Info } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { IconClose } from "@/components/icons"
 import SearchBar from "./search-bar"
@@ -206,7 +206,7 @@ export default function InfoPanel({
             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onMapToggle}
               title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
             >
-              <MapIcon className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
+              <Globe className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
             </Button>
           )}
           {/* About — on phones this replaces the map's info control */}

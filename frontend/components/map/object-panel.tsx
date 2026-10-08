@@ -1559,6 +1559,8 @@ export default function ObjectPanel({
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
             columns={isMobile || containerSize === "expanded" ? activeGridColumns : null}
+            // Map card: 40dvh + its 12px bottom margin + safe area, plus a 12px gap.
+            bottomInset={isMobile && MOBILE_FULL_SCREEN && mapOpen ? "calc(40dvh + 24px + env(safe-area-inset-bottom))" : undefined}
             header={isMobile && MOBILE_FULL_SCREEN ? (
               <>
                 {renderMobileInfo("drill")}

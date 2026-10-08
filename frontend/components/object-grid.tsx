@@ -78,6 +78,8 @@ interface ObjectGridProps {
   columns?: number | null
   /** Rendered above the tiles inside the scroll container, so it scrolls away with the grid (mobile info block). */
   header?: React.ReactNode
+  /** Extra room below the last row (mobile: clears the map card floating over the grid). */
+  bottomInset?: string
   /** Fires on every scroll of the grid's internal container, with its scrollTop and how far it can scroll. */
   onScroll?: (scrollTop: number, maxScrollTop: number) => void
 }
@@ -104,6 +106,7 @@ export default function ObjectGrid({
   columns: columnsOverride = null,
   onScroll,
   header,
+  bottomInset,
 }: ObjectGridProps) {
   const { ref: observerRef, inView } = useInView({
     threshold: 0.1,
@@ -382,7 +385,7 @@ export default function ObjectGrid({
 
 return (
   <div className="relative h-full bg-white">
-    <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white">
+    <div ref={containerRef} className="h-full overflow-auto px-4 pt-4 pb-4 bg-white" style={bottomInset ? { paddingBottom: bottomInset } : undefined}>
       {header && <div className="-mx-4 -mt-4 mb-2">{header}</div>}
       {emptyState ?? (
       <>
