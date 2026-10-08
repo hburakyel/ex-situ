@@ -9,6 +9,7 @@ import { eraToDateFilters, type EraDateFilters } from "@/lib/era-buckets"
 import type { MuseumObject, MapBounds, SelectedArc } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { AlertTriangle } from "lucide-react"
+import { IconExpand, IconMinimize } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -127,6 +128,14 @@ function MapContent() {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [containerSize, setContainerSize] = useState<ContainerSize>("default")
+  // Mobile: the object panel fills the screen and the map is a card above its
+  // bottom edge ("card"), full screen ("full") or put away ("hidden" — still mounted,
+  // so it reopens instantly). A first visit opens on the map card; a shared link
+  // to a place, collection or artifact opens on its objects.
+  const [mobileMap, setMobileMap] = useState<"card" | "full" | "hidden">(
+    () => (urlCountry || urlSite || urlInstitution || urlArtifactId ? "hidden" : "card"),
+  )
+  const [mobileGalleryOpen, setMobileGalleryOpen] = useState(false)
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
   const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({ institutions: [], countries: [], cities: [] })
   const [selectedArc, setSelectedArc] = useState<SelectedArc | null>(null)
@@ -1278,6 +1287,15 @@ function MapContent() {
   return (
     <div className="flex h-full flex-col">
       <div className="h-full w-full relative">
+        <div
+          className={isMobile
+            ? `fixed z-40 overflow-hidden bg-[#111] transition-[left,right,bottom,height,border-radius,transform,opacity] duration-300 ease-out ${
+                mobileMap === "full" ? "left-0 right-0 bottom-0 h-dvh rounded-none" : "left-3 right-3 h-[40dvh] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
+              } ${mobileMap === "hidden" || mobileGalleryOpen ? "translate-y-[calc(100%+24px)] opacity-0 pointer-events-none" : ""}`
+            : "absolute inset-0"}
+          style={isMobile && mobileMap !== "full" ? { bottom: "calc(12px + env(safe-area-inset-bottom))" } : undefined}
+          aria-hidden={isMobile && (mobileMap === "hidden" || mobileGalleryOpen) ? true : undefined}
+        >
         <MapView
           ref={mapRef}
           initialViewState={{ ...viewState, name: locationName }}
@@ -1326,6 +1344,28 @@ function MapContent() {
           hoveredObjectPlace={hoveredObjectPlace}
           dateBuckets={dateBuckets}
         />
+        {isMobile && (
+          <>
+            <button
+              type="button"
+              onClick={() => setMobileMap((m) => (m === "full" ? "card" : "full"))}
+              className="absolute top-3 left-3 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 shadow-md"
+              style={mobileMap === "full" ? { top: "calc(12px + env(safe-area-inset-top))" } : undefined}
+              aria-label={mobileMap === "full" ? "Shrink map" : "Full-screen map"}
+            >
+              {mobileMap === "full" ? <IconMinimize className="h-5 w-5 text-gray-600" /> : <IconExpand className="h-5 w-5 text-gray-600" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileMap("hidden")}
+              className="absolute top-3 right-3 z-50 flex h-10 items-center rounded-xl bg-white/95 px-3.5 text-sm text-gray-700 shadow-md"
+              style={mobileMap === "full" ? { top: "calc(12px + env(safe-area-inset-top))" } : undefined}
+            >
+              Done
+            </button>
+          </>
+        )}
+        </div>
 
         {/* Floating object container — images only (+ header on mobile) */}
         {isObjectContainerVisible && (
@@ -1378,6 +1418,9 @@ function MapContent() {
             linkObjects={[]}
             initialGalleryArtifact={initialGalleryArtifact}
             onCloseContainer={() => setIsObjectContainerVisible(false)}
+            mapOpen={mobileMap !== "hidden"}
+            onMapToggle={() => setMobileMap((m) => (m === "hidden" ? "card" : "hidden"))}
+            onGalleryOpenChange={setMobileGalleryOpen}
           />
         )}
 

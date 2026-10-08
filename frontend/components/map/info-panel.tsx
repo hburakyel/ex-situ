@@ -4,7 +4,7 @@
 import React from "react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronUp, Info } from "lucide-react"
+import { ChevronDown, ChevronUp, Info, Map as MapIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { IconClose } from "@/components/icons"
 import SearchBar from "./search-bar"
@@ -101,6 +101,9 @@ interface InfoPanelProps {
   /** Mobile only: "drill" is the top card (breadcrumb, Places/Sites/Time/Collections, filter chips);
    *  "summary" is the bottom sheet's count row. Omitted, everything renders together. */
   mobileVariant?: "summary" | "drill"
+  /** Mobile: shows/puts away the map card; its button takes the About button's place. */
+  onMapToggle?: () => void
+  mapOpen?: boolean
 }
 
 export default function InfoPanel({
@@ -134,6 +137,8 @@ export default function InfoPanel({
   locationName,
   activeCountry,
   mobileVariant,
+  onMapToggle,
+  mapOpen,
 }: InfoPanelProps) {
   // Mobile sections are an accordion: one list open at a time keeps the card short
   // enough to fit above the half-height sheet without scrolling.
@@ -197,8 +202,15 @@ export default function InfoPanel({
               )
             })}
           </div>
+          {mobileVariant === "drill" && onMapToggle && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onMapToggle}
+              title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
+            >
+              <MapIcon className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
+            </Button>
+          )}
           {/* About — on phones this replaces the map's info control */}
-          {mobileVariant === "drill" && (
+          {mobileVariant === "drill" && !onMapToggle && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" title="About" aria-label="About">

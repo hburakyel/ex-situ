@@ -72,6 +72,11 @@ export interface InstitutionItem {
   count: number
 }
 
+
+// Mobile layout: the object panel is the page and the map a card on top of it
+// (page.tsx). The bottom-sheet code paths below stay behind this flag for now.
+const MOBILE_FULL_SCREEN = true
+
 interface ObjectPanelProps {
   objects: MuseumObject[]
   onLoadMore: () => void
@@ -114,6 +119,11 @@ interface ObjectPanelProps {
   initialGalleryArtifact?: MuseumObject | null
   /** Hide the panel — desktop only. */
   onCloseContainer?: () => void
+  /** Mobile: whether the map card is showing, and the button that shows/puts it away. */
+  mapOpen?: boolean
+  onMapToggle?: () => void
+  /** Mobile: the map card steps aside while the gallery is open. */
+  onGalleryOpenChange?: (open: boolean) => void
 }
 
 export default function ObjectPanel({
@@ -156,6 +166,9 @@ export default function ObjectPanel({
   linkObjects = [],
   initialGalleryArtifact,
   onCloseContainer,
+  mapOpen,
+  onMapToggle,
+  onGalleryOpenChange,
 }: ObjectPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -284,7 +297,7 @@ export default function ObjectPanel({
   //
   // deltaY convention: positive = finger moved DOWN = sheet shrinks
   useEffect(() => {
-    if (!isMobile) return
+    if (!isMobile || MOBILE_FULL_SCREEN) return
 
     const sizeToHeight = (size: ContainerSize): number => {
       const vh = window.innerHeight
@@ -487,7 +500,7 @@ export default function ObjectPanel({
   // trigger a second snap within the same gesture.
   // Desktop: completely disabled.
   useEffect(() => {
-    if (!isMobile) return
+    if (!isMobile || MOBILE_FULL_SCREEN) return
     const panel = containerRef.current
     if (!panel) return
 
@@ -683,6 +696,8 @@ export default function ObjectPanel({
     }
   }, [galleryOpen])
 
+  useEffect(() => { onGalleryOpenChange?.(galleryOpen) }, [galleryOpen, onGalleryOpenChange])
+
   // ── Mobile: gallery should always be at expanded size (Apple Maps detail behavior) ──
   // Remember the size before opening so we can restore it on close.
   const sizeBeforeGallery = useRef<ContainerSize | null>(null)
@@ -752,6 +767,10 @@ export default function ObjectPanel({
   }, [activeCountry, activeSite, activeInstitution, galleryOpen, isMobile])
 
   const getContainerStyle = (): React.CSSProperties => {
+    if (isMobile && MOBILE_FULL_SCREEN) {
+      // The page itself: full screen, scrolls as one; the map is a card on top (page.tsx).
+      return { top: 0, left: 0, right: 0, bottom: 0, height: "100dvh", paddingTop: "env(safe-area-inset-top)" }
+    }
     if (isMobile) {
       const shadow = "0 -2px 20px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07)"
       // iOS-style spring: fast start, soft settle. 350ms feels natural without being heavy.
@@ -1311,6 +1330,8 @@ export default function ObjectPanel({
         isMobile={isMobile}
         containerSize={containerSize}
         mobileVariant={variant}
+        mapOpen={mapOpen}
+        onMapToggle={variant === "drill" ? onMapToggle : undefined}
         breadcrumb={variant === "drill" ? breadcrumb : []}
         onBreadcrumbClick={variant === "drill" ? onBreadcrumbClick : undefined}
         onCommandPaletteOpen={variant === "drill" ? onCommandPaletteOpen : undefined}
@@ -1382,7 +1403,7 @@ export default function ObjectPanel({
   const sheetInner = (
     <div className="h-full flex flex-col">
       {/* Mobile drag handle */}
-      {isMobile && (
+      {isMobile && !MOBILE_FULL_SCREEN && (
         <div
           ref={handleRef}
           role="button"
@@ -1419,7 +1440,7 @@ export default function ObjectPanel({
         </div>
       )}
         {/* Header: Desktop and Mobile layouts */}
-        {isMobile ? (
+        {isMobile && MOBILE_FULL_SCREEN ? null : isMobile ? (
           <div ref={headerRef} className="sticky top-0 z-30 flex flex-col bg-white">
             {renderMobileInfo("summary")}
           </div>
@@ -1538,6 +1559,12 @@ export default function ObjectPanel({
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
             columns={isMobile || containerSize === "expanded" ? activeGridColumns : null}
+            header={isMobile && MOBILE_FULL_SCREEN ? (
+              <>
+                {renderMobileInfo("drill")}
+                {renderMobileInfo("summary")}
+              </>
+            ) : undefined}
           />
           {/* Links section — paired museum image + wiki link cards */}
           {wikiLinks.length > 0 && (
@@ -1623,7 +1650,7 @@ export default function ObjectPanel({
     <>
     {/* Mobile info card — top of the map, separate from the object sheet (as on desktop).
         Hidden while the sheet is full screen. */}
-    {isMobile && containerSize !== "expanded" && !galleryOpen && (
+    {isMobile && !MOBILE_FULL_SCREEN && containerSize !== "expanded" && !galleryOpen && (
       <div
         role="region"
         aria-label="Info panel"
