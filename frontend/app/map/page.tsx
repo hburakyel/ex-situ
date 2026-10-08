@@ -136,6 +136,26 @@ function MapContent() {
     () => (urlCountry || urlSite || urlInstitution || urlArtifactId ? "hidden" : "card"),
   )
   const [mobileGalleryOpen, setMobileGalleryOpen] = useState(false)
+  // Picking a place or site from the list while the map is put away "peeks" it: the
+  // card comes up so the fly-to is visible, then goes away again — unless the map
+  // is touched in the meantime (then it stays, as if opened by hand).
+  const mapPeekTimer = useRef<number | null>(null)
+  const cancelMapPeek = useCallback(() => {
+    if (mapPeekTimer.current !== null) window.clearTimeout(mapPeekTimer.current)
+    mapPeekTimer.current = null
+  }, [])
+  const mobileMapRef = useRef(mobileMap)
+  useEffect(() => { mobileMapRef.current = mobileMap }, [mobileMap])
+  const peekMap = useCallback(() => {
+    if (mobileMapRef.current !== "hidden") return
+    cancelMapPeek()
+    setMobileMap("card")
+    mapPeekTimer.current = window.setTimeout(() => {
+      mapPeekTimer.current = null
+      setMobileMap((cur) => (cur === "card" ? "hidden" : cur))
+    }, 3500)
+  }, [cancelMapPeek])
+  useEffect(() => cancelMapPeek, [cancelMapPeek])
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
   const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({ institutions: [], countries: [], cities: [] })
   const [selectedArc, setSelectedArc] = useState<SelectedArc | null>(null)
@@ -1295,6 +1315,7 @@ function MapContent() {
             : "absolute inset-0"}
           style={isMobile && mobileMap !== "full" ? { bottom: "calc(12px + env(safe-area-inset-bottom))" } : undefined}
           aria-hidden={isMobile && (mobileMap === "hidden" || mobileGalleryOpen) ? true : undefined}
+          onPointerDown={isMobile ? cancelMapPeek : undefined}
         >
         <MapView
           ref={mapRef}
@@ -1348,7 +1369,7 @@ function MapContent() {
           <>
             <button
               type="button"
-              onClick={() => setMobileMap((m) => (m === "full" ? "card" : "full"))}
+              onClick={() => { cancelMapPeek(); setMobileMap((m) => (m === "full" ? "card" : "full")) }}
               className="absolute top-3 left-3 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 shadow-md"
               style={mobileMap === "full" ? { top: "calc(12px + env(safe-area-inset-top))" } : undefined}
               aria-label={mobileMap === "full" ? "Shrink map" : "Full-screen map"}
@@ -1357,7 +1378,7 @@ function MapContent() {
             </button>
             <button
               type="button"
-              onClick={() => setMobileMap("hidden")}
+              onClick={() => { cancelMapPeek(); setMobileMap("hidden") }}
               className="absolute top-3 right-3 z-50 flex h-10 items-center rounded-xl bg-white/95 px-3.5 text-sm text-gray-700 shadow-md"
               style={mobileMap === "full" ? { top: "calc(12px + env(safe-area-inset-top))" } : undefined}
             >
@@ -1397,13 +1418,13 @@ function MapContent() {
             groupedOrigins={groupedOrigins}
             sitesByCountry={sitesByCountry}
             isLoadingOrigins={isLoadingArcData}
-            onOriginClick={handleOriginClick}
+            onOriginClick={(...args: Parameters<typeof handleOriginClick>) => { if (isMobile) peekMap(); handleOriginClick(...args) }}
             groupedSites={groupedSites}
             drillInstitutions={institutions}
             activeSite={activeSite}
             activeCountry={activeCountry}
             activeInstitution={activeInstitution}
-            onToggleSite={handleToggleSite}
+            onToggleSite={(...args: Parameters<typeof handleToggleSite>) => { if (isMobile) peekMap(); handleToggleSite(...args) }}
             onToggleInstitution={handleToggleInstitution}
             isLoadingSubArcs={isLoadingSubArcs}
             locationName={effectiveLocationName}
@@ -1419,7 +1440,7 @@ function MapContent() {
             initialGalleryArtifact={initialGalleryArtifact}
             onCloseContainer={() => setIsObjectContainerVisible(false)}
             mapOpen={mobileMap !== "hidden"}
-            onMapToggle={() => setMobileMap((m) => (m === "hidden" ? "card" : "hidden"))}
+            onMapToggle={() => { cancelMapPeek(); setMobileMap((m) => (m === "hidden" ? "card" : "hidden")) }}
             onGalleryOpenChange={setMobileGalleryOpen}
           />
         )}
