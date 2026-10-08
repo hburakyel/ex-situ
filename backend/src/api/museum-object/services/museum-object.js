@@ -1572,6 +1572,81 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
   },
 
   /**
+   * Review queue (admin panel → Review). One row per place label still waiting for a
+   * person: flagged by the ETL (review_status 'pending' / geocoding_status 'ambiguous')
+   * or still sitting on its country's centroid under a label that isn't the country
+   * (hedged "probably Isfahan", regions, names no gazetteer resolved). Verified rows
+   * are done and never listed.
+   */
+  async getReviewQueue() {
+    const db = strapi.db.connection;
+    const result = await db.raw(`
+      WITH eff AS (
+        SELECT id, country_en, place_name, place_name_normalized, institution_name, title,
+               geocoding_status, geocoding_notes, review_status,
+               round(COALESCE(manual_latitude, latitude)::numeric, 4) AS la,
+               round(COALESCE(manual_longitude, longitude)::numeric, 4) AS lo
+        FROM museum_objects
+        WHERE published_at IS NOT NULL AND COALESCE(review_status, '') <> 'verified'
+      ), centroid AS (
+        SELECT country_en, la, lo FROM eff
+        WHERE lower(COALESCE(place_name_normalized, place_name)) = lower(country_en)
+        GROUP BY 1, 2, 3 HAVING count(*) >= 5
+      ), queued AS (
+        SELECT e.*,
+               CASE WHEN e.review_status = 'pending' OR e.geocoding_status = 'ambiguous' THEN 'flagged'
+                    ELSE 'country centroid' END AS reason
+        FROM eff e
+        LEFT JOIN centroid c ON c.country_en = e.country_en AND c.la = e.la AND c.lo = e.lo
+        WHERE (e.review_status = 'pending' OR e.geocoding_status = 'ambiguous'
+               OR (c.country_en IS NOT NULL AND lower(COALESCE(e.place_name_normalized, e.place_name, '')) <> lower(e.country_en)))
+          AND COALESCE(e.place_name_normalized, e.place_name, '') <> ''
+      )
+      SELECT COALESCE(place_name_normalized, place_name) AS label, country_en,
+             min(reason) AS reason, count(*)::integer AS objects,
+             min(la)::float AS latitude, min(lo)::float AS longitude,
+             (array_agg(DISTINCT place_name))[1:3] AS raw_names,
+             (array_agg(DISTINCT institution_name))[1:3] AS institutions,
+             (array_agg(geocoding_notes ORDER BY length(COALESCE(geocoding_notes, '')) DESC))[1] AS note,
+             (array_agg(title))[1] AS sample_title
+      FROM queued
+      GROUP BY 1, 2
+      ORDER BY count(*) DESC, 1
+      LIMIT 500
+    `);
+    return { data: this.getRows(result) };
+  },
+
+  /**
+   * Resolve one review-queue row: every not-yet-verified object with that label (and
+   * country) either gets coordinates the reviewer looked up ("set") or is accepted as
+   * it is ("accept"). Either way it becomes review_status 'verified', so scripts leave
+   * it alone from now on; the note records what was decided.
+   */
+  async resolveReviewGroup({ label, country, action, latitude, longitude, note }) {
+    const db = strapi.db.connection;
+    const when = new Date().toISOString().slice(0, 10);
+    const reviewNote = action === 'set'
+      ? `[review] ${when} set to ${latitude}, ${longitude}${note ? ` — ${note}` : ''}`
+      : `[review] ${when} accepted as is${note ? ` — ${note}` : ''}`;
+    const bindings = { label, country, note: reviewNote };
+    let set = `review_status = 'verified',
+               geocoding_notes = concat_ws(' | ', NULLIF(geocoding_notes, ''), :note::text)`;
+    if (action === 'set') {
+      set += `, manual_latitude = :lat, manual_longitude = :lng, geocoding_status = 'ok'`;
+      bindings.lat = latitude;
+      bindings.lng = longitude;
+    }
+    const result = await db.raw(`
+      UPDATE museum_objects SET ${set}
+      WHERE published_at IS NOT NULL AND COALESCE(review_status, '') <> 'verified'
+        AND COALESCE(place_name_normalized, place_name) = :label
+        AND country_en IS NOT DISTINCT FROM :country
+    `, bindings);
+    return { updated: result.rowCount ?? 0 };
+  },
+
+  /**
    * Phase 7: Data quality statistics per institution.
    * Returns counts, null-coordinate rates, geocoding confidence distribution,
    * and coordinate_precision breakdown for the quality dashboard.

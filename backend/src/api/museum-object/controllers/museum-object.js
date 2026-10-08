@@ -406,6 +406,44 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
     }
   },
 
+  async reviewQueue(ctx) {
+    try {
+      ctx.send(await strapi.service('api::museum-object.museum-object').getReviewQueue());
+    } catch (error) {
+      strapi.log.error('reviewQueue endpoint error:', error.message);
+      ctx.internalServerError('Review queue query failed');
+    }
+  },
+
+  async reviewResolve(ctx) {
+    try {
+      const { label, country, action, latitude, longitude, note } = ctx.request.body || {};
+      if (!label || typeof label !== 'string') return ctx.badRequest('label is required');
+      if (action !== 'set' && action !== 'accept') return ctx.badRequest('action must be "set" or "accept"');
+      let lat = null;
+      let lng = null;
+      if (action === 'set') {
+        lat = parseFloat(latitude);
+        lng = parseFloat(longitude);
+        if (!isFinite(lat) || lat < -90 || lat > 90 || !isFinite(lng) || lng < -180 || lng > 180) {
+          return ctx.badRequest('latitude must be -90…90 and longitude -180…180');
+        }
+      }
+      const data = await strapi.service('api::museum-object.museum-object').resolveReviewGroup({
+        label: label.slice(0, 255),
+        country: country ? String(country).slice(0, 100) : null,
+        action,
+        latitude: lat,
+        longitude: lng,
+        note: note ? String(note).slice(0, 300) : '',
+      });
+      ctx.send({ success: true, ...data });
+    } catch (error) {
+      strapi.log.error('reviewResolve endpoint error:', error.message);
+      ctx.internalServerError('Review update failed');
+    }
+  },
+
   async refreshViews(ctx) {
     try {
       await strapi

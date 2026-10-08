@@ -1,4 +1,4 @@
-import { Earth } from '@strapi/icons';
+import { Earth, Check } from '@strapi/icons';
 
 const bootstrap = (app) => {
   app.addMenuLink({
@@ -11,6 +11,19 @@ const bootstrap = (app) => {
     permissions: [],
     async Component() {
       const { default: Component } = await import('./extensions/GeoCorrection');
+      return { default: Component };
+    },
+  });
+  app.addMenuLink({
+    to: '/review-queue',
+    icon: Check,
+    intlLabel: {
+      id: 'review-queue.plugin.name',
+      defaultMessage: 'Review',
+    },
+    permissions: [],
+    async Component() {
+      const { default: Component } = await import('./extensions/ReviewQueue');
       return { default: Component };
     },
   });

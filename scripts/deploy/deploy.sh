@@ -61,6 +61,12 @@ if $backend; then
     log "backend dependencies changed → npm ci"
     (cd backend && npm ci)
   fi
+  if has '^backend/src/admin/'; then
+    # strapi start serves the prebuilt admin panel (backend/build); rebuild it so
+    # admin pages (Geo Correction, Review) match the code. The site keeps running.
+    log "admin panel changed → strapi build"
+    (cd backend && npm run build >/dev/null)
+  fi
   log "restarting backend (map API is unavailable while the map views rebuild)"
   pm2 restart exsitu-backend >/dev/null
   if ! wait_for "$API/api/museum-objects/geospatial?zoom=2" 600; then

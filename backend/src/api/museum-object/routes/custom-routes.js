@@ -146,6 +146,27 @@ module.exports = {
       },
     },
     {
+      method: 'GET',
+      path: '/museum-objects/review-queue',
+      handler: 'museum-object.reviewQueue',
+      config: {
+        // Admin panel (Review) only — see src/policies/is-admin-user.js
+        auth: false,
+        policies: ['global::is-admin-user'],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'PUT',
+      path: '/museum-objects/review-resolve',
+      handler: 'museum-object.reviewResolve',
+      config: {
+        auth: false,
+        policies: ['global::is-admin-user'],
+        middlewares: [],
+      },
+    },
+    {
       method: 'PUT',
       path: '/museum-objects/bulk-geocode',
       handler: 'museum-object.bulkGeocode',
