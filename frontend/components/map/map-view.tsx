@@ -1230,8 +1230,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
-            {/* ── Sites Section (country drill-down) ── */}
-            {drillLevel !== "global" && (
+            {/* ── Sites Section (country drill-down) — hidden when there is nothing to list ── */}
+            {drillLevel !== "global" && (groupedSites.length > 0 || isLoadingSubArcs) && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
@@ -1270,8 +1270,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
-            {/* ── Time Section — shown at all drill levels, above Collections ── */}
-            {(
+            {/* ── Time Section — shown at all drill levels, above Collections (if any dated objects) ── */}
+            {dateBuckets && (dateBuckets.objectDateBuckets.some((b) => b.count > 0) || (dateBuckets.objectDateSpans?.length ?? 0) > 0) && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">
@@ -1315,8 +1315,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
-            {/* ── Institutions Section — shown at all drill levels ── */}
-            {(
+            {/* ── Institutions Section — shown at all drill levels (if any) ── */}
+            {(drillInstitutions.length > 0 || isLoadingSubArcs) && (
               <div className="pt-0 mt-1">
                 <div className="flex items-center justify-between">
                   <span className="panel-text-muted">

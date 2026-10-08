@@ -319,10 +319,15 @@ export default function V3CommandPalette({
   // ── Filtered rows from search results ──
   const searchPlaceRows: PlaceRow[] = useMemo(() => {
     if (!search.hasQuery) return []
+    // Search arcs mix countries and sites; Places lists countries only. A site
+    // ("Salta") listed here would open as if it were a country and show nothing —
+    // it belongs under Sites, which opens it inside its country.
+    const countryNames = new Set(allPlaceRows.map((p) => p.name.toLowerCase()))
     const map = new Map<string, PlaceRow>()
     for (const arc of search.arcs) {
       const name = arc.place_name || ''
       if (!name) continue
+      if (countryNames.size > 0 && !countryNames.has(name.toLowerCase())) continue
       const key = name.toLowerCase()
       const existing = map.get(key)
       if (existing) {
@@ -332,7 +337,7 @@ export default function V3CommandPalette({
       }
     }
     return Array.from(map.values()).sort((a, b) => b.objectCount - a.objectCount)
-  }, [search.hasQuery, search.arcs])
+  }, [search.hasQuery, search.arcs, allPlaceRows])
 
   const searchSiteRows: SiteRow[] = useMemo(() => {
     if (!search.hasQuery) return []
