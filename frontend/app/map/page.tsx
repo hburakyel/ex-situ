@@ -9,12 +9,15 @@ import { eraToDateFilters, type EraDateFilters } from "@/lib/era-buckets"
 import type { MuseumObject, MapBounds, SelectedArc } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { AlertTriangle } from "lucide-react"
-import { IconExpand, IconMinimize } from "@/components/icons"
+import { IconClose, IconExpand, IconMinimize } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import debounce from "lodash/debounce"
-import { useUnifiedSearch, type ArcData } from "@/hooks/use-unified-search"
+import { useUnifiedSearch, INSTITUTION_CITIES, type ArcData } from "@/hooks/use-unified-search"
+import ObjectImage from "@/components/object-image"
+import { Spinner } from "@/components/ui/spinner"
+import { isWithdrawn } from "@/lib/withdrawn"
 import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/command-palette"
 import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
@@ -260,7 +263,12 @@ function MapContent() {
     if (!isMobile) return
     setIsObjectContainerVisible(true)
     setContainerSize(prev => prev === "minimized" ? "default" : prev)
-  }, [selectionKey, isMobile])
+    // Full-screen map: a pick on the map (arc, place, site) shows its objects in a
+    // preview card at the bottom instead of only updating the panel behind the map.
+    setMapPreviewOpen(mobileMapRef.current === "full" && drillLevel !== "global")
+  }, [selectionKey, isMobile, drillLevel])
+  const [mapPreviewOpen, setMapPreviewOpen] = useState(false)
+  useEffect(() => { if (mobileMap !== "full") setMapPreviewOpen(false) }, [mobileMap])
   // Transient hover-only highlight — mirrors an object card's origin onto the
   // matching map arc without triggering the navigation/fetch side effects of setActiveSite.
   const [hoveredObjectPlace, setHoveredObjectPlace] = useState<string | null>(null)
@@ -1327,6 +1335,15 @@ function MapContent() {
     return mapTotalCount + wikiCount
   }, [drillLevel, isGlobalInstitutionDrill, aggregateInstitutions, arcObjectsTotal, mapTotalCount, isWikipediaActive, wikiObjects.length])
 
+  // Mobile full-screen map: preview card for the current pick (see mapPreviewOpen).
+  const mapPreviewTitle = selectedArc
+    ? `${placeDisplayLabel(selectedArc.from, [])} → ${INSTITUTION_CITIES[selectedArc.to] || selectedArc.to}`
+    : (activeSite ? placeDisplayLabel(activeSite, groupedSites.map((s) => s.name)) : activeCountry || "")
+  const mapPreviewObjects = useMemo(
+    () => containerObjects.filter((o) => !isWithdrawn(o) && typeof o.attributes?.img_url === "string" && o.attributes.img_url.trim() !== "").slice(0, 12),
+    [containerObjects],
+  )
+
   const handleMapError = useCallback((error: string) => {
     console.error("Map error:", error)
     toast({ title: "Map Error", description: "There was an error loading the map.", variant: "destructive" })
@@ -1423,6 +1440,50 @@ function MapContent() {
             >
               Done
             </button>
+            {mobileMap === "full" && mapPreviewOpen && (
+              <div
+                className="absolute left-3 right-3 z-50 rounded-2xl bg-white p-3 shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
+                style={{ bottom: "calc(12px + env(safe-area-inset-bottom))" }}
+                role="region"
+                aria-label="Selection preview"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-black">{mapPreviewTitle}</div>
+                    <div className="text-xs text-gray-500">
+                      {arcObjectsLoading && containerObjects.length === 0 ? "Loading…" : `${containerTotalCount.toLocaleString("en-US")} artifact${containerTotalCount === 1 ? "" : "s"}`}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setMapPreviewOpen(false)} className="-mr-1 -mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center" aria-label="Close preview">
+                    <IconClose className="h-4 w-4 text-gray-500" />
+                  </button>
+                </div>
+                <div className="-mx-3 mt-2 flex h-20 gap-2 overflow-x-auto px-3" style={{ overscrollBehaviorX: "contain" }}>
+                  {mapPreviewObjects.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      className="h-20 flex-shrink-0"
+                      // Opens the gallery on this object (the map steps aside, and comes back on close).
+                      onClick={() => setInitialGalleryArtifact({ ...o })}
+                      aria-label={o.attributes.title || o.attributes.inventory_number || "Artifact"}
+                    >
+                      <ObjectImage src={o.attributes.img_url!} alt="" className="h-20 rounded-[4px]" imgClassName="h-20 w-auto" />
+                    </button>
+                  ))}
+                  {arcObjectsLoading && mapPreviewObjects.length === 0 && (
+                    <div className="flex h-20 w-full items-center justify-center"><Spinner size="1" /></div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { cancelMapPeek(); setMobileMap("hidden") }}
+                  className="mt-3 h-10 w-full rounded-xl border border-gray-200 text-sm text-gray-800"
+                >
+                  See all
+                </button>
+              </div>
+            )}
           </>
         )}
         </div>
