@@ -234,12 +234,12 @@ export default function InfoPanel({
                 <p className="mb-2.5 text-[#555]">
                   Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact&apos;s origin and current repository, it refuses problematic taxonomies and routes researchers directly to the source.
                 </p>
-                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block text-[#333]">
+                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block w-fit text-link">
                   GitHub ↗
                 </a>
-                <p className="mt-1.5 font-mono text-[11px] text-[#999]">
+                <p className="mt-1.5 text-[#999]">
                   Data may be incomplete.{" "}
-                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-[#999]">Report issue ↗</a>
+                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
                 </p>
               </PopoverContent>
             </Popover>
@@ -267,12 +267,12 @@ export default function InfoPanel({
                 <p className="mb-2.5 text-[#555]">
                   Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact&apos;s origin and current repository, it refuses problematic taxonomies and routes researchers directly to the source.
                 </p>
-                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block text-[#333]">
+                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block w-fit text-link">
                   GitHub ↗
                 </a>
-                <p className="mt-1.5 font-mono text-[11px] text-[#999]">
+                <p className="mt-1.5 text-[#999]">
                   Data may be incomplete.{" "}
-                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-[#999]">Report issue ↗</a>
+                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
                 </p>
         </div>
       )}

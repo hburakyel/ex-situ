@@ -478,7 +478,7 @@ export default function ImageGallery({
 
             if (sourceUrl) {
               return (
-                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={style}>
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: style.fontSize }}>
                   {credit || "View source"} ↗
                 </a>
               )

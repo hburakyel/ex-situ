@@ -42,6 +42,8 @@
     --panel-text: 0 0% 0%;
     --panel-text-muted: 0 0% 45%;
     --panel-backdrop: 0 0% 100% / 0.9;
+    /* Text links: the same blue as a grid tile's hover/selected ring (blue-500). */
+    --link: 217.2 91.2% 59.8%;
   }
 }
 
@@ -617,6 +619,14 @@ img {
 
 .panel-text-muted {
   color: hsl(var(--panel-text-muted));
+}
+
+.text-link {
+  color: hsl(var(--link));
+  text-decoration: none;
+}
+.text-link:hover {
+  text-decoration: underline;
 }
 
 /* Add these styles at the end of the file */

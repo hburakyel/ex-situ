@@ -1469,16 +1469,17 @@ function MapContent() {
                 role="region"
                 aria-label="Selection preview"
               >
+                {/* Same type as the panel: title and count in text-sm, the count muted like list counts. */}
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-black">{mapPreviewTitle}</div>
-                    <div className="text-xs text-gray-500">
+                  <div className="min-w-0 text-sm leading-normal">
+                    <div className="truncate text-black">{mapPreviewTitle}</div>
+                    <div className="text-gray-400">
                       {arcObjectsLoading && containerObjects.length === 0 ? "Loading…" : `${containerTotalCount.toLocaleString("en-US")} artifact${containerTotalCount === 1 ? "" : "s"}`}
                     </div>
                   </div>
-                  <button type="button" onClick={() => setMapPreviewOpen(false)} className="-mr-1 -mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center" aria-label="Close preview">
-                    <IconClose className="h-4 w-4 text-gray-500" />
-                  </button>
+                  <Button variant="ghost" size="icon" className="-mr-1 -mt-1 h-8 w-8 flex-shrink-0" onClick={() => setMapPreviewOpen(false)} aria-label="Close preview">
+                    <IconClose className="h-5 w-5 text-gray-500" />
+                  </Button>
                 </div>
                 <div className="-mx-3 mt-2 flex h-20 gap-2 overflow-x-auto px-3" style={{ overscrollBehaviorX: "contain" }}>
                   {mapPreviewObjects.map((o) => (
@@ -1497,13 +1498,14 @@ function MapContent() {
                     <div className="flex h-20 w-full items-center justify-center"><Spinner size="1" /></div>
                   )}
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 h-8 w-full rounded-md text-sm"
                   onClick={() => { cancelMapPeek(); setMobileMap("hidden") }}
-                  className="mt-3 h-10 w-full rounded-xl border border-gray-200 text-sm text-gray-800"
                 >
                   See all
-                </button>
+                </Button>
               </div>
             )}
           </>
