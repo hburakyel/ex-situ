@@ -26,6 +26,7 @@ import { Spinner } from "@/components/ui/spinner"
 import InfoPanel from "./info-panel"
 import type { EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
+import { track } from "@/lib/analytics"
 
 const EXPORT_ROW_CAP = 5000
 const EXPORT_TOOLTIP = "Select a place or artifact to export."
@@ -566,6 +567,7 @@ export default function ObjectPanel({
   // Share current URL to clipboard
   const handleShare = useCallback(async () => {
     const url = window.location.href
+    track("share_click", { target: "view" })
     try {
       await navigator.clipboard.writeText(url)
       setShowCopied(true)
@@ -1292,7 +1294,7 @@ export default function ObjectPanel({
         {icon}
         <span className="flex flex-col leading-tight">
           <span>{label}</span>
-          {sublabel && <span className="text-[10px] text-gray-400">{sublabel} (capped)</span>}
+          {sublabel && <span className="text-[10px] text-gray-500">{sublabel} (capped)</span>}
         </span>
       </DropdownMenuItem>
     )
@@ -1316,7 +1318,7 @@ export default function ObjectPanel({
       <DropdownMenuSeparator />
       <DropdownMenuItem
         onClick={handleReportIssue}
-        className="gap-2 cursor-pointer text-[12px] text-gray-400 focus:text-gray-500"
+        className="gap-2 cursor-pointer text-[12px] text-gray-500 focus:text-gray-500"
       >
         <span className="h-4 w-4 text-center leading-4">↗</span>
         Report a data issue
@@ -1350,7 +1352,7 @@ export default function ObjectPanel({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
-                {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[160px]">
@@ -1492,7 +1494,7 @@ export default function ObjectPanel({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
-                      {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
+                      {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-[160px]">
@@ -1582,7 +1584,7 @@ export default function ObjectPanel({
             <div className="px-4 pb-4 bg-white">
               <div className="flex items-center gap-3 py-2">
                 <div className="flex-1 h-px bg-gray-200" />
-                <span className="font-mono text-[10px] text-gray-400 uppercase tracking-wider whitespace-nowrap">Links</span>
+                <span className="font-mono text-[10px] text-gray-500 uppercase tracking-wider whitespace-nowrap">Links</span>
                 <div className="flex-1 h-px bg-gray-200" />
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -1624,7 +1626,7 @@ export default function ObjectPanel({
                     }}
                   >
                     {/* Top-left arrow */}
-                    <span className="text-gray-400 text-sm leading-none">↗</span>
+                    <span className="text-gray-500 text-sm leading-none">↗</span>
                     {/* Center — image or title */}
                     <div className="flex-1 flex items-center justify-center overflow-hidden px-1">
                       {linkCard.attributes.img_url ? (
@@ -1642,8 +1644,8 @@ export default function ObjectPanel({
                     </div>
                     {/* Bottom row */}
                     <div className="flex items-end justify-between mt-1 pl-0">
-                      <span className="text-[9px] text-gray-400 leading-none">Wikipedia</span>
-                      <span className="text-[9px] text-gray-400 leading-none truncate ml-1 max-w-[60%] text-right">
+                      <span className="text-[9px] text-gray-500 leading-none">Wikipedia</span>
+                      <span className="text-[9px] text-gray-500 leading-none truncate ml-1 max-w-[60%] text-right">
                         {linkCard.attributes.place_name_normalized || linkCard.attributes.place_name || linkCard.attributes.country_en || ''}
                       </span>
                     </div>

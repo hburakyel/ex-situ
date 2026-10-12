@@ -66,7 +66,7 @@ function matchesAnyFilter(value: string | null | undefined, filters: Set<string>
 
 export default function MapPageClient() {
   return (
-    <Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-white"><div className="text-gray-400">loading map...</div></div>}>
+    <Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-white"><div className="text-gray-500">loading map...</div></div>}>
       <MapContent />
     </Suspense>
   )

@@ -759,3 +759,13 @@ button.maplibregl-ctrl-icon svg {
   height: 14px;
 }
 
+
+/* Keyboard focus: one visible ring for everything that takes focus (WCAG 2.4.7, 2.4.11). */
+:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+.maplibregl-canvas:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: -2px;
+}

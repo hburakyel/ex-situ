@@ -8,6 +8,7 @@ import { useUnifiedSearch } from "@/hooks/use-unified-search"
 import { ERA_BUCKETS, eraToDateFilters, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import { fetchDecadeBucketCounts, type DateBucket, type DateBucketCounts } from "@/lib/api"
 import { placeDisplayLabels } from "@/lib/place-label"
+import { track } from "@/lib/analytics"
 
 // ── Types ──
 
@@ -106,6 +107,8 @@ export default function V3CommandPalette({
 }: V3CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
   const search = useUnifiedSearch({
     minChars: 2,
     dateFilters: eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
@@ -177,9 +180,12 @@ export default function V3CommandPalette({
   // Focus input when opened, reset on close
   useEffect(() => {
     if (open) {
+      returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
       const t = setTimeout(() => inputRef.current?.focus(), 50)
       return () => clearTimeout(t)
     } else {
+      returnFocusRef.current?.focus?.()
+      returnFocusRef.current = null
       search.clearSearch()
       setTab("all")
       setSelectedIdx(-1)
@@ -436,17 +442,27 @@ export default function V3CommandPalette({
   )
 
   // ── Selection handlers — toggle filter + fly to + close ──
+  // One analytics event per pick (not per keystroke): what was typed and what was chosen.
+  const trackPick = useCallback(
+    (type: string, pick: string) => {
+      if (search.hasQuery) track("command_palette_search", { query: search.searchQuery.trim(), type, pick })
+    },
+    [search.hasQuery, search.searchQuery],
+  )
+
   const handleSelectPlace = useCallback(
     (row: PlaceRow) => {
+      trackPick("territory", row.name)
       toggleFilter("countries", row.name)
       handlers.onOriginClick?.(row.name, row.lat, row.lng)
       onOpenChange(false)
     },
-    [toggleFilter, handlers, onOpenChange],
+    [toggleFilter, handlers, onOpenChange, trackPick],
   )
 
   const handleSelectSite = useCallback(
     (row: SiteRow) => {
+      trackPick("site", row.name)
       // Drill into country + site atomically so breadcrumb updates correctly. A row
       // without its country (search result before the site list loaded) gets it
       // looked up by the page, and no "cities" chip — at world level that chip showed
@@ -459,24 +475,26 @@ export default function V3CommandPalette({
       }
       onOpenChange(false)
     },
-    [toggleFilter, handlers, onOpenChange],
+    [toggleFilter, handlers, onOpenChange, trackPick],
   )
 
   const handleSelectCollection = useCallback(
     (row: CollectionRow) => {
+      trackPick("institution", row.name)
       toggleFilter("institutions", row.name)
       onOpenChange(false)
     },
-    [toggleFilter, onOpenChange],
+    [toggleFilter, onOpenChange, trackPick],
   )
 
   // ── Fly-to handler (just navigate, no filter toggle) ──
   const handleSelectFlyTo = useCallback(
     (row: SiteRow) => {
+      trackPick("fly_to", row.name)
       handlers.onNavigatePlace?.(row.lng, row.lat, row.name)
       onOpenChange(false)
     },
-    [handlers, onOpenChange],
+    [handlers, onOpenChange, trackPick],
   )
 
   const handleSelectFlat = useCallback(
@@ -525,6 +543,17 @@ export default function V3CommandPalette({
         onOpenChange(false)
         return
       }
+      if (e.key === "Tab" && dialogRef.current) {
+        const f = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>('button, input, [href], [tabindex]:not([tabindex="-1"])'),
+        ).filter((el) => !el.hasAttribute("disabled") && el.offsetParent !== null)
+        if (f.length) {
+          const first = f[0], last = f[f.length - 1]
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+        }
+        return
+      }
       if (flatItems.length === 0) return
       if (e.key === "ArrowDown") {
         e.preventDefault()
@@ -560,13 +589,20 @@ export default function V3CommandPalette({
       {/* Palette */}
       <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 pointer-events-none">
         <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search"
           className="w-full max-w-lg bg-white rounded-[20px] shadow-2xl border border-gray-200 overflow-hidden pointer-events-auto"
           onKeyDown={handleKeyDown}
         >
+          <div role="status" aria-live="polite" className="sr-only">
+            {hasQuery ? `${matchCount} ${matchCount === 1 ? "result" : "results"}` : ""}
+          </div>
           {/* Search input */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
             {/* [&_*]:text-inherit beats the global `* { color }` reset so the strokes stay gray */}
-            <Search className="w-4 h-4 text-gray-400 flex-shrink-0 [&_*]:text-inherit" />
+            <Search className="w-4 h-4 text-gray-500 flex-shrink-0 [&_*]:text-inherit" />
             <input
               ref={inputRef}
               type="text"
@@ -574,15 +610,16 @@ export default function V3CommandPalette({
               onChange={(e) => search.setSearchQuery(e.target.value)}
               placeholder="Search"
               aria-label="Search places, sites, collections"
-              className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
+              aria-describedby={selectedIdx >= 0 ? `palette-row-${selectedIdx}` : undefined}
+              className="flex-1 text-sm bg-transparent placeholder:text-gray-500"
             />
             {search.isSearching && <Spinner size="1" />}
             {search.searchQuery && (
               <button onClick={() => search.clearSearch()} className="p-0.5 hover:bg-gray-100 rounded-md">
-                <X className="w-3.5 h-3.5 text-gray-400" />
+                <X className="w-3.5 h-3.5 text-gray-500" />
               </button>
             )}
-            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 text-[10px] text-gray-400">
+            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 text-[10px] text-gray-500">
               ESC
             </kbd>
           </div>
@@ -645,7 +682,7 @@ export default function V3CommandPalette({
                 </span>
               )}
               {activeFilterCount > 1 && (
-                <button onClick={clearAllFilters} className="text-[10px] text-gray-400 hover:text-gray-600 px-1">Clear all</button>
+                <button onClick={clearAllFilters} className="text-[10px] text-gray-500 hover:text-gray-700 px-1">Clear all</button>
               )}
             </div>
           )}
@@ -663,15 +700,15 @@ export default function V3CommandPalette({
                   value={pathFrom}
                   onChange={e => setPathFrom(e.target.value)}
                   placeholder="From (e.g. origin_country:Turkey)"
-                  className="flex-1 text-xs bg-white border border-violet-200 rounded-md px-2 py-1.5 outline-none focus:border-violet-400 placeholder:text-gray-400"
+                  className="flex-1 text-xs bg-white border border-violet-200 rounded-md px-2 py-1.5 focus:border-violet-400 placeholder:text-gray-500"
                 />
-                <span className="text-gray-400 text-xs">→</span>
+                <span className="text-gray-500 text-xs">→</span>
                 <input
                   type="text"
                   value={pathTo}
                   onChange={e => setPathTo(e.target.value)}
                   placeholder="To (e.g. institution:British Museum)"
-                  className="flex-1 text-xs bg-white border border-violet-200 rounded-md px-2 py-1.5 outline-none focus:border-violet-400 placeholder:text-gray-400"
+                  className="flex-1 text-xs bg-white border border-violet-200 rounded-md px-2 py-1.5 focus:border-violet-400 placeholder:text-gray-500"
                 />
                 <button
                   onClick={() => findPath(pathFrom, pathTo)}
@@ -720,19 +757,19 @@ export default function V3CommandPalette({
           <div ref={listRef} className="h-[min(50dvh,420px)] overflow-y-auto">
             {/* Typing hint */}
             {search.searchQuery.length > 0 && search.searchQuery.length < 2 && (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">Type at least 2 characters…</div>
+              <div className="px-4 py-6 text-center text-sm text-gray-500">Type at least 2 characters…</div>
             )}
 
             {/* No results */}
             {hasQuery && !search.isSearching && matchCount === 0 && (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">
+              <div className="px-4 py-6 text-center text-sm text-gray-500">
                 No results for &ldquo;{search.searchQuery}&rdquo;
               </div>
             )}
 
             {/* Nothing for this tab while other tabs have matches */}
             {hasQuery && matchCount > 0 && flatItems.length === 0 && tab !== "time" && tab !== "migration" && (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">
+              <div className="px-4 py-6 text-center text-sm text-gray-500">
                 No {TABS.find((t) => t.key === tab)?.label.toLowerCase()} for &ldquo;{search.searchQuery}&rdquo;
               </div>
             )}
@@ -751,6 +788,8 @@ export default function V3CommandPalette({
                       <button
                         key={`p-${row.name}`}
                         data-flat={fi}
+                        id={`palette-row-${fi}`}
+                        aria-current={fi === selectedIdx ? "true" : undefined}
                         className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                           active
                             ? "bg-blue-50 text-blue-800"
@@ -763,7 +802,7 @@ export default function V3CommandPalette({
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-blue-500" : "bg-blue-400"}`} />
                         <span className="flex-1 text-sm truncate" title={row.name}>{placeLabels.get(row.name) ?? row.name}</span>
-                        <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                        <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
                         {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
@@ -782,6 +821,8 @@ export default function V3CommandPalette({
                       <button
                         key={`s-${row.name}`}
                         data-flat={fi}
+                        id={`palette-row-${fi}`}
+                        aria-current={fi === selectedIdx ? "true" : undefined}
                         className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                           active
                             ? "bg-blue-50 text-blue-800"
@@ -794,7 +835,7 @@ export default function V3CommandPalette({
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-blue-500" : "bg-blue-400"}`} />
                         <span className="flex-1 text-sm truncate" title={row.name}>{placeLabels.get(row.name) ?? row.name}</span>
-                        <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                        <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
                         {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
@@ -818,7 +859,7 @@ export default function V3CommandPalette({
                         onChange={(e) => setTimeYearInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") applyTimeYear() }}
                         placeholder="Exact year (e.g. 1906, -500 for BCE)"
-                        className="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-gray-400 placeholder:text-gray-400"
+                        className="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-md px-2 py-1 focus:border-gray-400 placeholder:text-gray-500"
                       />
                       <button
                         onClick={applyTimeYear}
@@ -857,7 +898,7 @@ export default function V3CommandPalette({
                                 className="p-0.5 -m-0.5 flex-shrink-0"
                                 aria-label={isExpanded ? "Collapse" : "Expand"}
                               >
-                                <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                                <ChevronRight className={`w-3.5 h-3.5 text-gray-500 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                               </button>
                             ) : (
                               <span className="w-3.5 h-3.5 flex-shrink-0" />
@@ -868,7 +909,7 @@ export default function V3CommandPalette({
                             >
                               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-gray-500" : "bg-gray-400"}`} />
                               <span className="flex-1 text-sm truncate">{bucket.label}</span>
-                              <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                              <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
                                 {count.toLocaleString()}
                               </span>
                               {active && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
@@ -877,7 +918,7 @@ export default function V3CommandPalette({
                           {drillable && isExpanded && (
                             <div className="pl-8">
                               {isLoadingDecades && !decades && (
-                                <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-gray-400">
+                                <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-gray-500">
                                   <Spinner size="1" /> Loading decades…
                                 </div>
                               )}
@@ -895,7 +936,7 @@ export default function V3CommandPalette({
                                     >
                                       <span className={`w-1 h-1 rounded-full flex-shrink-0 ${decadeActive ? "bg-gray-500" : "bg-gray-400"}`} />
                                       <span className="flex-1 text-sm truncate">{decade.label}</span>
-                                      <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                                      <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
                                         {decade.count.toLocaleString()}
                                       </span>
                                       {decadeActive && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
@@ -932,7 +973,7 @@ export default function V3CommandPalette({
                             onChange={(e) => setMigrationYearInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") applyMigrationYear() }}
                             placeholder="Exact year (e.g. 1925)"
-                            className="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-gray-400 placeholder:text-gray-400"
+                            className="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-md px-2 py-1 focus:border-gray-400 placeholder:text-gray-500"
                           />
                           <button
                             onClick={applyMigrationYear}
@@ -963,7 +1004,7 @@ export default function V3CommandPalette({
                               >
                                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-gray-500" : "bg-gray-400"}`} />
                                 <span className="flex-1 text-sm truncate">{migrationBucket.label}</span>
-                                <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                                <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
                                   {bucket.count.toLocaleString()}
                                 </span>
                                 {active && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
@@ -986,6 +1027,8 @@ export default function V3CommandPalette({
                       <button
                         key={`c-${row.name}`}
                         data-flat={fi}
+                        id={`palette-row-${fi}`}
+                        aria-current={fi === selectedIdx ? "true" : undefined}
                         className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                           active
                             ? "bg-orange-50 text-orange-800"
@@ -1000,13 +1043,13 @@ export default function V3CommandPalette({
                         <div className="flex-1 min-w-0">
                           <span className="text-sm truncate block">{row.name}</span>
                           {row.countries.length > 0 && (
-                            <span className="text-sm text-gray-400 truncate block">
+                            <span className="text-sm text-gray-500 truncate block">
                               {row.countries.slice(0, 3).join(", ")}
                               {row.countries.length > 3 ? ` +${row.countries.length - 3}` : ""}
                             </span>
                           )}
                         </div>
-                        <span className="text-sm text-gray-400 tabular-nums flex-shrink-0">
+                        <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
                         {active && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />}
@@ -1024,6 +1067,8 @@ export default function V3CommandPalette({
                         <button
                           key={`ft-${i}-${row.name}`}
                           data-flat={fi}
+                        id={`palette-row-${fi}`}
+                        aria-current={fi === selectedIdx ? "true" : undefined}
                           className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
                             fi === selectedIdx
                               ? "bg-gray-50 text-gray-900"
@@ -1073,7 +1118,7 @@ function GroupLabel({
     <div className="flex items-center justify-between px-4 pt-3 pb-1">
       <span className="text-sm font-medium text-gray-500">{label}</span>
       {truncated && onShowAll && (
-        <button onClick={onShowAll} className="text-sm text-gray-400 hover:text-black transition-colors">
+        <button onClick={onShowAll} className="text-sm text-gray-500 hover:text-black transition-colors">
           {total !== undefined ? `Show all ${total.toLocaleString()}` : "Show all"}
         </button>
       )}

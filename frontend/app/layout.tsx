@@ -2,6 +2,7 @@ import "./globals.css"
 import type React from "react"
 import ClientMapLibreCSS from "@/components/client-maplibre-css"
 import { Theme } from "@radix-ui/themes"
+import AnalyticsScript from "@/components/analytics-script"
 
 export default function RootLayout({
   children,
@@ -33,6 +34,7 @@ export default function RootLayout({
           <ClientMapLibreCSS />
           {children}
         </Theme>
+        <AnalyticsScript />
       </body>
     </html>
   )

@@ -27,6 +27,7 @@ import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucke
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
 import { placeDisplayLabels } from "@/lib/place-label"
+import { track } from "@/lib/analytics"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -883,6 +884,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           const [lng, lat] = d.sourcePosition
           const arcKey = `${d.fromName}-${d.toName}`
           if (selectedArcRef.current?.key === arcKey) { onSelectArcRef.current?.(null); return }
+          track("arc_click", { from: d.fromName, to: d.toName, artifacts: d.count })
           onSelectArcRef.current?.({
             key: arcKey, from: d.fromName, to: d.toName, fromLat: lat, fromLng: lng,
             fromCity: d.fromCity, fromCountry: d.fromCountry, toCity: d.toCity, toCountry: d.toCountry, objectCount: d.count,
@@ -960,6 +962,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           const d = info.object
           // Use onSelectArc (same path as main arcLayer) so handleSelectArc sets
           // both activeSite and activeInstitution, filtering the object panel correctly
+          track("arc_click", { from: d.place_name, to: d.institution_name, artifacts: d.object_count })
           onSelectArcRef.current?.({
             key: `${d.place_name}-${d.institution_name}`,
             from: d.place_name,
@@ -1153,7 +1156,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 <div className="text-sm text-muted-foreground line-clamp-3 mb-2 leading-relaxed">{selectedDoc.description}</div>
               )}
               <div className="flex items-center justify-between mt-2">
-                <span className="text-[10px] text-gray-400">{selectedDoc.source_name}</span>
+                <span className="text-[10px] text-gray-500">{selectedDoc.source_name}</span>
                 {selectedDoc.source_url && (
                   <button
                     onClick={() => window.open(selectedDoc.source_url, '_blank', 'noopener,noreferrer')}
@@ -1248,7 +1251,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                               </TooltipTrigger>
                               <TooltipContent side="top">{origin.country}</TooltipContent>
                             </Tooltip>
-                            <span className="ml-2 text-gray-400 text-sm">{origin.totalCount}</span>
+                            <span className="ml-2 text-gray-500 text-sm">{origin.totalCount}</span>
                           </div>
                       ))}
                     </HeaderAccordionList>
@@ -1288,7 +1291,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                             </TooltipTrigger>
                             <TooltipContent side="top">{site.name}</TooltipContent>
                           </Tooltip>
-                          <span className="ml-2 text-gray-400 text-sm">{site.totalCount}</span>
+                          <span className="ml-2 text-gray-500 text-sm">{site.totalCount}</span>
                         </div>
                       ))}
                     </HeaderAccordionList>
@@ -1333,7 +1336,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                               </TooltipTrigger>
                               <TooltipContent side="top">{row.label}</TooltipContent>
                             </Tooltip>
-                            <span className="ml-2 text-gray-400 text-sm">{row.count}</span>
+                            <span className="ml-2 text-gray-500 text-sm">{row.count}</span>
                           </div>
                         ))}
                     </HeaderAccordionList>
@@ -1372,7 +1375,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                             </TooltipTrigger>
                             <TooltipContent side="top">{inst.name}</TooltipContent>
                           </Tooltip>
-                          <span className="ml-2 text-gray-400 text-sm">{inst.count}</span>
+                          <span className="ml-2 text-gray-500 text-sm">{inst.count}</span>
                         </div>
                       ))}
                     </HeaderAccordionList>

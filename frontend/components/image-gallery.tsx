@@ -12,6 +12,8 @@ import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
 import { isWithdrawn, withdrawnSourceUrl } from "@/lib/withdrawn"
 import { isPublicDomain, rightsLabel } from "@/lib/image-rights"
+import { artifactCorrectionUrl } from "@/lib/correction-link"
+import { linkHost, track } from "@/lib/analytics"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const MOBILE_CLOSE_SWIPE_THRESHOLD = 48
@@ -71,6 +73,22 @@ export default function ImageGallery({
     setImageError(!objectHasImage)
     setIsLoading(objectHasImage)
   }
+
+  // One artifact_open per artifact shown: on open and on each previous/next.
+  const currentObjectId = currentObject?.id
+  useEffect(() => {
+    if (!currentObject || String(currentObject.id).startsWith("wiki-")) return
+    track("artifact_open", { id: String(currentObject.id), institution: currentObject.attributes.institution_name })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentObjectId])
+
+  const trackOutbound = (url: string | null | undefined, via: string) =>
+    track("outbound_institution_click", {
+      institution: currentObject?.attributes.institution_name,
+      host: linkHost(url),
+      id: currentObject ? String(currentObject.id) : undefined,
+      via,
+    })
 
   // Log container width on mount and resize
   useEffect(() => {
@@ -280,6 +298,7 @@ export default function ImageGallery({
                   onClick={(e) => {
                     e.stopPropagation()
                     const url = `${window.location.origin}/artifact/${rawId}`
+                    track("share_click", { target: "artifact", id: String(rawId) })
                     navigator.clipboard.writeText(url).catch(() => {})
                     setLinkCopied(true)
                     setTimeout(() => setLinkCopied(false), 2000)
@@ -298,7 +317,10 @@ export default function ImageGallery({
                 onClick={(e) => {
                   e.stopPropagation()
                   const url = getLinkUrl()
-                  if (url) window.open(url, "_blank", "noopener,noreferrer")
+                  if (url) {
+                    trackOutbound(url, "button")
+                    window.open(url, "_blank", "noopener,noreferrer")
+                  }
                 }}
                 className="h-8 w-8"
                 title="View Source"
@@ -447,7 +469,23 @@ export default function ImageGallery({
 
         {/* Site mark — bottom left; image credit — bottom right */}
         <div style={{ padding: "4px 16px 6px", backgroundColor: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
-          <span style={{ color: "#2a2a2a", fontSize: "9px", whiteSpace: "nowrap", flexShrink: 0 }}>Ex Situ 2022</span>
+          <span style={{ color: "#2a2a2a", fontSize: "9px", whiteSpace: "nowrap", flexShrink: 0 }}>
+            Ex Situ 2022
+            {!String(currentObject.id).startsWith("wiki-") && (
+              <>
+                {" · "}
+                <a
+                  href={artifactCorrectionUrl({ id: currentObject.id, ...currentObject.attributes })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-link"
+                  style={{ fontSize: "9px" }}
+                >
+                  {isMobile ? "Correction" : "Suggest a correction"} ↗
+                </a>
+              </>
+            )}
+          </span>
           <span style={{ textAlign: "right" }}>
           {(() => {
             // Image credit as each museum states it for its images (audited 2026-10-07):
@@ -488,7 +526,7 @@ export default function ImageGallery({
 
             if (sourceUrl) {
               return (
-                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: style.fontSize }}>
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: style.fontSize }} onClick={() => trackOutbound(sourceUrl, "credit")}>
                   {credit || "View source"} ↗
                 </a>
               )

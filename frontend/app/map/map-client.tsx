@@ -21,6 +21,7 @@ import { isWithdrawn } from "@/lib/withdrawn"
 import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/command-palette"
 import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
+import { track } from "@/lib/analytics"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -793,6 +794,7 @@ function MapContent() {
     // re-clicking the already-active country respects a deliberate close.
     if (normalizePlaceKey(activeCountryRef.current) !== normalizePlaceKey(country)) {
       setIsObjectContainerVisible(true)
+      track("territory_drilldown", { territory: country })
     }
     setSelectedArc(null)
     setActiveCountry(country)
@@ -1379,7 +1381,7 @@ function MapContent() {
       <div className="flex h-full items-center justify-center bg-white">
         <div className="text-center">
           <div className="text-red-500 mb-2">{error}</div>
-          <button onClick={() => window.location.reload()} className="text-gray-400 hover:text-gray-600">retry</button>
+          <button onClick={() => window.location.reload()} className="text-gray-500 hover:text-gray-700">retry</button>
         </div>
       </div>
     )
@@ -1479,7 +1481,7 @@ function MapContent() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 text-sm leading-normal">
                     <div className="truncate text-black">{mapPreviewTitle}</div>
-                    <div className="text-gray-400">
+                    <div className="text-gray-500">
                       {arcObjectsLoading && containerObjects.length === 0 ? "Loading…" : `${containerTotalCount.toLocaleString("en-US")} artifact${containerTotalCount === 1 ? "" : "s"}`}
                     </div>
                   </div>

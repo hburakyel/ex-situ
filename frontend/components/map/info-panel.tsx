@@ -237,7 +237,7 @@ export default function InfoPanel({
                 <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block w-fit text-link">
                   GitHub ↗
                 </a>
-                <p className="mt-1.5 text-[#999]">
+                <p className="mt-1.5 text-[#666]">
                   Data may be incomplete.{" "}
                   <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
                 </p>
@@ -270,7 +270,7 @@ export default function InfoPanel({
                 <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block w-fit text-link">
                   GitHub ↗
                 </a>
-                <p className="mt-1.5 text-[#999]">
+                <p className="mt-1.5 text-[#666]">
                   Data may be incomplete.{" "}
                   <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
                 </p>
@@ -350,7 +350,7 @@ export default function InfoPanel({
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{formatCount(origin.totalCount)}</span>
+                            <span className="ml-2 text-gray-500 text-sm">{formatCount(origin.totalCount)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>
@@ -373,7 +373,7 @@ export default function InfoPanel({
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{formatCount(site.totalCount)}</span>
+                            <span className="ml-2 text-gray-500 text-sm">{formatCount(site.totalCount)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>
@@ -401,7 +401,7 @@ export default function InfoPanel({
                               onClick={() => onToggleEra?.(row.era)}
                             >
                               <span className="truncate max-w-[70%]" title={row.label}>{row.label}</span>
-                              <span className="ml-2 text-gray-400 text-sm">{formatCount(row.count)}</span>
+                              <span className="ml-2 text-gray-500 text-sm">{formatCount(row.count)}</span>
                             </div>
                           ))}
                     </FadedAccordionList>
@@ -423,7 +423,7 @@ export default function InfoPanel({
                             onClick={() => onToggleInstitution?.(inst.name)}
                           >
                             <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
-                            <span className="ml-2 text-gray-400 text-sm">{formatCount(inst.count)}</span>
+                            <span className="ml-2 text-gray-500 text-sm">{formatCount(inst.count)}</span>
                           </div>
                         ))}
                     </FadedAccordionList>
