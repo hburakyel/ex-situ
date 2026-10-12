@@ -116,6 +116,10 @@ OUT_OF_SCOPE_PROVIDERS = {
     "Värmland Museum": "watercolour of the place",
     "Roscheider Hof Open Air Museum": "modern consumer goods",
     "Science Center and Technology Museum (NOESIS)": "modern electronics",
+    # Origin only from Europeana's automatic place tagging, not from the museum's
+    # own records (e.g. 3,441 objects tagged "Türkiye"); a tagged place is often
+    # one depicted or mentioned. Left out until checked against RMO's own data.
+    "National Museum of Antiquities": "origin from Europeana enrichment only",
     "Moldova National Museum Complex": "modern manufactured goods",
     "Petroleum Museum": "industrial tools",
     "Netherlands Institute for Sound & Vision": "consumer electronics",
@@ -489,17 +493,20 @@ def stable_object_id(europeana_id: str) -> int:
     return int.from_bytes(hashlib.sha256(europeana_id.encode()).digest()[:8], "big") >> 11
 
 
-def place_labels(resolved: list) -> list:
+def place_labels(resolved: list, country_name=None) -> list:
     """
     One label per country, from its most specific place: "Türkiye" and the
-    Europeana entity "Turkey" for the same record become one name.
+    Europeana entity "Turkey" for the same record become one name. A label that
+    only names the country is the GeoNames English name (country_name(iso2)), the
+    one every other collection uses — Europeana's own entity labels ("Türkiye",
+    "Viet Nam") would list the same country twice.
     """
     rank = {"city": 0, "region": 1, "country": 2}
     best = {}
     for r in resolved:
         if r["label"] and (r["iso2"] not in best or rank[r["level"]] < rank[best[r["iso2"]]["level"]]):
             best[r["iso2"]] = r
-    return [best[c]["label"] for c in sorted(best)]
+    return [country_name(c) if country_name and best[c]["level"] == "country" else best[c]["label"] for c in sorted(best)]
 
 
 def map_record(item: dict, decision: str, source: str, resolved: list,
@@ -513,7 +520,7 @@ def map_record(item: dict, decision: str, source: str, resolved: list,
     if image and image.startswith("http://"):
         image = "https://" + image[len("http://"):]   # CSP and production are https-only
 
-    labels = place_labels(resolved)
+    labels = place_labels(resolved, gaz.country_name)
     countries = sorted({r["iso2"] for r in resolved})
 
     # Coordinates only when the provider pointed at exactly one GeoNames
@@ -552,7 +559,8 @@ def map_record(item: dict, decision: str, source: str, resolved: list,
         "geocoder_source": "geonames_exact",
         "geocoding_status": "ambiguous" if flagged else "ok",
         "geocoding_notes": " | ".join(notes),
-        "review_status": "pending",
+        # Like the other collections: only flagged records wait for review.
+        "review_status": "pending" if flagged else None,
         # Europeana's "year" is not an object date ("18th century" → 1701, and
         # often the photo/digitisation year), so no date is taken from it.
         "object_date": None,
@@ -595,8 +603,9 @@ def provider_identifier(record: dict) -> Optional[str]:
 
 def add_inventory_numbers(records: list, api_key: str, workers: int = 4) -> None:
     """
-    The search API does not return dc:identifier, so objects without an image
-    (shown in the grid by inventory number) get it from the Record API.
+    The search API does not return dc:identifier, so every kept object gets it
+    from the Record API: the artifact view shows it as the ID, and an image that
+    stops loading later (a museum withdraws it) falls back to it in the grid.
     One call per object, cached in europeana_identifier_cache.jsonl.
     """
     from concurrent.futures import ThreadPoolExecutor
@@ -608,7 +617,7 @@ def add_inventory_numbers(records: list, api_key: str, workers: int = 4) -> None
                 e = json.loads(line)
                 cache[e["id"]] = e["identifier"]
     todo = [r["europeana_id"] for r in records
-            if not r["img_url"] and r["europeana_id"] not in cache
+            if r["europeana_id"] not in cache
             and r["decision"] == "non_european" and r["latitude"] is not None
             and r["institution_latitude"] is not None]
     logger.info("Inventory numbers: %d cached, %d to fetch", len(cache), len(todo))
@@ -873,7 +882,8 @@ def main():
             resolved = [x for x in (resolve_value(v["label"], gaz, places) for v in r["original_place_variants"])
                         if x["status"] == "resolved"]
             if resolved:
-                r["place_name"] = "; ".join(place_labels(resolved))
+                r["place_name"] = "; ".join(place_labels(resolved, gaz.country_name))
+            r["review_status"] = "pending" if r["decision"] != "non_european" else None
         add_coordinates(list(records.values()), orgs, gaz)
         add_inventory_numbers(list(records.values()), api_key)
         excluded = Counter()

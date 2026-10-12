@@ -23,11 +23,16 @@ Output: europeana_image_check.json {"bad_urls": [...]} — the resolver leaves
 these objects out (scrape_europeana.py --apply --finalize-only).
 
 Usage:
-    python etl/check_europeana_images.py
+    python etl/check_europeana_images.py [--workers 8] [--timeout 30] [--host HOST]
+                                         [--exclude-institution NAME]
+Server errors and timeouts are retried and not trusted from the cache; a slow
+server is best checked on its own with few workers (--host … --workers 2).
 """
 
+import argparse
 import json
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
@@ -50,9 +55,18 @@ def group_key(r: dict) -> str:
     return f"{r['institution_name']}|{urlparse(r['img_url']).netloc}"
 
 
-def check(url: str) -> tuple:
+TIMEOUT = 30
+
+
+def transient(why: str) -> bool:
+    """A server error or timeout says nothing about the image — e.g. a museum server that
+    answers 500 under parallel requests. Retried, and never trusted from the cache."""
+    return why.startswith("5") or "Timeout" in why or "ConnectionError" in why
+
+
+def check_once(url: str) -> tuple:
     try:
-        with requests.get(url, headers=HEADERS, timeout=30, stream=True, allow_redirects=True) as resp:
+        with requests.get(url, headers=HEADERS, timeout=TIMEOUT, stream=True, allow_redirects=True) as resp:
             ctype = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
             corp = resp.headers.get("Cross-Origin-Resource-Policy", "").lower()
             ok = resp.status_code == 200 and ctype in DISPLAYABLE and corp not in ("same-origin", "same-site")
@@ -61,15 +75,33 @@ def check(url: str) -> tuple:
         return url, False, type(exc).__name__
 
 
+def check(url: str) -> tuple:
+    for attempt in range(3):
+        url, ok, why = check_once(url)
+        if ok or not transient(why):
+            break
+        time.sleep(5 * (attempt + 1))
+    return url, ok, why
+
+
 def main():
-    records = json.load(open(OBJECTS, encoding="utf-8"))
+    global TIMEOUT
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--workers", type=int, default=8, help="parallel requests (keep low for slow museum servers)")
+    ap.add_argument("--timeout", type=int, default=30)
+    ap.add_argument("--host", help="only check URLs on this host (the output still covers every record)")
+    ap.add_argument("--exclude-institution", action="append", default=[], help="leave these institutions out")
+    args = ap.parse_args()
+    TIMEOUT = args.timeout
+    records = [r for r in json.load(open(OBJECTS, encoding="utf-8")) if r["institution_name"] not in args.exclude_institution]
     groups = json.load(open(GROUPS, encoding="utf-8"))["groups"]
 
     cache = {}
     if os.path.exists(CACHE):
         for line in open(CACHE, encoding="utf-8"):
             e = json.loads(line)
-            cache[e["url"]] = e["ok"]
+            if e["ok"] or not transient(e.get("why") or ""):
+                cache[e["url"]] = e["ok"]
 
     bad = set()
     todo = []
@@ -80,11 +112,12 @@ def main():
         if verdict == "drop":
             bad.add(r["img_url"])
         elif verdict == "check_each" and r["img_url"] not in cache:
-            todo.append(r["img_url"])
+            if not args.host or urlparse(r["img_url"]).hostname == args.host:
+                todo.append(r["img_url"])
     todo = sorted(set(todo))
     print(f"{len(bad):,} URLs in dropped groups; {len(todo):,} to check one by one")
 
-    with open(CACHE, "a", encoding="utf-8") as out, ThreadPoolExecutor(8) as pool:
+    with open(CACHE, "a", encoding="utf-8") as out, ThreadPoolExecutor(args.workers) as pool:
         for i, (url, ok, why) in enumerate(pool.map(check, todo), 1):
             cache[url] = ok
             out.write(json.dumps({"url": url, "ok": ok, "why": why}, ensure_ascii=False) + "\n")

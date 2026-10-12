@@ -1,6 +1,6 @@
 {
- "checked": "2026-10-10",
- "method": "browser sample of 20 images per institution|host on localhost:3000 with the site CSP; groups not listed loaded every sampled image",
+ "checked": "2026-10-12",
+ "method": "browser sample of 20 images per institution|host on localhost:3000 with the site CSP; groups not listed loaded every sampled image; 2026-10-12 audit (40 random URLs per group): SMVK answers some URLs with 200 text/plain \"object missing or access denied\", wereldculturen/GoTellGo time out or rate-limit, vazcollections 404 — those groups are now checked one by one",
  "groups": {
   "Digital Library Real Academia de la Historia|bibliotecadigital.rah.es": "drop",
   "National Museum of Art of Romania|resource.culturalia.ro": "check_each",
@@ -27,6 +27,14 @@
   "Hellenic Literary and Historical Archive - Cultural Foundation of the National Bank Of Greece|eliaserver.elia.org.gr": "drop",
   "Asia and Pacific Museum|manuskrypty.muzeumazji.pl": "check_each",
   "Fortepan|mandadb.hu": "check_each",
-  "Public Library - Haskovo|rb-haskovo.no-ip.org": "drop"
+  "Public Library - Haskovo|rb-haskovo.no-ip.org": "drop",
+  "Museum of Ethnography|collections.smvk.se": "check_each",
+  "The Museum of Mediterranean and Near Eastern Antiquities|collections.smvk.se": "check_each",
+  "Museum of Far Eastern Antiquities|collections.smvk.se": "check_each",
+  "Museum of World Culture|collections.smvk.se": "check_each",
+  "National Museum of World Cultures Foundation|collectie.wereldculturen.nl": "check_each",
+  "East Asian Collections in Slovenia|vazcollections.si": "check_each",
+  "GoTellGo Cultural Association|citytelling.org": "check_each",
+  "GoTellGo Cultural Association|www.lasciailsegno.it": "check_each"
  }
 }
