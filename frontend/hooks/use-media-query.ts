@@ -1,24 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 
+// Read through useSyncExternalStore so the first client render already has the real
+// value: the map renders client-side only, and a useState(false) + useEffect hook
+// drew one frame of the desktop layout on phones before switching. On a server
+// render React uses getServerSnapshot (false) and updates after hydration, so
+// server-rendered users of this hook don't get a hydration mismatch.
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false)
-
-  useEffect(() => {
-    // Set initial value
-    const media = window.matchMedia(query)
-    setMatches(media.matches)
-
-    // Create event listener
-    const listener = () => setMatches(media.matches)
-
-    // Add listener
-    media.addEventListener("change", listener)
-
-    // Remove listener on cleanup
-    return () => media.removeEventListener("change", listener)
-  }, [query])
-
-  return matches
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const media = window.matchMedia(query)
+      media.addEventListener("change", onChange)
+      return () => media.removeEventListener("change", onChange)
+    },
+    [query],
+  )
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  )
 }
