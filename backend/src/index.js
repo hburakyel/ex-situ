@@ -20,6 +20,15 @@ const DROP_DEPENDENCIES_SQL = `
   DROP MATERIALIZED VIEW IF EXISTS public.mv_acquisition_year_stats;
 `;
 
+// V&A import dedupe. scripts/pre-strapi.js drops it so Strapi's schema sync can run
+// (Strapi doesn't know it and fails dropping it as a constraint); restored on its own
+// so a failure here (e.g. a duplicate row) never stops the map views being rebuilt.
+const VA_DEDUPE_INDEX_SQL = `
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_museum_objects_va_inv_source_unique
+      ON public.museum_objects USING btree (institution_name, inventory_number, source_link)
+      WHERE ((institution_name)::text = 'Victoria and Albert Museum'::text AND inventory_number IS NOT NULL);
+`;
+
 const RESTORE_DEPENDENCIES_SQL = `
   -- Ensure columns exist
   ALTER TABLE public.museum_objects ADD COLUMN IF NOT EXISTS manual_latitude double precision;
@@ -166,6 +175,11 @@ module.exports = {
     try {
       // 1. Ensure columns + trigger + indexes
       await db.raw(RESTORE_DEPENDENCIES_SQL);
+      try {
+        await db.raw(VA_DEDUPE_INDEX_SQL);
+      } catch (err) {
+        strapi.log.warn(`[bootstrap] V&A dedupe index not restored: ${err.message}`);
+      }
 
       // 2. Ensure materialized views
       const [{ exists: mvCountry }] = (await db.raw(

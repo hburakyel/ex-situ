@@ -47,6 +47,9 @@ async function main() {
       DROP INDEX IF EXISTS idx_museum_objects_resolved_lat;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_lon;
       DROP INDEX IF EXISTS idx_museum_objects_resolved_coords;
+      -- Partial unique index (V&A import dedupe) that isn't in the Strapi schema: on any
+      -- schema change Strapi tries to drop it as a constraint and fails to start.
+      DROP INDEX IF EXISTS idx_museum_objects_va_inv_source_unique;
       DROP MATERIALIZED VIEW IF EXISTS public.mv_country_institution_stats;
       DROP MATERIALIZED VIEW IF EXISTS public.mv_city_institution_stats;
       DROP MATERIALIZED VIEW IF EXISTS public.mv_time_bucket_stats;
