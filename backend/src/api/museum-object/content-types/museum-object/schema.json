@@ -21,6 +21,9 @@
     "img_url": {
       "type": "text"
     },
+    "image_rights": {
+      "type": "string"
+    },
     "latitude": {
       "type": "float"
     },

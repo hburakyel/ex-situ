@@ -2,11 +2,16 @@
 // (removing it means per-request nonces, which would make every page dynamic).
 // 'unsafe-eval' is only needed by the dev server's React Refresh.
 const isDev = process.env.NODE_ENV !== "production"
+// Image hosts of the institutions indexed via Europeana, generated from the
+// resolver output (etl/scrape_europeana.py → lib/europeana-image-hosts.json).
+const europeanaImageHosts = require("./lib/europeana-image-hosts.json")
+  .map((host) => ` https://${host}`)
+  .join("")
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum https://framemark.vam.ac.uk https://smb.museum-digital.de https://asset.museum-digital.org https://search.smb.museum https://www.artic.edu",
+  `img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum https://framemark.vam.ac.uk https://smb.museum-digital.de https://asset.museum-digital.org https://search.smb.museum https://www.artic.edu${europeanaImageHosts}`,
   "connect-src 'self' https://api.protomaps.com https://fonts.openmaptiles.org https://protomaps.github.io",
   "font-src 'self' data: https://fonts.openmaptiles.org",
   "worker-src 'self' blob:",

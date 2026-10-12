@@ -11,6 +11,7 @@ import { Check, Link2 } from "lucide-react"
 import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
 import { isWithdrawn, withdrawnSourceUrl } from "@/lib/withdrawn"
+import { isPublicDomain, rightsLabel } from "@/lib/image-rights"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const MOBILE_CLOSE_SWIPE_THRESHOLD = 48
@@ -470,13 +471,19 @@ export default function ImageGallery({
             }
             const institution = currentObject.attributes.institution_name || ""
             const sourceUrl = getLinkUrl()
+            // Per-object licence (image_rights), stored for institutions indexed via
+            // Europeana, whose images carry their own CC licence each.
+            const rights = currentObject.attributes.image_rights
+            const rightsText = rightsLabel(rights)
             const credit = isWithdrawn(currentObject)
               // No image: the museum withdrew the record that stated its licence.
               ? `© ${institution} · No image licence`
               : SMB_COLLECTIONS.has(institution)
                 // Phones: SMB's own abbreviation, so the credit fits one line next to the mark.
                 ? `© ${institution}, ${isMobile ? "SMB" : "Staatliche Museen zu Berlin"} · CC BY-NC-SA`
-                : CREDITS[institution] || (institution ? `© ${institution}` : "")
+                : CREDITS[institution]
+                  || (rightsText ? `${isPublicDomain(rights) ? "" : "© "}${institution} · ${rightsText}` : "")
+                  || (institution ? `© ${institution}` : "")
             const style = { color: "#2a2a2a", fontSize: "9px", textDecoration: "none" }
 
             if (sourceUrl) {

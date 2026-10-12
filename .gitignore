@@ -54,10 +54,10 @@ etl/fix_*.py
 etl/fix_*.sql
 etl/institution_coords.py
 etl/normalize_city_en.py
-etl/scrape_europeana.py
 etl/pyrightconfig.json
 etl/smb_*.json
 etl/met_*.json
+etl/europeana_*.json
 etl/updated_*.json
 etl/ethnologisches_museum_objects.json
 etl/scrape_smb.py
@@ -117,3 +117,7 @@ data/
 frontend/.next-a/
 frontend/.next-b/
 docs/DEPLOY.md
+
+# Europeana pipeline files that belong in the repo
+!etl/backfill_europeana_fields.py
+!etl/europeana_image_groups.json

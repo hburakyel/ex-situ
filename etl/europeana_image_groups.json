@@ -1,0 +1,32 @@
+{
+ "checked": "2026-10-10",
+ "method": "browser sample of 20 images per institution|host on localhost:3000 with the site CSP; groups not listed loaded every sampled image",
+ "groups": {
+  "Digital Library Real Academia de la Historia|bibliotecadigital.rah.es": "drop",
+  "National Museum of Art of Romania|resource.culturalia.ro": "check_each",
+  "Royal Museums of Art and History, Brussels|sketchfab.com": "drop",
+  "Historical & Ethnological Society of Greece|www.searchculture.gr": "drop",
+  "Ignacio Larramendi Foundation|www.larramendi.es": "drop",
+  "Library of the Wroclaw University|glam.uni.wroc.pl": "drop",
+  "Foundation Baron Michael Tossizza|www.searchculture.gr": "drop",
+  "Royal Institute for Cultural Heritage|balat.kikirpa.be": "drop",
+  "Craft Museum of Finland|museo.disec.fi": "drop",
+  "Mobilier National Collections|collection.mobilier-national.fr": "drop",
+  "Romanian Peasant Museum|resource.culturalia.ro": "drop",
+  "Helsinki City Museum|mpfinlandrepox.zetcom.app": "drop",
+  "National Museum of Romanian History|resource.culturalia.ro": "check_each",
+  "Austrian Academy of Sciences|loris.acdh.oeaw.ac.at": "drop",
+  "Benaki Museum|www.benaki.org": "drop",
+  "Varnavas Folklore Company of the Municipality of Marathon|sketchfab.com": "drop",
+  "Veria Central Public Library|medusa.libver.gr": "drop",
+  "International Institute of Social History|hdl.handle.net": "check_each",
+  "German Museum of Technology|www.museum-digital.de": "drop",
+  "National Museum of Antiquities|img.rmo.nl": "check_each",
+  "Forum Marinum Maritime Centre|museo.disec.fi": "drop",
+  "Sörmland Museum|sokisamlingar.sormlandsmuseum.se": "check_each",
+  "Hellenic Literary and Historical Archive - Cultural Foundation of the National Bank Of Greece|eliaserver.elia.org.gr": "drop",
+  "Asia and Pacific Museum|manuskrypty.muzeumazji.pl": "check_each",
+  "Fortepan|mandadb.hu": "check_each",
+  "Public Library - Haskovo|rb-haskovo.no-ip.org": "drop"
+ }
+}

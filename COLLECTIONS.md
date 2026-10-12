@@ -22,6 +22,72 @@ This document tracks indexed collections, planned integrations, and contribution
 
 ---
 
+## Via Europeana — resolver ready, not yet imported
+
+Europeana is the access route, not a collection: each record is attributed to its holding institution
+(`dataProvider`) and links to that institution's own page. Resolver: `etl/scrape_europeana.py`
+(scan of October 2026). Counts are objects whose origin the institution places outside Europe,
+that can be mapped (origin point and museum location known) and whose image loads on Ex Situ
+(checked in a browser, `etl/check_europeana_images.py`), excluding SMB, V&A, Met and AIC (indexed
+directly), natural-history providers, and objects held in their country of origin.
+
+116,589 objects from 79 institutions. Top 45:
+
+| # | Institution | Location | Artifacts | Notes |
+|---|-------------|----------|-----------|-------|
+| 1 | Museum of Ethnography | Stockholm, Sweden | 29,524 | — |
+| 2 | National Museum of Antiquities | Leiden, Netherlands | 27,020 | Origin from Europeana enrichment only — review |
+| 3 | The Museum of Mediterranean and Near Eastern Antiquities | Stockholm, Sweden | 19,723 | — |
+| 4 | Museum of Far Eastern Antiquities | Stockholm, Sweden | 16,567 | — |
+| 5 | Museum of World Culture | Göteborg, Sweden | 8,091 | — |
+| 6 | Dresden State Art Collections. Porcelain collection | Dresden, Germany | 7,918 | — |
+| 7 | National Museum of World Cultures Foundation | Leiden, Netherlands | 3,295 | — |
+| 8 | Rijksmuseum | Amsterdam, Netherlands | 1,057 | — |
+| 9 | Chester Beatty | Dublin, Ireland | 827 | — |
+| 10 | Museum of Gothenburg | Göteborg, Sweden | 710 | — |
+| 11 | Cartographic and Geological Institute of Catalonia | Barcelona, Spain | 251 | Origin from Europeana enrichment only — review; Maps — places are depicted, not origin |
+| 12 | East Asian Collections in Slovenia | Ljubljana, Slovenia | 250 | — |
+| 13 | Rippl-Rónai Municipal Museum with County Scope - Kaposvár | Kaposvár, Hungary | 223 | — |
+| 14 | Vänersborgs museum | Vänersborg, Sweden | 206 | — |
+| 15 | Sörmland Museum | Nyköping, Sweden | 140 | — |
+| 16 | Army Museum | Stockholm, Sweden | 91 | — |
+| 17 | Netherlands Institute for Military History | Utrecht, Netherlands | 81 | — |
+| 18 | Manos & Anastasia Faltaits Folk Art & Ethnographic Museum | Skýros, Greece | 77 | — |
+| 19 | Skansen | Stockholm, Sweden | 53 | — |
+| 20 | National Museum of Art of Romania | Bucharest, Romania | 38 | 14 via enrichment |
+| 21 | Roscheider Hof Open Air Museum | Konz, Germany | 36 | 9 via enrichment |
+| 22 | Peleș National Museum | Sinaia, Romania | 32 | — |
+| 23 | Lusto - The Finnish Forest Museum | Kerimäki, Finland | 31 | — |
+| 24 | The British Library | London, United Kingdom | 26 | — |
+| 25 | Department of Life Sciences, University of Trieste | Trieste, Italy | 25 | — |
+| 26 | Museum for Sepulchral Culture | Kassel, Germany | 24 | 8 via enrichment |
+| 27 | Fortepan | Budapest, Hungary | 23 | — |
+| 28 | Asia and Pacific Museum | Warszawa, Poland | 22 | Origin from Europeana enrichment only — review |
+| 29 | Amsterdam Museum | Amsterdam, Netherlands | 20 | — |
+| 30 | Naval Museum | Karlskrona, Sweden | 18 | — |
+| 31 | Moldova National Museum Complex | Iași, Romania | 16 | — |
+| 32 | Riksidrottsmuseum | Stockholm, Sweden | 16 | — |
+| 33 | Skelleftea museum | Skellefteå, Sweden | 14 | — |
+| 34 | ASTRA National Museum Complex | Sibiu, Romania | 12 | 11 via enrichment |
+| 35 | National Museum of Lithuania | Vilnius, Lithuania | 12 | — |
+| 36 | Science Center and Technology Museum (NOESIS) | Thessaloniki, Greece | 8 | — |
+| 37 | GoTellGo Cultural Association | Roma, Italy | 8 | — |
+| 38 | Ploiești Museum of History and Archeology | Ploiești, Romania | 7 | 6 via enrichment |
+| 39 | Freies Deutsches Hochstift / Frankfurter Goethe-Museum | Frankfurt am Main, Germany | 6 | Origin from Europeana enrichment only — review |
+| 40 | Blekinge Museum | Karlskrona, Sweden | 6 | — |
+| 41 | Iron Gates Region Museum | Drobeta-Turnu Severin, Romania | 5 | — |
+| 42 | Museum of Arts and Crafts, Zagreb | Zagreb, Croatia | 5 | — |
+| 43 | Trakai History Museum | Trakai, Lithuania | 5 | — |
+| 44 | Constanța Folk Art Museum | Constanța, Romania | 4 | — |
+| 45 | Vytautas the Great War Museum | Kaunas, Lithuania | 4 | — |
+
+Plus 34 smaller institutions (62 objects). Not included: objects without an image or
+whose image does not load (TIFF, viewer pages, 404/401/403, hotlink-blocked), institutions without a
+location in Europeana's organisation records, and records whose origin spans several countries or is
+an ambiguous place name (`etl/europeana_flagged.json`, for review).
+
+---
+
 ## Planned — Tier 1 (Open REST API)
 
 Easy to integrate. API key required where noted.
@@ -43,7 +109,6 @@ Easy to integrate. API key required where noted.
 | # | Institution | Location | Est. Artifacts | Access | Notes |
 |---|-------------|----------|-------------|--------|-------|
 | 17 | British Museum | London | ~100k filtered | SPARQL | Endpoint unreliable — scraper in progress |
-| 18 | Europeana | Pan-European | Millions filtered | REST API, key needed | Aggregator — covers 3000+ institutions in one integration |
 | 19 | Wikidata | Global | Millions | SPARQL | Query by museum Q-identifier |
 | 20 | Deutsche Digitale Bibliothek | Germany | Large | OAI-PMH + API | German institutions not covered by SMB |
 
@@ -84,7 +149,6 @@ One integration covering many institutions.
 | # | Platform | Coverage | Method | Notes |
 |---|----------|----------|--------|-------|
 | 40 | Smithsonian Open Access | 19 US museums | REST API | Single key — highest ROI integration |
-| 41 | Europeana | 3000+ European institutions | REST API | Filter non-European origin artifacts |
 | 42 | Museum Data Service (UK) | 100M+ UK artifacts | API | Covers Pitt Rivers, Horniman, and more |
 | 43 | DPLA | US institutions | REST API | Digital Public Library of America |
 

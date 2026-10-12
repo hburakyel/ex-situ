@@ -12,6 +12,9 @@ etl/
 ├── scrape_met_api.py          # Metropolitan Museum of Art resolver
 ├── scrape_vam.py              # Victoria and Albert Museum resolver
 ├── scrape_aic_api.py          # Art Institute of Chicago resolver
+├── scrape_europeana.py        # Europeana resolver — institutions via Europeana, non-European origins only
+├── check_europeana_images.py  # Finds Europeana image URLs that do not load (objects are left out)
+├── backfill_europeana_fields.py # After import: country/city, museum locality, licence, inventory number
 ├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
 ├── import_gazetteer.sh        # Loads a GeoNames extract into gazetteer_places
 ├── normalize_place_names.py   # Place name normalization + deduplication
@@ -77,6 +80,25 @@ python scrape_vam.py --collection east-asia --dry-run
 # Resume from page 5
 python scrape_vam.py --collection south-asia --start-page 5
 ```
+
+**Institutions via Europeana**
+
+Europeana is the access route, not a collection: every record is attributed to its `dataProvider`
+and links to the institution's own page (`edmIsShownAt`). Only objects whose origin the institution
+places outside Europe, with a museum location and an image that loads, are kept.
+
+```bash
+export EUROPEANA_API_KEY=...          # your own key; never commit it
+python scrape_europeana.py                         # dry run: counts per dataProvider
+python scrape_europeana.py --apply                 # full scan → europeana_objects.json (+ flagged)
+python check_europeana_images.py                   # per-image check for mixed hosts
+python scrape_europeana.py --apply --finalize-only # rebuild from the last scan, no fetching
+```
+
+`europeana_image_groups.json` holds the browser sample verdict per institution and image host
+(images that fail in a browser: TIFF, viewer pages, 404/403, hotlink-blocked). Then import with
+`backend/scripts/importData.js` (copy the output to `data/museum_objects.json`), run
+`backfill_europeana_fields.py --apply`, and restart Strapi.
 
 Common flags available on all resolvers:
 

@@ -777,12 +777,31 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // the tooltip's x/y change on every mouse move and must not rebuild the layer.
     const hoveredArcKey = isMobile && hoveredArc ? `${hoveredArc.fromName}-${hoveredArc.toName}` : null
 
+    // Focus: once a country, site, collection or arc is selected, only its arcs
+    // are drawn. Unrelated arcs used to stay on the map — a hairball at world
+    // zoom, and when zoomed in, long arcs passing the camera as wide bands.
+    const matchesArcFocus = useCallback((fromName: string, fromCountry: string, toName: string) => {
+      const from = normalizePlaceKey(fromName)
+      const to = normalizePlaceKey(toName)
+      if (selectedArc) {
+        return normalizePlaceKey(selectedArc.from) === from && normalizePlaceKey(selectedArc.to) === to
+      }
+      if (activeCountry) {
+        const country = normalizePlaceKey(activeCountry)
+        if (normalizePlaceKey(fromCountry) !== country && from !== country) return false
+      }
+      if (activeSite && normalizePlaceKey(activeSite) !== from) return false
+      if (activeInstitution && normalizePlaceKey(activeInstitution) !== to) return false
+      return true
+    }, [selectedArc?.from, selectedArc?.to, activeCountry, activeSite, activeInstitution])
+
     // ArcLayer: görsel ve etkileşim bir arada, mobilde hover/tıklama sırasında geçici olarak genişler
     const arcLayer = useMemo(() => {
       if (!isMapReady || processedArcs.arcLayerData.length === 0) return null
       const { dataSource, layerStyle } = processedArcs
       const arcLayerData = processedArcs.arcLayerData.filter((arc) =>
-        hasValidCoordinatePair(arc.sourcePosition) && hasValidCoordinatePair(arc.targetPosition)
+        hasValidCoordinatePair(arc.sourcePosition) && hasValidCoordinatePair(arc.targetPosition) &&
+        matchesArcFocus(arc.fromName, arc.fromCountry, arc.toName)
       )
       if (arcLayerData.length === 0) return null
       const { sourceColor, targetColor } = layerStyle
@@ -882,7 +901,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           }
         },
       })
-    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView])
+    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, matchesArcFocus])
 
     // ── Drill arc layer: persistent city-cluster arcs ──
     // Shown at city zoom (< 7) always. At zoom 7+, shown only when arcLayer has
@@ -894,10 +913,13 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       // At zoom 7+, only hide when the active arc layer is already rendering
       // individual object routes for the current viewport.
       if (isStreetZoom && processedArcs.dataSource === 'geospatial-objects' && processedArcs.arcLayerData.length > 0) return null
+      // Drill arcs already belong to the active country; site/collection/arc
+      // selections narrow them further (the country check is skipped here).
       const validArcs = drillArcs.filter(a =>
         hasValidCoordinates(a.latitude, a.longitude) &&
         a.institution_latitude != null && a.institution_longitude != null &&
-        hasValidCoordinates(a.institution_latitude, a.institution_longitude)
+        hasValidCoordinates(a.institution_latitude, a.institution_longitude) &&
+        matchesArcFocus(a.place_name, activeCountry ?? "", a.institution_name)
       )
       if (validArcs.length === 0) return null
       // Drill-down selection: emphasized blue→purple gradient + thicker width.
@@ -954,7 +976,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 1800 })
         },
       })
-    }, [isMapReady, drillLevel, drillArcs, activeSite, hoveredObjectPlace, isMobile, isStreetZoom, processedArcs.dataSource, processedArcs.arcLayerData.length])
+    }, [isMapReady, drillLevel, drillArcs, activeSite, activeCountry, hoveredObjectPlace, isMobile, isStreetZoom, processedArcs.dataSource, processedArcs.arcLayerData.length, matchesArcFocus])
 
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({

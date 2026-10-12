@@ -156,8 +156,8 @@ function buildServer(): McpServer {
     {
       instructions:
         "Ex Situ maps museum objects from where they were made or found to the museum that holds them today. " +
-        "Data covers 9 museums (Berlin State Museums collections, The Met, V&A, Art Institute of Chicago). " +
-        "Start with get_overview for museum names and totals. Counts reflect what Ex Situ has indexed, not a museum's full holdings. " +
+        "Data covers museums such as the Berlin State Museums collections, The Met, V&A and the Art Institute of Chicago. " +
+        "Start with get_overview for the current list of museums and totals. Counts reflect what Ex Situ has indexed, not a museum's full holdings. " +
         "Many objects have no located origin: report counts with the coverage (total / located / unlocated) the tools return. " +
         "Origin places come from museum records; precision says whether a place is a site, city, region or only a country, and a trailing '?' marks an uncertain attribution. " +
         "Link answers to the ex_situ_page / map_url provided.",

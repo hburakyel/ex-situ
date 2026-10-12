@@ -199,8 +199,10 @@ See [COLLECTIONS.md](COLLECTIONS.md) for the full collection roadmap.
 - [OpenStreetMap contributors](https://openstreetmap.org) — base map data (ODbL 1.0)
 - [Nominatim](https://nominatim.org) — geocoding
 - [Natural Earth](https://naturalearthdata.com) — public domain geodata
+- [GeoNames](https://www.geonames.org) — gazetteer for place and country matching (CC BY 4.0)
+- [Europeana](https://www.europeana.eu) — aggregator API used to find records of further European institutions; each record is credited to, and links to, its holding institution
 
-**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum, Art Institute of Chicago (CC0), and others — see the map for the full, current list of indexed collections.
+**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum, Art Institute of Chicago (CC0), and others — see the map for the full, current list of indexed collections. Institutions reached via Europeana are listed in [COLLECTIONS.md](COLLECTIONS.md); their image credits show each image's own licence.
 
 ---
 

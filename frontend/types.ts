@@ -28,6 +28,8 @@ export interface MuseumObject {
   attributes: {
     title: string
     img_url?: string
+    /** Image licence URI (edm:rights), set for institutions indexed via Europeana */
+    image_rights?: string | null
     longitude: number
     latitude: number
     inventory_number: string
