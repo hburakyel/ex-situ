@@ -37,7 +37,9 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     expect(r.coverage.total).toBe(5612)
     expect(r.coverage.located + r.coverage.unlocated).toBe(r.coverage.total)
     // Country flows exclude located objects that have no country.
-    expect(r.flows_objects).toBe(2418)
+    // 2405 since 2026-10-08: 13 "Agora" records that a fuzzy match had geocoded to
+    // Warsaw lost their (wrong) coordinates and country and wait for review.
+    expect(r.flows_objects).toBe(2405)
     expect(r.flows_objects).toBeLessThanOrEqual(r.coverage.located)
     expect(r.note).toMatch(/^\d+ of 5612 objects \(\d+%\) have a located origin/)
     expect(r.note).not.toMatch(/slightly higher/)
