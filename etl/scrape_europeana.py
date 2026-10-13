@@ -619,17 +619,26 @@ def add_inventory_numbers(records: list, api_key: str, workers: int = 4) -> None
     todo = [r["europeana_id"] for r in records
             if r["europeana_id"] not in cache
             and r["decision"] == "non_european" and r["latitude"] is not None
-            and r["institution_latitude"] is not None]
+            and r["institution_latitude"] is not None
+            and r["institution_name"] not in OUT_OF_SCOPE_PROVIDERS]
     logger.info("Inventory numbers: %d cached, %d to fetch", len(cache), len(todo))
 
     def fetch(eid):
         session = requests.Session()
         session.headers.update({"Accept": "application/json", "X-Api-Key": api_key})
-        data = api_get(session, RECORD_URL.format(id=eid), {}) or {}
+        try:
+            data = api_get(session, RECORD_URL.format(id=eid), {}) or {}
+        except RuntimeError as exc:
+            # One record the API keeps failing on must not stop the run; it is not
+            # cached, so the next run tries it again.
+            logger.warning("Inventory number skipped: %s", exc)
+            return eid, False
         return eid, provider_identifier(data.get("object") or {})
 
     with open(IDENTIFIER_CACHE_FILE, "a", encoding="utf-8") as out, ThreadPoolExecutor(workers) as pool:
         for i, (eid, ident) in enumerate(pool.map(fetch, todo), 1):
+            if ident is False:
+                continue
             cache[eid] = ident
             out.write(json.dumps({"id": eid, "identifier": ident}, ensure_ascii=False) + "\n")
             if i % 1000 == 0:
