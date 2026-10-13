@@ -1390,6 +1390,12 @@ function MapContent() {
   return (
     <div className="flex h-full flex-col">
       <div className="h-full w-full relative">
+        {/* Safari tints its toolbar from a fixed element at the bottom edge, which was
+            the dark map card. A white strip below the card keeps it white unless the
+            map is full screen. */}
+        {isMobile && mobileMap !== "full" && (
+          <div aria-hidden="true" className="fixed inset-x-0 bottom-0 z-[41] h-3 bg-white pointer-events-none" />
+        )}
         <div
           className={isMobile
             ? `fixed z-40 overflow-hidden bg-[#111] ${
