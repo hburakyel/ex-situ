@@ -204,6 +204,10 @@ export default function ObjectPanel({
   // text (info icon) or the search box + Places/Time/Collections (search icon).
   const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"search" | "about" | null>(null)
   const toggleMobileHeaderPanel = (panel: "search" | "about") => setMobileHeaderPanel((cur) => (cur === panel ? null : panel))
+  // One scrolling panel with the header (breadcrumb, info/globe/search/grid icons,
+  // unfolding search + Places/Time/Collections) on top of the grid: always on phones,
+  // and on desktop while the panel is expanded (the left card is covered then).
+  const unifiedPanel = isMobile ? MOBILE_FULL_SCREEN : containerSize === "expanded"
   const [showCopied, setShowCopied] = useState(false)
   // Grid density: null = the responsive default; otherwise 1 / 3 / 5 columns (remembered per browser).
   const [gridColumns, setGridColumns] = useState<number | null>(null)
@@ -1333,16 +1337,18 @@ export default function ObjectPanel({
   // grid size) heading the bottom sheet.
   const renderMobileInfo = (variant: "summary" | "drill") => (
     <InfoPanel
-        isMobile={isMobile}
+        isMobile={isMobile || unifiedPanel}
         containerSize={containerSize}
         mobileVariant={variant}
-        mapOpen={mapOpen}
-        onMapToggle={variant === "drill" ? onMapToggle : undefined}
-        infoOpen={variant === "drill" && MOBILE_FULL_SCREEN ? mobileHeaderPanel === "search" : undefined}
-        onInfoToggle={variant === "drill" && MOBILE_FULL_SCREEN ? () => toggleMobileHeaderPanel("search") : undefined}
-        aboutOpen={variant === "drill" && MOBILE_FULL_SCREEN ? mobileHeaderPanel === "about" : undefined}
-        onAboutToggle={variant === "drill" && MOBILE_FULL_SCREEN ? () => toggleMobileHeaderPanel("about") : undefined}
-        headerSlot={variant === "drill" && MOBILE_FULL_SCREEN ? gridSizeButton : undefined}
+        mapOpen={isMobile ? mapOpen : false}
+        // Desktop: the globe goes back to the map (panel at its normal size).
+        onMapToggle={variant === "drill" ? (isMobile ? onMapToggle : () => setContainerSize("default")) : undefined}
+        infoOpen={variant === "drill" && unifiedPanel ? mobileHeaderPanel === "search" : undefined}
+        onInfoToggle={variant === "drill" && unifiedPanel ? () => toggleMobileHeaderPanel("search") : undefined}
+        aboutOpen={variant === "drill" && unifiedPanel ? mobileHeaderPanel === "about" : undefined}
+        onAboutToggle={variant === "drill" && unifiedPanel ? () => toggleMobileHeaderPanel("about") : undefined}
+        headerSlot={variant === "drill" && unifiedPanel ? gridSizeButton : undefined}
+        sectionColumns={variant === "drill" && unifiedPanel && !isMobile}
         breadcrumb={variant === "drill" ? breadcrumb : []}
         onBreadcrumbClick={variant === "drill" ? onBreadcrumbClick : undefined}
         onCommandPaletteOpen={variant === "drill" ? onCommandPaletteOpen : undefined}
@@ -1383,7 +1389,7 @@ export default function ObjectPanel({
               {reportIssueMenuItem}
             </DropdownMenuContent>
           </DropdownMenu>
-          {!MOBILE_FULL_SCREEN && gridSizeButton}
+          {!unifiedPanel && gridSizeButton}
           </div>
         )}
         totalCount={totalCount}
@@ -1451,7 +1457,7 @@ export default function ObjectPanel({
         </div>
       )}
         {/* Header: Desktop and Mobile layouts */}
-        {isMobile && MOBILE_FULL_SCREEN ? null : isMobile ? (
+        {unifiedPanel ? null : isMobile ? (
           <div ref={headerRef} className="sticky top-0 z-30 flex flex-col bg-white">
             {renderMobileInfo("summary")}
           </div>
@@ -1572,7 +1578,7 @@ export default function ObjectPanel({
             columns={isMobile || containerSize === "expanded" ? activeGridColumns : null}
             // Map card: 40dvh + its 12px bottom margin + safe area, plus a 12px gap.
             bottomInset={isMobile && MOBILE_FULL_SCREEN && mapOpen ? "calc(40dvh + 24px + env(safe-area-inset-bottom))" : undefined}
-            header={isMobile && MOBILE_FULL_SCREEN ? (
+            header={unifiedPanel ? (
               <>
                 {renderMobileInfo("drill")}
                 {renderMobileInfo("summary")}

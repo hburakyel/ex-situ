@@ -47,6 +47,33 @@ function SectionToggle({ open, onToggle, children }: { open: boolean; onToggle: 
   )
 }
 
+// Side-by-side sections (desktop expanded panel): every list is open, so the header
+// is a plain label rather than a toggle.
+function SectionHeader({ columns, open, onToggle, children }: { columns?: boolean; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+  if (!columns) return <SectionToggle open={open} onToggle={onToggle}>{children}</SectionToggle>
+  return (
+    <div className="flex h-8 items-center">
+      <span className="panel-text-muted">{children}</span>
+    </div>
+  )
+}
+
+// About Ex Situ: the mobile header's info section and the desktop popover.
+function AboutText() {
+  return (
+    <>
+      <p className="mb-2.5 text-[#555]">
+        Ex Situ is an open-source spatial index of the migration of cultural artifacts. Each artifact is an arc from its place of origin to the institution that holds it today. Ex Situ does not host images or copy records. Every arc links back to the institution&rsquo;s own page. The index shows what museum records state. Many objects have no located origin, and some locations are uncertain.
+      </p>
+      <p>
+        <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="text-link">GitHub ↗</a>
+        {" · "}
+        <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
+      </p>
+    </>
+  )
+}
+
 function FadedAccordionList({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative">
@@ -112,6 +139,8 @@ interface InfoPanelProps {
   aboutOpen?: boolean
   /** Mobile: extra header buttons after the icons (grid size). */
   headerSlot?: React.ReactNode
+  /** Desktop expanded panel: Places/Sites, Time and Collections side by side, all open. */
+  sectionColumns?: boolean
 }
 
 export default function InfoPanel({
@@ -152,12 +181,13 @@ export default function InfoPanel({
   onAboutToggle,
   aboutOpen,
   headerSlot,
+  sectionColumns,
 }: InfoPanelProps) {
   // Mobile sections are an accordion: one list open at a time keeps the card short
   // enough to fit above the half-height sheet without scrolling.
   const [openSection, setOpenSection] = React.useState<"origins" | "sites" | "time" | "collections" | null>("origins")
   const sectionState = (key: "origins" | "sites" | "time" | "collections") =>
-    [openSection === key, (open: boolean) => setOpenSection(open ? key : null)] as const
+    [sectionColumns || openSection === key, (open: boolean) => setOpenSection(open ? key : null)] as const
   const [showOrigins, setShowOrigins] = sectionState("origins")
   // Places (global) and Sites (country) share one open state, so drilling in keeps the list open.
   const [showSites, setShowSites] = sectionState("origins")
@@ -231,16 +261,7 @@ export default function InfoPanel({
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 rounded-xl text-[13px] leading-normal text-[#333]">
-                <p className="mb-2.5 text-[#555]">
-                  Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact&apos;s origin and current repository, it refuses problematic taxonomies and routes researchers directly to the source.
-                </p>
-                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block w-fit text-link">
-                  GitHub ↗
-                </a>
-                <p className="mt-1.5 text-[#666]">
-                  Data may be incomplete.{" "}
-                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
-                </p>
+                <AboutText />
               </PopoverContent>
             </Popover>
           )}
@@ -264,16 +285,7 @@ export default function InfoPanel({
 
       {mobileVariant === "drill" && aboutOpen && (
         <div className="pt-1 pb-2 text-[13px] leading-normal text-[#333]">
-                <p className="mb-2.5 text-[#555]">
-                  Ex Situ is an open-source spatial index mapping cultural heritage displacement. By tracking only the geographic extraction vector between an artifact&apos;s origin and current repository, it refuses problematic taxonomies and routes researchers directly to the source.
-                </p>
-                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="block w-fit text-link">
-                  GitHub ↗
-                </a>
-                <p className="mt-1.5 text-[#666]">
-                  Data may be incomplete.{" "}
-                  <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
-                </p>
+                <AboutText />
         </div>
       )}
 
@@ -335,14 +347,17 @@ export default function InfoPanel({
               className={`overflow-hidden transition-[max-height,opacity] ease-in-out ${
                 drillSectionsVisible ? "duration-700 max-h-[1000px] opacity-100" : "duration-400 max-h-0 opacity-0"
               }`}
+              // Inline, not Tailwind's grid-cols-3: globals.css has an old .grid rule
+              // (auto-fill 150px columns) that overrides the utility class.
+              style={sectionColumns ? { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", columnGap: 40, alignItems: "start" } : undefined}
             >
               {/* Places (global) */}
               {drillLevel === "global" && groupedOrigins.length > 0 && (
                 <div>
-                  <SectionToggle open={showOrigins} onToggle={() => setShowOrigins(!showOrigins)}>
+                  <SectionHeader columns={sectionColumns} open={showOrigins} onToggle={() => setShowOrigins(!showOrigins)}>
                     Places
                     {isLoadingOrigins && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                  </SectionToggle>
+                  </SectionHeader>
                   {showOrigins && (
                     <FadedAccordionList>
                         {groupedOrigins.map((origin, index) => (
@@ -361,10 +376,10 @@ export default function InfoPanel({
               {/* Sites (country) */}
               {drillLevel !== "global" && groupedSites.length > 0 && (
                 <div>
-                  <SectionToggle open={showSites} onToggle={() => setShowSites(!showSites)}>
+                  <SectionHeader columns={sectionColumns} open={showSites} onToggle={() => setShowSites(!showSites)}>
                     Sites
                     {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
-                  </SectionToggle>
+                  </SectionHeader>
                   {showSites && (
                     <FadedAccordionList>
                         {groupedSites.map((site, index) => (
@@ -384,9 +399,9 @@ export default function InfoPanel({
               {/* Time — shown at all drill levels */}
               {dateBuckets && (
                 <div>
-                  <SectionToggle open={showTime} onToggle={() => setShowTime(!showTime)}>
+                  <SectionHeader columns={sectionColumns} open={showTime} onToggle={() => setShowTime(!showTime)}>
                     Time
-                  </SectionToggle>
+                  </SectionHeader>
                   {showTime && (
                     <FadedAccordionList>
                         {collapseContiguousBuckets(
@@ -412,9 +427,9 @@ export default function InfoPanel({
               {/* Institutions — shown at all zoom levels */}
               {drillInstitutions.length > 0 && (
                 <div>
-                  <SectionToggle open={showCollections} onToggle={() => setShowCollections(!showCollections)}>
+                  <SectionHeader columns={sectionColumns} open={showCollections} onToggle={() => setShowCollections(!showCollections)}>
                     Collections
-                  </SectionToggle>
+                  </SectionHeader>
                   {showCollections && (
                     <FadedAccordionList>
                         {drillInstitutions.map((inst, index) => (
