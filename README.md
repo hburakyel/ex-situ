@@ -7,7 +7,7 @@
 [![Strapi](https://img.shields.io/badge/Strapi-4-2E7EEA)](https://strapi.io)
 [![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-336791)](https://postgis.net)
 
-![Ex Situ — provenance arc visualization](docs/screenshot.png)
+![Ex Situ — provenance arcs from Iran to 11 collections](docs/screenshot-2026-10.png)
 
 → [exsitu.app](https://exsitu.app)
 
