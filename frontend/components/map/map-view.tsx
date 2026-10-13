@@ -605,12 +605,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             if (this._popup) { this._popup.remove(); this._popup = null; return }
             const rect = btn.getBoundingClientRect()
             this._popup = document.createElement("div")
-            this._popup.style.cssText = `position:fixed;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);padding:14px 16px;width:220px;font-family:system-ui,sans-serif;z-index:9999;font-size:13px;line-height:1.5;color:#333`
+            this._popup.style.cssText = `position:fixed;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);padding:14px 16px;width:320px;font-family:system-ui,sans-serif;z-index:9999;font-size:13px;line-height:1.5;color:#333`
             this._popup.style.bottom = `${window.innerHeight - rect.bottom}px`
             this._popup.style.left = `${rect.right + 8}px`
             this._popup.innerHTML = `
               <div style="margin-bottom:10px;color:#555">Ex Situ is an open-source spatial index of the migration of cultural artifacts. Each artifact is an arc from its place of origin to the institution that holds it today. Ex Situ does not host images or copy records. Every arc links back to the institution’s own page. The index shows what museum records state. Many objects have no located origin, and some locations are uncertain.</div>
-              <div>
+              <div style="white-space:nowrap">
                 <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:none">GitHub ↗</a>
                 ·
                 <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:none">Report issue ↗</a>

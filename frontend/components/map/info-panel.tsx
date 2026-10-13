@@ -6,7 +6,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Globe, Info, Search } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { IconClose } from "@/components/icons"
+import { IconClose, IconMinimize } from "@/components/icons"
 import SearchBar from "./search-bar"
 import { ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
@@ -141,6 +141,8 @@ interface InfoPanelProps {
   headerSlot?: React.ReactNode
   /** Desktop expanded panel: Places/Sites, Time and Collections side by side, all open. */
   sectionColumns?: boolean
+  /** "collapse": the map button is the minimize icon at the end of the row (desktop expanded panel). */
+  mapToggle?: "globe" | "collapse"
 }
 
 export default function InfoPanel({
@@ -182,6 +184,7 @@ export default function InfoPanel({
   aboutOpen,
   headerSlot,
   sectionColumns,
+  mapToggle = "globe",
 }: InfoPanelProps) {
   // Mobile sections are an accordion: one list open at a time keeps the card short
   // enough to fit above the half-height sheet without scrolling.
@@ -265,7 +268,7 @@ export default function InfoPanel({
               </PopoverContent>
             </Popover>
           )}
-          {mobileVariant === "drill" && onMapToggle && (
+          {mobileVariant === "drill" && onMapToggle && mapToggle !== "collapse" && (
             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onMapToggle}
               title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
             >
@@ -280,6 +283,15 @@ export default function InfoPanel({
             </Button>
           )}
           {mobileVariant === "drill" && headerSlot}
+          {/* Desktop expanded panel: the way back is the counterpart of the icon that
+              expanded it (not the globe, which on the map means "global view"). */}
+          {mobileVariant === "drill" && onMapToggle && mapToggle === "collapse" && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onMapToggle}
+              title="Minimize panel" aria-label="Minimize panel"
+            >
+              <IconMinimize className="w-5 h-5 text-gray-500" />
+            </Button>
+          )}
         </div>
       )}
 

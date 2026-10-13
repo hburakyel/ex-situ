@@ -1349,6 +1349,7 @@ export default function ObjectPanel({
         onAboutToggle={variant === "drill" && unifiedPanel ? () => toggleMobileHeaderPanel("about") : undefined}
         headerSlot={variant === "drill" && unifiedPanel ? gridSizeButton : undefined}
         sectionColumns={variant === "drill" && unifiedPanel && !isMobile}
+        mapToggle={isMobile ? "globe" : "collapse"}
         breadcrumb={variant === "drill" ? breadcrumb : []}
         onBreadcrumbClick={variant === "drill" ? onBreadcrumbClick : undefined}
         onCommandPaletteOpen={variant === "drill" ? onCommandPaletteOpen : undefined}
