@@ -74,6 +74,7 @@ LABELS = {
     "Kait (Papua Neuguinea)": ("Kait", "Papua New Guinea"),
     "British Columbia, Canada, Queen Charlotte Islands (?)": ("Haida Gwaii?", None),
     "Jerusalem District": ("Jerusalem", None),
+    "Jerusalem, present-day Israel": ("Jerusalem", None),  # the Met's phrasing stays in place_name
     "Kertsch/Pantikapaion": ("Kerch", None),
 }
 

@@ -53,11 +53,16 @@ def _in_ring(lon, lat, ring):
     return inside
 
 
-def un_country(lat, lon, country):
+def un_country(lat, lon, country, label=None):
     """(action, country) when the point's country under UN usage differs from country_en."""
-    # Jerusalem is left out: a record that says only "Jerusalem" carries the
-    # city's generic point, which cannot tell East from West Jerusalem.
+    # Jerusalem: a record that names only the city carries its generic point,
+    # which cannot tell East from West. Such records are listed under Palestine:
+    # the historic city, the Old City, lies in East Jerusalem, occupied since
+    # 1967, whose annexation the Security Council declared null and void
+    # (resolution 478, 1980). Other points in the city are left as recorded.
     if 31.70 < lat < 31.88 and 35.13 < lon < 35.30:
+        if (label or "").strip().rstrip("?").strip().lower() == "jerusalem" and country != "Palestine":
+            return ("country", "Palestine")
         return None
     geom = UN["Palestine"]
     polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
@@ -120,7 +125,7 @@ def plan(cur, classifier):
     cache = {}
     for oid, raw, label, country, lat, lon in cur.fetchall():
         raw = raw or ""
-        un = un_country(lat, lon, country)
+        un = un_country(lat, lon, country, label or raw)
         if un:
             actions[un].append(oid)
             examples[un[0]][f"{raw} → {un[1]} (UN usage)"] += 1
