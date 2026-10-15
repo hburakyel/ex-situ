@@ -30,7 +30,7 @@ Data rules (CLAUDE.md, METHODOLOGY.md):
     not sovereignty: the UN-usage rule of normalize_origin_points.py is
     applied to the findspot (Palestine incl. East Jerusalem and Gaza, Golan,
     Crimea, Western Sahara), and a conflict that is only about occupation is
-    not held back. Jerusalem itself keeps the source's country.
+    not held back. Elsewhere in Jerusalem no country is inferred from towns.
 
 Resumable via a JSONL cache: re-running `fetch` skips row ids already in the
 cache. `fetch` never writes to the database; `apply` reads the cache and
@@ -344,7 +344,7 @@ class Countries:
         english = self.german.get(n.lower(), n)
         return self.by_key.get(self.key(english)) or self.by_key.get(self.key(n))
 
-    def findspot_country(self, lat, lon):
+    def findspot_country(self, lat, lon, label=None):
         """(country label or None, reason, nearest town)."""
         towns = []
         for dy in (-1, 0, 1):
@@ -365,16 +365,18 @@ class Countries:
             country, reason = None, f"towns of several countries within {radius} km: {', '.join(sorted(codes))}"
         else:
             country, reason = self.iso2_name.get(codes.pop()), f"GeoNames towns within {radius} km"
-        if 31.70 < lat < 31.88 and 35.13 < lon < 35.30:
-            # Left out of the UN rule in normalize_origin_points.py, pending the user's decision.
-            return None, "Jerusalem: country left to review", nearest
         # Occupation is not sovereignty: same rule as normalize_origin_points.py
         # (Palestine incl. East Jerusalem and Gaza, Golan → Syria, Crimea → Ukraine).
-        un = un_country(lat, lon, country)
+        un = un_country(lat, lon, country, label)
         if un and un[0] == "country":
             return un[1], f"UN usage (GeoNames: {country or reason})", nearest
         if un:
             return None, "Western Sahara, not Morocco (UN usage)", nearest
+        if 31.74 < lat < 31.88 and 35.13 < lon < 35.30:
+            if un_country(lat, lon, None, label):  # the Old City, east of it, or "Jerusalem"
+                return "Palestine", "East Jerusalem (UN usage)", nearest
+            # Elsewhere in Jerusalem a nearby town cannot tell East from West: not inferred.
+            return None, "Jerusalem outside the Old City and east of it: country not inferred", nearest
         return country, reason, nearest
 
 
@@ -403,7 +405,8 @@ def classify(records, countries):
         elif countries.label_for_name(r["new_place_name"]):
             d["action"] = "skip: event place is a whole country (centre point, not a findspot)"
         else:
-            country, reason, nearest = countries.findspot_country(r["new_latitude"], r["new_longitude"])
+            country, reason, nearest = countries.findspot_country(r["new_latitude"], r["new_longitude"],
+                                                                  r["new_place_name"])
             claimed = r.get("old_country_en") or countries.label_for_name(r["old_place_name"])
             d.update(findspot_country=country, country_reason=reason, nearest_town=nearest, claimed_country=claimed)
             if claimed and country and claimed != country and frozenset((claimed, country)) in OCCUPIED_PAIRS:
