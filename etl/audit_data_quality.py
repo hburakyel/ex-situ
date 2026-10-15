@@ -28,7 +28,7 @@ import os
 import re
 from collections import Counter, defaultdict
 
-from audit_places import get_conn, key, km, load_gazetteer, tsv, MARGIN_DEG
+from audit_places import EXTRA_CODES, get_conn, key, km, load_gazetteer, tsv, MARGIN_DEG
 from build_country_labels import country_key
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -78,6 +78,13 @@ class Classifier:
                     self.alt_index[key(alt)].append((lat, lon, f[1], cc))
 
     def inside(self, cc, pt):
+        """Is the point in country cc? The nearest town within 50 km decides (its
+        country, or a territory filed under cc); without one, cc's extent of towns
+        plus MARGIN_DEG. An extent alone put Rayy (near Tehran), geocoded to Oman,
+        inside Iran."""
+        near = self.nearest(pt)
+        if near and near[0] <= 50:
+            return near[1][3] == cc or near[1][3] in EXTRA_CODES.get(cc, [])
         e = self.extent.get(cc)
         return bool(e) and e[0] - MARGIN_DEG <= pt[0] <= e[1] + MARGIN_DEG and e[2] - MARGIN_DEG <= pt[1] <= e[3] + MARGIN_DEG
 
