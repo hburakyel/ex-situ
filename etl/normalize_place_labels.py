@@ -13,8 +13,13 @@ base name (frontend/lib/place-label.ts), so "Kano (State)" usually shows as "Kan
 
 Per current site label (COALESCE(place_name_normalized, city_en), per country):
   strip      trailing "(<country>)" that matches country_en
-  translate  German generic term in a tag -> English (Bundesstaat -> State, Fluss -> River …)
-  merge      result equals another label in the same country AND centroids ≤ MERGE_KM apart
+  translate  German generic term in a tag -> English (Bundesstaat -> State, Fluss -> River …),
+             or in front of the name ("Provinz Catamarca" -> "Catamarca Province")
+  hedge      "probably X" / "possibly X" / "X (probably)" for a single place -> "X?"
+             (METHODOLOGY: a trailing "?" marks an uncertain attribution)
+  merge      result equals another label in the same country AND centroids ≤ MERGE_KM apart;
+             also spelling variants of one label (accents, a "(City)" tag: "Aššur (City)" ->
+             "Assur") take the most common spelling under the same distance rule
   flag       anything that needs a human: country tag ≠ country_en, country missing,
              same name but different coordinates, German left in the label,
              historical/contested name, "?" (uncertain attribution)
@@ -106,6 +111,18 @@ GERMAN_IN_TEXT = re.compile(
 )
 TRAILING_TAG = re.compile(r"^(?P<base>.*\S)\s*\((?P<tag>[^()]*)\)\s*$")
 
+# "probably Isfahan", "possibly Tabriz", "Lucknow (probably)" → "Isfahan?": METHODOLOGY writes an
+# uncertain attribution with a trailing "?". Only a single place; "probably Aleppo or Damascus",
+# "Gujarat, probably based on …" and "India, probably Deccan" stay as the source writes them.
+HEDGED = re.compile(r"^\s*(?:(?:probably|possibly)\s+(?P<pre>[^,()?]+)|(?P<post>[^,()?]+?)\s*\((?:probably|possibly)\))\s*$",
+                    re.IGNORECASE)
+HEDGE_STOP = re.compile(r"\b(or|and|probably|possibly|based|from|near)\b|/", re.IGNORECASE)
+# German generic term in front of the name: "Provinz Catamarca" → "Catamarca Province",
+# "Gouvernement al-Fayyum" → "al-Fayyum Governorate", "Departement du Nkam" → "Nkam Department".
+GERMAN_PREFIX = re.compile(r"^(?P<term>Provinz|Region|Gouvernement|Distrikt|Bezirk|Departement(?: du| de la| de)?)\s+"
+                           r"(?!of\b)(?P<name>[^,()]+?)\s*$")
+CITY_TAG = re.compile(r"\s*\(City\)\s*$")
+
 
 def key(value):
     """Case/accent-insensitive comparison key (same as normalizePlaceName in origins.ts)."""
@@ -134,8 +151,19 @@ def haversine_km(a, b):
 def classify(label, country, en_countries):
     """Return (proposed_label, actions[], reasons[], flags[]) for one current label."""
     proposed, actions, reasons, flags = label, [], [], []
+    hedged = HEDGED.match(label)
+    hedged_place = (hedged.group("pre") or hedged.group("post")).strip() if hedged else None
+    prefixed = GERMAN_PREFIX.match(label)
     m = TRAILING_TAG.match(label)
-    if m:
+    if hedged_place and not HEDGE_STOP.search(hedged_place):
+        proposed = f"{hedged_place}?"
+        actions.append("hedge")
+        reasons.append(f"'{label}' → '{proposed}' (uncertain attribution)")
+    elif prefixed:
+        proposed = f"{prefixed.group('name')} {GENERIC_TERMS[prefixed.group('term').split()[0].lower()]}"
+        actions.append("translate")
+        reasons.append(f"German term first: '{label}' → '{proposed}'")
+    elif m:
         base, tag = m.group("base"), m.group("tag").strip()
         tag_key = key(tag)
         tag_country = GERMAN_COUNTRIES.get(tag.lower()) or (tag if tag_key in en_countries else None)
@@ -211,13 +239,27 @@ def load_labels(cur, institution=None, country=None):
 def build_proposal(rows):
     en_countries = english_countries()
     by_key = defaultdict(list)  # (country, label key) → rows, to detect merges
+    by_spelling = defaultdict(list)  # same, ignoring a "(City)" tag: "Aššur (City)" ~ "Assur"
     for r in rows:
         by_key[(key(r[1] or ""), key(r[0]))].append(r)
+        by_spelling[(key(r[1] or ""), key(CITY_TAG.sub("", r[0])))].append(r)
 
     out, missing_country = [], []
     for label, country, n, lat, lon, museums, raw in rows:
         proposed, actions, reasons, flags = classify(label, country, en_countries)
-        if proposed != label:
+        if proposed == label and not flags:
+            # Spelling variants of one place ("Fayum"/"Fayûm") are separate groups on the map;
+            # the smaller one takes the more common spelling when both sit at the same place.
+            variants = by_spelling[(key(country or ""), key(CITY_TAG.sub("", label)))]
+            t = max(variants, key=lambda x: (x[2], x[0]))
+            if t[0].lower() != label.lower():  # case alone is already one group on the map
+                if None not in (lat, lon, t[3], t[4]) and haversine_km((lat, lon), (t[3], t[4])) <= MERGE_KM:
+                    proposed = t[0]
+                    actions.append("merge")
+                    reasons.append(f"spelling variant of '{t[0]}' ({t[2]} objects, ≤{MERGE_KM:g} km)")
+                else:
+                    flags.append(f"spelling variant of '{t[0]}' at different coordinates — keep separate")
+        if proposed != label and "merge" not in actions:
             targets = [t for t in by_key.get((key(country or ""), key(proposed)), []) if t[0] != label]
             if targets:
                 t = max(targets, key=lambda x: x[2])
@@ -246,7 +288,8 @@ def build_proposal(rows):
         # A missing country_en with nothing else to say about the label is a data gap,
         # not a label decision — reported separately so it doesn't bury the table.
         (missing_country if not actions and flags == ["country missing"] else out).append(record)
-    order = {"strip": 0, "translate": 1, "strip+merge": 2, "translate+merge": 3, "flag": 4}
+    order = {"strip": 0, "translate": 1, "hedge": 2, "merge": 3, "strip+merge": 4, "translate+merge": 5,
+             "hedge+merge": 6, "flag": 7}
     by_size = lambda r: (order.get(r["action"], 5), -r["objects"])
     return sorted(out, key=by_size), sorted(missing_country, key=by_size)
 

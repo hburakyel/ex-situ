@@ -37,8 +37,8 @@ Live integration tests against production:
 - Fuzzy place matching is opt-in (`--fuzzy`); it produced Lagos→Laos, Delphi→Delhi.
 - Palestine is an ordinary country, not flagged as disputed.
 - ETL scripts: dry run first, `--apply` only after reviewing output.
-- After a data import: normalize_place_names.py → fill_place_name_normalized.py →
-  normalize_place_labels.py → audit_places.py, then restart Strapi.
+- After a data import: normalize_place_names.py → normalize_country_names.py →
+  fill_place_name_normalized.py → normalize_place_labels.py → audit_places.py, then restart Strapi.
 - Answer data questions via the public API / MCP tools, not by reading the large `etl/*.json` dumps.
 
 ## Conventions
