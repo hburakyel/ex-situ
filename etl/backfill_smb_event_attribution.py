@@ -367,16 +367,16 @@ class Countries:
             country, reason = self.iso2_name.get(codes.pop()), f"GeoNames towns within {radius} km"
         # Occupation is not sovereignty: same rule as normalize_origin_points.py
         # (Palestine incl. East Jerusalem and Gaza, Golan → Syria, Crimea → Ukraine).
-        un = un_country(lat, lon, country, label)
-        if un and un[0] == "country":
-            return un[1], f"UN usage (GeoNames: {country or reason})", nearest
-        if un:
-            return None, "Western Sahara, not Morocco (UN usage)", nearest
         if 31.74 < lat < 31.88 and 35.13 < lon < 35.30:
-            if un_country(lat, lon, None, label):  # the Old City, east of it, or "Jerusalem"
+            if un_country(lat, lon, None, label)[1] == "Palestine":  # the Old City, east of it, or "Jerusalem"
                 return "Palestine", "East Jerusalem (UN usage)", nearest
             # Elsewhere in Jerusalem a nearby town cannot tell East from West: not inferred.
             return None, "Jerusalem outside the Old City and east of it: country not inferred", nearest
+        un = un_country(lat, lon, country, label)  # ("country"|"keep", X), ("outside", "Morocco") or None
+        if un and un[0] == "outside":
+            return None, "Western Sahara, not Morocco (UN usage)", nearest
+        if un and un[1] != country:
+            return un[1], f"UN usage (GeoNames: {country or reason})", nearest
         return country, reason, nearest
 
 
