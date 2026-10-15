@@ -40,7 +40,9 @@ Live integration tests against production:
   UN/ICJ usage; public text explains choices by their sources, not by stance.
 - ETL scripts: dry run first, `--apply` only after reviewing output.
 - After a data import: normalize_place_names.py → normalize_country_names.py →
-  fill_place_name_normalized.py → normalize_place_labels.py → audit_places.py, then restart Strapi.
+  fill_place_name_normalized.py → normalize_place_labels.py → normalize_origin_points.py →
+  normalize_present_day_names.py (AIC: normalize_aic_origins.py) → audit_places.py and
+  audit_data_quality.py, then SELECT refresh_geospatial_views(); (no Strapi restart needed).
 - Answer data questions via the public API / MCP tools, not by reading the large `etl/*.json` dumps.
 
 ## Conventions
