@@ -58,6 +58,7 @@ etl/pyrightconfig.json
 etl/smb_*.json
 etl/met_*.json
 etl/europeana_*.json
+etl/rijks_*.json
 etl/updated_*.json
 etl/ethnologisches_museum_objects.json
 etl/scrape_smb.py
