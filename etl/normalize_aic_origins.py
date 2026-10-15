@@ -9,8 +9,8 @@ With place_name_normalized empty, the map labelled the origin by that region:
 "Bergama" as "Aegean Region", "Corinth" as "Peloponnese Region". Worse, broad
 attributions had been geocoded to a point: "Mediterranean Region", "Eastern
 Mediterranean Region" and "Ancient Mediterranean" sat in southern Turkey with
-country_en "Turkey", "Ottoman Empire" likewise, and "Venado Beach" (Panama) in
-Chile.
+country_en "Turkey", "Ottoman Empire" likewise, and "Venado Beach" (Panama) and
+"Cerro Blanco" (Peru) in Chile.
 
 Passes (one transaction):
   cultural  place_name names a cultural area, not a place → no coordinates, no
@@ -48,11 +48,14 @@ CULTURAL_AREAS = {
     "ottoman empire",
 }
 
-# place_name → country_en, from the AIC record, where the coordinates are in
-# another country. Venado Beach: "Venado Beach, Coclé province, Panama"
-# (api.artic.edu artwork 32555); no gazetteer entry, so no coordinates.
+# place_name → (country_en, label), from the AIC record, where the coordinates
+# are in another country. Neither has a gazetteer entry, so no coordinates.
+#   Venado Beach  "Venado Beach, Coclé province, Panama" (api.artic.edu artwork 32555)
+#   Cerro Blanco  "Possibly Cerro Blanco, Ocucaje area, Ica Valley, south coast,
+#                 Peru" (artwork 124483) — "?" marks the uncertain attribution
 WRONG_COUNTRY = {
-    "Venado Beach": "Panama",
+    "Venado Beach": ("Panama", "Venado Beach"),
+    "Cerro Blanco": ("Peru", "Cerro Blanco?"),
 }
 
 # Site labels the map already uses under another spelling. Bergama is the
@@ -109,15 +112,15 @@ def run(cur):
         print(f"  {n:>5}  {name!r}")
 
     print("coordinates in the wrong country → removed, country from the AIC record")
-    for name, country in WRONG_COUNTRY.items():
+    for name, (country, label) in WRONG_COUNTRY.items():
         cur.execute(
             f"""UPDATE museum_objects SET {note('latitude', 'longitude', 'country_en', 'city_en')},
                   latitude = NULL, longitude = NULL, country_en = %s, city_en = NULL,
-                  place_name_normalized = place_name, geocoding_status = 'ambiguous'
+                  place_name_normalized = %s, geocoding_status = 'ambiguous'
                 WHERE institution_name = %s AND place_name = %s AND {located} AND {GUARD}""",
-            (country, AIC, name),
+            (country, label, AIC, name),
         )
-        print(f"  {cur.rowcount:>5}  {name!r} → unlocated, {country}")
+        print(f"  {cur.rowcount:>5}  {name!r} → {label!r}, unlocated, {country}")
 
     print("site label: reverse-geocoded region → the source's place name")
     cur.execute(
