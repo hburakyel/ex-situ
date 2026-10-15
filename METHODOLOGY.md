@@ -36,7 +36,7 @@ Each origin is checked against its own source record and the GeoNames gazetteer 
 
 ## Place names
 
-Places are labelled with their present-day names; the name in the source record is kept with the record. Historical, colonial and imperial names of places that exist today give way to the name in use now — Chennai for Madras, Bergama for Pergamon, Haida Gwaii for the Queen Charlotte Islands — matched together with the country, so a Madras in Oregon is left alone. The present-day name is the one in official use, applied the same way everywhere, including where a renaming is itself debated (Prayagraj for Allahabad, 2018). Historical units that span several present-day countries, such as Rhodesia, are not given a point. The list is in `etl/normalize_present_day_names.py`.
+Places are labelled with their present-day names; the name in the source record is kept with the record. Historical, colonial and imperial names of places that exist today give way to the name in use now — Chennai for Madras, Jakarta for Batavia, Bergama for Pergamon, Haida Gwaii for the Queen Charlotte Islands — matched together with the country, so a Madras in Oregon is left alone. The present-day name is the one in official use, applied the same way everywhere, including where a renaming is itself debated (Prayagraj for Allahabad, 2018). Historical units that span several present-day countries, such as Rhodesia, are not given a point. The list is in `etl/normalize_present_day_names.py`.
 
 ## Country labels
 

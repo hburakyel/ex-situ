@@ -63,6 +63,27 @@ RENAMES = {
     ("Theben", "Greece"): "Thiva",
     ("Natal", "South Africa"): "KwaZulu-Natal",
     ("Natal Province", "South Africa"): "KwaZulu-Natal",
+    # Rijksmuseum (Dutch colonial names and pre-1972 Indonesian spelling), 2026-10-15.
+    ("Batavia", "Indonesia"): "Jakarta",
+    ("Weltevreden", "Indonesia"): "Jakarta",
+    ("Celebes", "Indonesia"): "Sulawesi",
+    ("Jogjakarta", "Indonesia"): "Yogyakarta",
+    ("Lampong", "Indonesia"): "Lampung",
+    ("Bindjai", "Indonesia"): "Binjai",
+    ("Soekaboemi", "Indonesia"): "Sukabumi",
+    ("Atjeh", "Indonesia"): "Aceh",
+    ("Soengeiliat", "Indonesia"): "Sungailiat",
+    ("Soerakarta", "Indonesia"): "Surakarta",
+    ("Tjibeber", "Indonesia"): "Cibeber",
+    ("Djambi", "Indonesia"): "Jambi",
+    ("Tjimahi", "Indonesia"): "Cimahi",
+    ("Batoedjadjar", "Indonesia"): "Batujajar",
+    ("Gadingredjo", "Indonesia"): "Gadingrejo",
+    ("Tjipanas", "Indonesia"): "Cipanas",
+    ("Modjokerto", "Indonesia"): "Mojokerto",
+    ("Tandjong Poera", "Indonesia"): "Tanjung Pura",
+    ("Constantinople", "Turkey"): "Istanbul",
+    ("Kanton", "China"): "Guangzhou",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -85,6 +106,19 @@ LABELS = {
     "Idalion (Nekropolen)": ("Idalion necropoleis", None),
     "Esquilin-Nekropole": ("Esquiline necropolis", None),
     "Jiaohe (Ruinenstadt)": ("Jiaohe ruins", None),
+    # Dutch labels from Rijksmuseum records, translated (2026-10-15).
+    "Oost-Sumatra": ("East Sumatra", None),
+    "Nikkō-shi": ("Nikkō", None),
+    "Centraal-Molukken": ("Central Maluku", None),
+    "Mentawai-eilanden": ("Mentawai Islands", None),
+    "Aru-eilanden": ("Aru Islands", None),
+    "Madiun (Oost-Java)": ("Madiun", None),
+    "Kupang (Timor)": ("Kupang", None),
+    "Yogyakarta (City)": ("Yogyakarta", None),
+    "Sumba (Indonesia)": ("Sumba", None),
+    "Nord-Bali": ("North Bali", None),
+    "Kandy (voormalige natie)": ("Kingdom of Kandy", None),
+    "Mariënburg (Suriname)": ("Mariënburg", None),
 }
 
 AREAS = {"Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa"}
