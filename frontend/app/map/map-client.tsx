@@ -1240,7 +1240,15 @@ function MapContent() {
     }
 
     if (!mapRef.current) return
-  if (!hasValidCoordinates(latitude, longitude)) return
+    if (!hasValidCoordinates(latitude, longitude)) return
+
+    // An object located only to its country sits on the country point the first
+    // click already flew to — zooming to 14 there would just land on a made-up spot.
+    if (object) {
+      const country = object.attributes.country_en || object.attributes.country || object.attributes.place_name || null
+      const site = siteLabel(object.attributes)
+      if (site === "Unknown" || (country && normalizePlaceKey(site) === normalizePlaceKey(country))) return
+    }
 
     // ── Step 2: Country level → fly to object detail ──
     mapRef.current.flyToLocation(longitude, latitude, 14, 1200)

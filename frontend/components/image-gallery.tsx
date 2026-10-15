@@ -470,7 +470,7 @@ export default function ImageGallery({
         {/* Site mark — bottom left; image credit — bottom right */}
         <div style={{ padding: "4px 16px 6px", backgroundColor: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
           <span style={{ color: "#2a2a2a", fontSize: "9px", whiteSpace: "nowrap", flexShrink: 0 }}>
-            Ex Situ 2022
+            Indexed by Ex Situ
             {!String(currentObject.id).startsWith("wiki-") && (
               <>
                 {" · "}
@@ -481,12 +481,12 @@ export default function ImageGallery({
                   className="text-link"
                   style={{ fontSize: "9px" }}
                 >
-                  {isMobile ? "Correction" : "Suggest a correction"} ↗
+                  Correction ↗
                 </a>
               </>
             )}
           </span>
-          <span style={{ textAlign: "right" }}>
+          <span style={{ textAlign: "right", minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
           {(() => {
             // Image credit as each museum states it for its images (audited 2026-10-07):
             // - SMB (museum-digital object_images[].rights): CC BY-NC-SA for every collection
@@ -524,10 +524,16 @@ export default function ImageGallery({
                   || (institution ? `© ${institution}` : "")
             const style = { color: "#2a2a2a", fontSize: "9px", textDecoration: "none" }
 
+            // One line always: the institution name shrinks with an ellipsis, the licence stays whole.
+            const linkText = { fontSize: "9px", color: "hsl(var(--link))" }
+            const parts = (credit || "View source").split(" · ")
+            const licence = parts.length > 1 ? parts.pop() : ""
+            const creditName = parts.join(" · ")
             if (sourceUrl) {
               return (
-                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: style.fontSize }} onClick={() => trackOutbound(sourceUrl, "credit")}>
-                  {credit || "View source"} ↗
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link" title={credit} style={{ fontSize: style.fontSize, display: "flex", justifyContent: "flex-end", minWidth: 0, whiteSpace: "nowrap" }} onClick={() => trackOutbound(sourceUrl, "credit")}>
+                  <span style={{ ...linkText, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{creditName}</span>
+                  <span style={{ ...linkText, flexShrink: 0 }}>{licence ? ` · ${licence}` : ""} ↗</span>
                 </a>
               )
             }
