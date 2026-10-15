@@ -22,6 +22,7 @@ etl/
 ├── normalize_place_labels.py  # Clean display labels (strip/translate tags), flags for review
 ├── audit_places.py            # Finds wrong labels (Lagos → Laos) and wrong-country coordinates
 ├── build_mcp_gazetteer.py     # GeoNames lookup for the MCP server's place precision
+├── build_country_labels.py    # The map's country labels, from Natural Earth (see METHODOLOGY.md)
 └── requirements.txt           # Python dependencies
 ```
 

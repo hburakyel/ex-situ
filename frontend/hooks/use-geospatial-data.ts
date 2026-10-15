@@ -90,6 +90,10 @@ export function useGeospatialData(
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
+  // Responses can land out of order (zoom in, then straight back out); only the
+  // latest request may set data.
+  const requestSeqRef = useRef(0)
+
   // Track previous fetch params to avoid redundant requests
   const lastFetchRef = useRef<{
     zoom: number
@@ -125,6 +129,7 @@ export function useGeospatialData(
     // Update last fetch ref
     lastFetchRef.current = { zoom: floorZoom, bounds: boundsKey, filtersKey }
 
+    const seq = ++requestSeqRef.current
     setLoading(true)
     setError(null)
 
@@ -135,11 +140,15 @@ export function useGeospatialData(
       // Zoom 7+: individual objects (requires bbox)
       const boundsParam = floorZoom >= 7 ? bounds : undefined
       const result = await fetchGeospatialData(floorZoom, boundsParam, f)
+      if (seq !== requestSeqRef.current) return
       setData(result)
     } catch (err) {
+      if (seq !== requestSeqRef.current) return
+      // Let the same view retry on the next move instead of being skipped as done.
+      lastFetchRef.current = null
       setError(err instanceof Error ? err : new Error("Failed to fetch geospatial data"))
     } finally {
-      setLoading(false)
+      if (seq === requestSeqRef.current) setLoading(false)
     }
   }, [])
 

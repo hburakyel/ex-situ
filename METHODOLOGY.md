@@ -30,6 +30,17 @@ Object dates come from source institutions, shown at whatever precision they pro
 
 Place names are resolved to coordinates through a lookup table of known variants and a gazetteer. Fuzzy string matching is off by default and only used when explicitly enabled, because it produced false matches (Lagos → Laos, Delphi → Delhi); ambiguous places are flagged rather than guessed. Historical or ambiguous place names sometimes resolve imprecisely — corrections happen as they're found, not systematically.
 
+## Country labels
+
+Country names on the map follow one rule for every country: the usage of the United Nations and the International Court of Justice. The basemap's own labels come from OpenStreetMap and treat neighbouring countries differently by zoom level, so Ex Situ draws country labels itself, from Natural Earth v5.1.2 (public domain), in the basemap's style.
+
+- UN member states and the observer State of Palestine (General Assembly resolution 67/19) are labelled as countries. Natural Earth labels Palestine and Western Sahara later than their neighbours; here they appear from the same zoom as Israel and Morocco, and stay in view where labels would overlap.
+- Territories are labelled as UN bodies describe them: Western Sahara as one territory (a UN Non-Self-Governing Territory); the Chagos Archipelago under that name (ICJ advisory opinion, 2019; General Assembly resolution 73/295); no separate label for Northern Cyprus (Security Council resolution 541).
+- Countries carry their common English names; where a country has asked to be called by its own name, that name is used: Côte d'Ivoire, Timor-Leste, Cabo Verde, Czechia, Falkland Islands (Malvinas) as the UN writes it.
+- Other contested borders (Kashmir, Kosovo, Taiwan, Somaliland) follow Natural Earth. The basemap's border lines are OpenStreetMap's and are not redrawn.
+
+Below the world view, the start of each arc is named as the source record gives it. Countries are not shaded by number of artifacts: records name a place, and present-day borders often differ from those of the time an object was made, so shading by country would suggest a continuity the records don't state. Origins that name a region ("Africa", "Middle East") or a place drawn inside another country (Guadeloupe) are matched to no country rather than to a larger area. The labels are rebuilt by `etl/build_country_labels.py`.
+
 ## Titles
 
 Object titles aren't shown. Historical museum records sometimes carry outdated or offensive language. The source link takes you directly to the institution's own record, including their title, if you want it.

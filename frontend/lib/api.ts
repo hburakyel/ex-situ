@@ -9,6 +9,17 @@ function fixLocalhost(url: string): string {
 const apiCache: Record<string, { data: any; timestamp: number }> = {}
 const CACHE_DURATION = 10 * 60 * 1000 // 10 minutes in milliseconds
 
+// Identical requests in flight at the same time share one fetch: on load the
+// map, the left panel and the command palette all ask for the same arc data.
+const inflightRequests = new Map<string, Promise<any>>()
+export function sharedRequest<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const pending = inflightRequests.get(key)
+  if (pending) return pending
+  const request = load().finally(() => inflightRequests.delete(key))
+  inflightRequests.set(key, request)
+  return request
+}
+
 // Rate limiting variables
 let lastRequestTime = 0
 const MIN_REQUEST_INTERVAL = 200 // Minimum 200ms between requests
@@ -478,10 +489,13 @@ export async function fetchGeospatialData(
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
   const floorZoom = Math.floor(zoom)
-  
-  // Build query parameters
+
+  // The backend answers every zoom below 4 with the same country statistics and
+  // every zoom 4–6 with the same city clusters. One zoom per band keeps the URL
+  // (and so the proxy and browser caches) shared with the left panel's requests.
+  const requestZoom = floorZoom < 4 ? 1 : floorZoom < 7 ? 4 : floorZoom
   const params = new URLSearchParams({
-    zoom: floorZoom.toString(),
+    zoom: requestZoom.toString(),
   })
 
   // Add bounding box only for zoom >= 7 (object level)
@@ -522,7 +536,7 @@ export async function fetchGeospatialData(
   const countriesKey = filters?.countries?.sort().join(',') || 'all'
   const dateKey = filters?.undated ? 'undated' : `${filters?.dateStart ?? ''}-${filters?.dateEnd ?? ''}`
   const acqDateKey = filters?.acqUndated ? 'undated' : `${filters?.acqDateStart ?? ''}-${filters?.acqDateEnd ?? ''}`
-  const cacheKey = `geospatial:${floorZoom}:${bounds ? JSON.stringify(bounds) : 'global'}:${institutionsKey}:${citiesKey}:${countriesKey}:${dateKey}:${acqDateKey}`
+  const cacheKey = `geospatial:${requestZoom}:${bounds ? JSON.stringify(bounds) : 'global'}:${institutionsKey}:${citiesKey}:${countriesKey}:${dateKey}:${acqDateKey}`
 
   try {
     const isServer = typeof window === "undefined"
@@ -537,7 +551,7 @@ export async function fetchGeospatialData(
 
     console.log(`[Geospatial API] Fetching zoom=${floorZoom}`, bounds ? `bbox=[${bounds.minLon.toFixed(2)},${bounds.minLat.toFixed(2)},${bounds.maxLon.toFixed(2)},${bounds.maxLat.toFixed(2)}]` : 'global')
 
-    const data = await fetchWithRateLimit(
+    const data = await sharedRequest(url, () => fetchWithRateLimit(
       url,
       {
         method: "GET",
@@ -547,7 +561,7 @@ export async function fetchGeospatialData(
       },
       3,
       cacheKey
-    )
+    ))
 
     console.log(`[Geospatial API] Response type=${data.type}, count=${data.data?.length || 0}`)
     return data as GeospatialResponse

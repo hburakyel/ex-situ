@@ -97,13 +97,19 @@ export function useArcWorker(
     }
   }, [])
 
+  // Fallback objects only matter without geospatial data. Depending on them
+  // regardless re-processed every arc (and re-uploaded the arc layer) each time
+  // the object panel loaded a page.
+  const hasGeospatial = !!geospatialData?.data && geospatialData.data.length > 0
+  const activeFallback = hasGeospatial ? null : fallbackObjects
+
   // Post work to the worker whenever input data changes
   useEffect(() => {
     const worker = workerRef.current
     if (!worker) return
 
     // Nothing to process
-    const hasGeospatial = geospatialData?.data && geospatialData.data.length > 0
+    const fallbackObjects = activeFallback ?? []
     const hasFallback = fallbackObjects.length > 0
 
     if (!hasGeospatial && !hasFallback) {
@@ -148,7 +154,7 @@ export function useArcWorker(
       geospatialData: hasGeospatial ? geospatialData : null,
       fallbackObjects: flatFallback,
     })
-  }, [geospatialData, fallbackObjects])
+  }, [geospatialData, activeFallback])
 
   return { processedArcs, processing }
 }

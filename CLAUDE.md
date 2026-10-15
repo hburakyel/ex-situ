@@ -35,7 +35,9 @@ Live integration tests against production:
 - Never invent coordinates or precision. Ambiguous places get flagged, not guessed.
 - Rows with `review_status = 'verified'` are never touched by scripts.
 - Fuzzy place matching is opt-in (`--fuzzy`); it produced Lagos→Laos, Delphi→Delhi.
-- Palestine is an ordinary country, not flagged as disputed.
+- Palestine is an ordinary country, not flagged as disputed. Map country labels are Ex Situ's own
+  (`etl/build_country_labels.py`, METHODOLOGY "Country labels"), not the basemap's, and follow
+  UN/ICJ usage; public text explains choices by their sources, not by stance.
 - ETL scripts: dry run first, `--apply` only after reviewing output.
 - After a data import: normalize_place_names.py → fill_place_name_normalized.py →
   normalize_place_labels.py → audit_places.py, then restart Strapi.

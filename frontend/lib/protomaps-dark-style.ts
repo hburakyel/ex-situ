@@ -13,8 +13,9 @@
  * Tile source: Protomaps CDN (requires NEXT_PUBLIC_PROTOMAPS_KEY) or
  * self-hosted PMTiles file at /basemap.pmtiles.
  */
-import type { LayerSpecification, StyleSpecification } from "maplibre-gl"
+import type { LayerSpecification, SourceSpecification, StyleSpecification, SymbolLayerSpecification } from "maplibre-gl"
 import { layers, DARK, namedFlavor, type Flavor } from "@protomaps/basemaps"
+import { COUNTRY_LABELS_SOURCE, COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE } from "./country-labels"
 
 /** Ex Situ dark flavor — based on DARK with muted cartographic colors. */
 const exSituFlavor: Flavor = {
@@ -88,8 +89,9 @@ const exSituFlavor: Flavor = {
   address_label_halo: "#111111",
 }
 
-/** Layers to suppress — POIs and road shields add visual clutter. */
-const SUPPRESSED_LAYERS = new Set(["pois", "roads_shields"])
+/** Layers to suppress — POIs and road shields add visual clutter. Country
+ *  labels are Ex Situ's own (exSituLabelLayers below). */
+const SUPPRESSED_LAYERS = new Set(["pois", "roads_shields", "places_country"])
 
 /**
  * Return the tile source URL. Prefers self-hosted PMTiles when available,
@@ -137,9 +139,9 @@ export function protomapsCustomStyle(): StyleSpecification {
   return {
     version: 8,
     name: "Ex Situ Dark",
-    sources: { protomaps: protomapsSource },
+    sources: { protomaps: protomapsSource, ...exSituLabelSources },
     glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
-    layers: baseLayers,
+    layers: [...baseLayers, ...exSituLabelLayers],
   } as StyleSpecification
 }
 
@@ -162,6 +164,55 @@ function applyBlackTextStyle(layer: LayerSpecification): LayerSpecification {
       }
     : layer
 }
+
+// ── Ex Situ's own labels ────────────────────────────────────────────
+// They look exactly like the basemap's labels, so nothing marks them as added.
+
+// Country labels come from etl/build_country_labels.py instead of the basemap,
+// which labels Israel from the world view on but Palestine only from zoom 6, as
+// "Palestinian Territories" (METHODOLOGY.md, "Country labels").
+const basemapLabel = (id: string) => {
+  const { layout, paint } = applyBlackTextStyle(
+    layers("protomaps", namedFlavor("black"), { lang: "en" }).find((l) => l.id === id)!,
+  ) as SymbolLayerSpecification
+  return { layout: layout!, paint: paint! }
+}
+const countryLabel = basemapLabel("places_country")
+// Origin names take the basemap's town-name look, without its town dots.
+const { "icon-image": _icon, "icon-size": _iconSize, "icon-padding": _iconPadding, ...townLabelLayout } =
+  basemapLabel("places_locality").layout
+const townLabelPaint = basemapLabel("places_locality").paint
+
+const exSituLabelSources: Record<string, SourceSpecification> = {
+  [COUNTRY_LABELS_SOURCE]: { type: "geojson", data: COUNTRY_LABELS_URL },
+  [ORIGIN_LABELS_SOURCE]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+}
+
+const exSituLabelLayers: LayerSpecification[] = [
+  // Below the world view the arcs start at sites: each start is named as the
+  // source records give it (set by the map, with population_rank and sort_key
+  // so the basemap's size and priority rules apply). Above the basemap's place
+  // names, so these win collisions with them.
+  {
+    id: "origin-labels",
+    type: "symbol",
+    source: ORIGIN_LABELS_SOURCE,
+    minzoom: 4,
+    layout: { ...townLabelLayout, "text-field": ["get", "name"] },
+    paint: townLabelPaint,
+  },
+  // Topmost, so country labels win every collision: Palestine is never hidden
+  // behind another name.
+  {
+    id: "country-labels",
+    type: "symbol",
+    source: COUNTRY_LABELS_SOURCE,
+    maxzoom: 9,
+    filter: [">=", ["zoom"], ["get", "min_zoom"]],
+    layout: { ...countryLabel.layout, "symbol-sort-key": ["get", "sort_key"], "text-field": ["get", "name"] },
+    paint: countryLabel.paint,
+  },
+]
 
 const blackFinalLayers = layers("protomaps", namedFlavor("black"), { lang: "en" })
   .filter((l) => !SUPPRESSED_LAYERS.has(l.id))
@@ -204,8 +255,9 @@ export function protomapsBlackStyle(): StyleSpecification {
           url: tileSource,
           attribution: "© Protomaps © OpenStreetMap",
         },
+        ...exSituLabelSources,
       },
-      layers: blackFinalLayers,
+      layers: [...blackFinalLayers, ...exSituLabelLayers],
     } as StyleSpecification
   }
 
@@ -231,8 +283,9 @@ export function protomapsBlackStyle(): StyleSpecification {
         maxzoom: 15,
         attribution: "© Protomaps © OpenStreetMap",
       },
+      ...exSituLabelSources,
     },
-    layers: [...localLowZoomLayers, ...cdnLayersAboveLowZoom],
+    layers: [...localLowZoomLayers, ...cdnLayersAboveLowZoom, ...exSituLabelLayers],
   } as StyleSpecification
 }
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { sharedRequest } from "@/lib/api"
 
 // Arc data from geospatial API
 export interface ArcData {
@@ -170,8 +171,8 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     const dateQuery = dateParams.toString() ? `&${dateParams.toString()}` : ''
 
     // 1) Country data — unblocks the UI
-    fetch(`/api/proxy/geospatial?zoom=1${dateQuery}`)
-      .then(res => res.json())
+    const countryUrl = `/api/proxy/geospatial?zoom=1${dateQuery}`
+    sharedRequest(countryUrl, () => fetch(countryUrl).then(res => res.json()))
       .then(data => {
         if (!cancelled && data?.data && Array.isArray(data.data)) {
           setArcData(data.data.map(normalizeArcItem))
@@ -181,8 +182,8 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       .finally(() => { if (!cancelled) setIsLoadingArcData(false) })
 
     // 2) City data — loads in background, doesn't block UI
-    fetch(`/api/proxy/geospatial?zoom=4${dateQuery}`)
-      .then(res => res.json())
+    const cityUrl = `/api/proxy/geospatial?zoom=4${dateQuery}`
+    sharedRequest(cityUrl, () => fetch(cityUrl).then(res => res.json()))
       .then(data => {
         if (!cancelled && data?.data && Array.isArray(data.data)) {
           setCityArcData(data.data.map(normalizeArcItem))
@@ -196,8 +197,8 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
   // Load synonyms from DB-backed API (replaces hardcoded COUNTRY_ALIASES)
   useEffect(() => {
     let cancelled = false
-    fetch('/api/proxy/museum-objects/synonyms')
-      .then(res => res.ok ? res.json() : null)
+    const synonymsUrl = '/api/proxy/museum-objects/synonyms'
+    sharedRequest(synonymsUrl, () => fetch(synonymsUrl).then(res => res.ok ? res.json() : null))
       .then(data => {
         if (!cancelled && Array.isArray(data?.data) && data.data.length > 0) {
           const map: Record<string, string> = { ...COUNTRY_ALIASES_FALLBACK }
