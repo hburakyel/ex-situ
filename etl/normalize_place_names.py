@@ -256,8 +256,8 @@ _LOOKUP_RAW: dict[str, str] = {
     "kongo (republik)": "Republic of the Congo",
     "kongo-kinshasa": "Democratic Republic of the Congo",
     "kongo-brazzaville": "Republic of the Congo",
-    "ussr": "Russia",
-    "soviet union": "Russia",
+    "ussr": "Soviet Union",  # historical — not one present-day country
+    "soviet union": "Soviet Union",
     "jugoslawien": "Yugoslavia",  # historical — keep as-is or mark as region
     "tschechoslowakei": "Czechoslovakia",  # historical
     "ostpakistan": "Bangladesh",
