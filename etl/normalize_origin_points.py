@@ -26,6 +26,8 @@ Usage:
 """
 
 import argparse
+import json
+import os
 import sys
 from collections import Counter, defaultdict
 from datetime import date
@@ -34,6 +36,40 @@ from audit_data_quality import Classifier, effective
 from audit_places import get_conn
 
 NOTE_TAG = "[origin-audit]"
+
+# Occupation is not recorded as sovereignty (METHODOLOGY.md, "Country labels";
+# UN Security Council 242, 497, 2334, GA 68/262, ICJ 2004/2024): a point in the
+# West Bank including East Jerusalem or in Gaza lies in Palestine, in the Golan
+# Heights in Syria, in Crimea in Ukraine. A point in Western Sahara recorded as
+# Morocco contradicts it either way and is removed for review.
+UN = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "un_territories.json"), encoding="utf-8"))
+
+
+def _in_ring(lon, lat, ring):
+    inside = False
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+        if (y1 > lat) != (y2 > lat) and lon < (x2 - x1) * (lat - y1) / (y2 - y1) + x1:
+            inside = not inside
+    return inside
+
+
+def un_country(lat, lon, country):
+    """(action, country) when the point's country under UN usage differs from country_en."""
+    # Jerusalem is left out: a record that says only "Jerusalem" carries the
+    # city's generic point, which cannot tell East from West Jerusalem.
+    if 31.70 < lat < 31.88 and 35.13 < lon < 35.30:
+        return None
+    geom = UN["Palestine"]
+    polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
+    if any(_in_ring(lon, lat, p[0]) and not any(_in_ring(lon, lat, h) for h in p[1:]) for p in polys):
+        return None if country == "Palestine" else ("country", "Palestine")
+    if country == "Israel" and 32.55 < lat < 33.35 and lon > 35.62:
+        return ("country", "Syria")
+    if country == "Russia" and 44.3 < lat < 46.25 and 32.4 < lon < 36.7:
+        return ("country", "Ukraine")
+    if country == "Morocco" and lat < 27.67 and lon < -8.67:
+        return ("outside", "Morocco")
+    return None
 
 # Checked by hand (2026-10-15, every "outside" finding): the rule would be wrong
 # for these place_name values, mostly because the point is right.
@@ -84,6 +120,11 @@ def plan(cur, classifier):
     cache = {}
     for oid, raw, label, country, lat, lon in cur.fetchall():
         raw = raw or ""
+        un = un_country(lat, lon, country)
+        if un:
+            actions[un].append(oid)
+            examples[un[0]][f"{raw} → {un[1]} (UN usage)"] += 1
+            continue
         if raw in SKIP or raw.startswith(SKIP_PREFIXES):
             continue
         if raw in AREA:

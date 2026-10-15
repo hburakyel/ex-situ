@@ -73,6 +73,8 @@ LABELS = {
     "King (Papua Neuguinea)": ("King", "Papua New Guinea"),
     "Kait (Papua Neuguinea)": ("Kait", "Papua New Guinea"),
     "British Columbia, Canada, Queen Charlotte Islands (?)": ("Haida Gwaii?", None),
+    "Jerusalem District": ("Jerusalem", None),
+    "Kertsch/Pantikapaion": ("Kerch", None),
 }
 
 AREAS = {"Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa"}
