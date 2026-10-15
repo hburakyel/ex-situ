@@ -29,8 +29,8 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
 
   const param = place ? "place" : "institution"
   const canonical = `/map?${param}=${encodeURIComponent(group.name)}`
-  const title = place ? `${group.name} — objects by museum` : `${group.name} — objects by origin`
-  const description = `${group.count.toLocaleString("en-US")} objects · ${names(group.related)}`
+  const title = place ? `${group.name} — artifacts by museum` : `${group.name} — artifacts by origin`
+  const description = `${group.count.toLocaleString("en-US")} artifacts · ${names(group.related)}`
 
   return {
     title: `${title} | Ex Situ`,

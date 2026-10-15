@@ -129,7 +129,7 @@ export default function ObjectList({
             </div>
           ))}
         </div>
-        <div className="text-xs text-gray-500">Loading objects near this view…</div>
+        <div className="text-xs text-gray-500">Loading artifacts near this view…</div>
       </div>
     )
   }

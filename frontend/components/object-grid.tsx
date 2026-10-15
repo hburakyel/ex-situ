@@ -497,7 +497,7 @@ return (
       )}
       <ObjectImage
         src={object.attributes.img_url!}
-        alt={object.attributes?.title || "Museum object"}
+        alt={object.attributes?.title || "Museum artifact"}
         className="block"
         imgClassName={`block w-auto bg-white ${tileHeight ? "max-w-full" : "max-h-44"}`}
         imgStyle={tileHeight ? { maxHeight: tileHeight } : undefined}

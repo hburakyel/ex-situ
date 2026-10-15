@@ -416,7 +416,7 @@ export default function ArcDetailClient({ params }: { params: Promise<{ slug: st
           )}
 
           {!isLoadingObjects && objects.length === 0 && (
-            <div className="text-gray-400 py-8">no objects found.</div>
+            <div className="text-gray-400 py-8">no artifacts found.</div>
           )}
 
           {objects.length > 0 && (

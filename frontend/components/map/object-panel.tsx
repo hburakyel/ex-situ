@@ -1609,7 +1609,7 @@ export default function ObjectPanel({
                       {museum.attributes?.img_url ? (
                         <ObjectImage
                           src={museum.attributes.img_url}
-                          alt={museum.attributes.title || "Museum object"}
+                          alt={museum.attributes.title || "Museum artifact"}
                           className="block"
                           imgClassName="block max-h-36 w-auto bg-white"
                           loading="lazy"

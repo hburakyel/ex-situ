@@ -78,8 +78,8 @@ export default function ResearchLayout({ children }: { children: React.ReactNode
   // Collect search results for inline display
   const searchResults = hasQuery && hasResults
     ? [
-        ...arcs.map((a) => ({ type: "arc" as const, label: a.place_name, sub: `${a.object_count} objects · ${a.institution_name}`, action: () => handleArcSelect(a) })),
-        ...collections.map((c) => ({ type: "collection" as const, label: c.name, sub: `${c.objectCount.toLocaleString()} objects`, action: () => handleCollectionSelect(c.name) })),
+        ...arcs.map((a) => ({ type: "arc" as const, label: a.place_name, sub: `${a.object_count} artifacts · ${a.institution_name}`, action: () => handleArcSelect(a) })),
+        ...collections.map((c) => ({ type: "collection" as const, label: c.name, sub: `${c.objectCount.toLocaleString()} artifacts`, action: () => handleCollectionSelect(c.name) })),
         ...places.map((p) => ({ type: "place" as const, label: p.name, sub: `${p.latitude.toFixed(2)}, ${p.longitude.toFixed(2)}`, action: () => handlePlaceSelect(p) })),
       ]
     : []
@@ -158,7 +158,7 @@ export default function ResearchLayout({ children }: { children: React.ReactNode
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="search objects, arcs, collections..."
+              placeholder="search artifacts, arcs, collections..."
               className="flex-1 bg-transparent border-none outline-none text-black placeholder:text-gray-300"
             />
             {isSearching && (

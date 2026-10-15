@@ -435,7 +435,7 @@ export default function ImageGallery({
             <div className="gallery-image-bg" style={{ width: "100%", height: "100%" }}>
               <ObjectImage
               src={currentObject.attributes.img_url!}
-              alt={currentObject.attributes.title || "Museum object"}
+              alt={currentObject.attributes.title || "Museum artifact"}
               className="w-full h-full flex items-center justify-center"
               imgClassName="w-full h-full object-contain"
               imgStyle={{ backgroundColor: "white", margin: "0", padding: "0" }}

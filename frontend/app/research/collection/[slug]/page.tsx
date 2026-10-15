@@ -75,7 +75,7 @@ export async function generateMetadata({
 
   const description =
     totalObjects > 0
-      ? `${displayName} holds ${totalObjects.toLocaleString()} cultural heritage objects from ${origins.join(", ")}${origins.length > 0 ? " and other origins" : ""}. Explore the collection on Ex Situ.`
+      ? `${displayName} holds ${totalObjects.toLocaleString()} cultural heritage artifacts from ${origins.join(", ")}${origins.length > 0 ? " and other origins" : ""}. Explore the collection on Ex Situ.`
       : `Explore the ${displayName} collection and its provenance data on Ex Situ.`
 
   const canonicalUrl = `https://exsitu.app/research/collection/${encodeURIComponent(decodedSlug.toLowerCase())}`
