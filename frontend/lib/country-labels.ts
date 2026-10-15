@@ -38,3 +38,17 @@ export function buildCountryIndex(collection: CountryLabelCollection): Map<strin
   }
   return index
 }
+
+/**
+ * Normalized name → the name the data uses for that country: each label's name,
+ * which etl/normalize_country_names.py writes back to country_en.
+ */
+export function buildCountryNameIndex(collection: { features: { properties: { keys: string; name: string } }[] }): Map<string, string> {
+  const index = new Map<string, string>()
+  for (const { properties } of collection.features) {
+    for (const key of properties.keys.split("|")) {
+      if (key && !index.has(key)) index.set(key, properties.name)
+    }
+  }
+  return index
+}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import fs from "node:fs"
 import path from "node:path"
 import cases from "./country-key-cases.json"
-import { buildCountryIndex, countryKey } from "./country-labels"
+import { buildCountryIndex, buildCountryNameIndex, countryKey } from "./country-labels"
 
 describe("countryKey", () => {
   it.each(cases)("$name → $key (same cases as etl/build_country_labels.py)", ({ name, key }) => {
@@ -33,5 +33,16 @@ describe("country labels file", () => {
 
   it("leaves regions and places drawn inside another country unmatched", () => {
     expect(["Middle East", "Africa", "Guadeloupe"].map(match)).toEqual([undefined, undefined, undefined])
+  })
+
+  it("resolves older spellings to the name the data uses now (old links keep working)", () => {
+    const names = buildCountryNameIndex(collection)
+    const current = (name: string) => names.get(countryKey(name))
+    expect(current("Ivory Coast")).toBe("Côte d'Ivoire")
+    expect(current("People's Republic of China")).toBe("China")
+    expect(current("Palestinian Territories")).toBe("Palestine")
+    expect(current("United States of America")).toBe("United States")
+    expect(current("Palestine")).toBe("Palestine")
+    expect(current("Sbaita")).toBeUndefined()
   })
 })
