@@ -20,7 +20,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${analyticsOrigin}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum https://framemark.vam.ac.uk https://smb.museum-digital.de https://asset.museum-digital.org https://search.smb.museum https://www.artic.edu${europeanaImageHosts}`,
+  `img-src 'self' data: blob: https://images.metmuseum.org https://recherche.smb.museum https://www.britishmuseum.org https://upload.wikimedia.org https://id.smb.museum https://framemark.vam.ac.uk https://smb.museum-digital.de https://asset.museum-digital.org https://search.smb.museum https://www.artic.edu https://iiif.micr.io${europeanaImageHosts}`,
   `connect-src 'self' https://api.protomaps.com https://fonts.openmaptiles.org https://protomaps.github.io${analyticsOrigin}`,
   "font-src 'self' data: https://fonts.openmaptiles.org",
   "worker-src 'self' blob:",

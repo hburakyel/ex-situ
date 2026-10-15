@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import MapClient from "./map-client"
 import { fetchArcTotals, findGroup, groupByInstitution, groupByPlace } from "@/lib/arc-index"
+import { mapTitle } from "@/lib/map-title"
 
 // Place and museum views live on /map (?place=, ?institution=); give each its own title,
 // description and canonical so search engines can index them. Labels and counts only.
@@ -29,7 +30,7 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
 
   const param = place ? "place" : "institution"
   const canonical = `/map?${param}=${encodeURIComponent(group.name)}`
-  const title = place ? `${group.name} — artifacts by museum` : `${group.name} — artifacts by origin`
+  const title = place ? mapTitle({ place: group.name })! : mapTitle({ institution: group.name })!
   const description = `${group.count.toLocaleString("en-US")} artifacts · ${names(group.related)}`
 
   return {

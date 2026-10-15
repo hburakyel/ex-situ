@@ -22,6 +22,7 @@ import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/co
 import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
 import { track } from "@/lib/analytics"
+import { mapTitle } from "@/lib/map-title"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -260,6 +261,12 @@ function MapContent() {
   const activeSiteRef = useRef<string | null>(urlSite || null)
   useEffect(() => { activeSiteRef.current = activeSite }, [activeSite])
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
+
+  // Tab title follows the drill (the server only sets it for the URL the page loaded with).
+  useEffect(() => {
+    const title = mapTitle({ place: activeCountry, site: activeSite, institution: activeInstitution })
+    document.title = title ? `${title} | Ex Situ` : "Ex Situ"
+  }, [activeCountry, activeSite, activeInstitution])
 
   // Mobile: picking an arc, place, site or collection brings the object sheet up to
   // half height when it is minimized or hidden (a full-screen sheet is left as is).
