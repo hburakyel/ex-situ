@@ -352,10 +352,6 @@ export default function ImageGallery({
               if (from) items.push(["From", from])
               if (to) items.push(["To", to])
               if (time) items.push(["Time", time])
-              // The maker, when the record names one: a sketch drawn in Istanbul by a
-              // visiting Dutch artist and an object taken from there share an origin
-              // place but not a story.
-              if (at.origin_person_name) items.push(["Maker", at.origin_person_name])
               if (at.institution_name) items.push(["Collection", at.institution_name])
               // Pairs are separated by a real space (a break point) and each label is held
               // to its value; short pairs ("To: Berlin", "Time: 1–600 CE") never split.

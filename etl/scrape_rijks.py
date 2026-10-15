@@ -407,12 +407,6 @@ def map_record(rdf: ET.Element, gaz: Gazetteer, institution: dict, hierarchy: Op
         "review_status": "pending" if flagged else None,
         "object_date": created,
         "time": [{"time_name": created, "time_start": start, "time_end": end}] if created and start is not None else [],
-        # Makers as the museum names them ("anonymous" left out): a photograph made in
-        # Batavia by Kassian Céphas and a sketch drawn in Istanbul by Marius Bauer share
-        # an origin place but tell different stories, so the panel names the maker.
-        "creators": [n for n in (_label(a) for a in rdf.findall("edm:Agent", NS)
-                                 if a.get(RDF_ABOUT) in {c.get(RDF_RESOURCE) for c in cho.findall("dc:creator", NS)})
-                     if n and n.lower() not in ("anonymous", "anoniem")],
         "inventory_number": inventory,
         "object_type": "; ".join(t for t in types if t) or None,
         "provenance": _text(cho, "dcterms:provenance", "en") or _text(cho, "dcterms:provenance"),
