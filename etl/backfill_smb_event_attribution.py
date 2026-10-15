@@ -129,9 +129,16 @@ def fetch_object_details(object_id, session=None):
             continue
         if r.status_code == 200:
             try:
-                return r.json(), None
+                data = r.json()
             except json.JSONDecodeError:
                 return None, "invalid JSON response"
+            # When throttling, museum-digital answers 200 with {"status": "error", "code": 503};
+            # read as a record that would look like "no event with a place".
+            if data.get("status") == "error" or "object_events" not in data:
+                last_error = f"error body: {data.get('code')} {data.get('msg')}"
+                time.sleep(RETRY_SLEEP_SECONDS)
+                continue
+            return data, None
         elif r.status_code in (429, 503):
             last_error = f"HTTP {r.status_code}"
             time.sleep(RETRY_SLEEP_SECONDS)
@@ -241,7 +248,10 @@ def cmd_fetch(args):
         all_rows = fetch_rows(conn, institutions)
         conn.close()
 
-    already_done = {r["id"] for r in load_cache_records(args.cache)}
+    # A line with no inventory number was a museum-digital error body read as a record
+    # (before fetch_object_details checked for it): fetch it again; the new line wins.
+    already_done = {r["id"] for r in load_cache_records(args.cache)
+                    if not (r["status"] == "ok" and r.get("inventory_number") is None)}
     remaining = [r for r in all_rows if r["id"] not in already_done]
 
     print(f"Institutions:        {institutions}")
