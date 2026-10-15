@@ -1,8 +1,8 @@
 # Ex Situ — Collection Roadmap
 
-Current (13 October 2026): **227,872 artifacts on the map · 61 collections · 211 territories · 4,565 origin sites**
+Current (15 October 2026): **280,763 artifacts on the map · 61 collections · 203 territories · 6,179 origin sites**
 
-265,166 records are indexed. The difference: 25,556 records have no located origin in their institution's record yet, 4,426 have a point but no territory that can be assigned without guessing (regions such as Polynesia, or a place name that does not match its point), and 7,312 are parts of one object that share an inventory number and are counted once. 9 collections are indexed directly, 52 via Europeana.
+318,828 records are indexed. The others have no located origin in their institution's record yet, have a point but no territory that can be assigned without guessing (regions such as Polynesia, or a place name that does not match its point), or are parts of one object that share an inventory number and are counted once. 10 collections are indexed directly, 51 via Europeana.
 
 This document tracks indexed collections, planned integrations, and contribution priorities.
 
@@ -21,6 +21,7 @@ This document tracks indexed collections, planned integrations, and contribution
 | 7 | Museum für Asiatische Kunst | Berlin | 2,693 | SMB API | ✅ Live |
 | 8 | Vorderasiatisches Museum | Berlin | 1,061 | SMB API | ✅ Live |
 | 9 | Art Institute of Chicago | Chicago | 33,890 | REST API (CC0) | ✅ Live |
+| 10 | Rijksmuseum | Amsterdam | 54,719 | OAI-PMH (EDM, open data) | ✅ Live |
 
 ---
 
@@ -33,7 +34,7 @@ Europe, that can be mapped (origin point and museum location known) and whose im
 (`etl/check_europeana_images.py`), excluding SMB, V&A, Met and AIC (indexed directly), natural-history
 providers, and objects held in their country of origin. Each image is credited with its own licence.
 
-85,098 objects from 52 institutions:
+84,041 objects from 51 institutions (the Rijksmuseum, first reached this way, is now indexed directly):
 
 | # | Institution | Location | Artifacts |
 |---|-------------|----------|-----------|
@@ -42,53 +43,52 @@ providers, and objects held in their country of origin. Each image is credited w
 | 3 | Museum of Far Eastern Antiquities | Stockholm, Sweden | 16,389 |
 | 4 | Museum of World Culture | Göteborg, Sweden | 7,984 |
 | 5 | Dresden State Art Collections. Porcelain collection | Dresden, Germany | 7,918 |
-| 6 | Rijksmuseum | Amsterdam, Netherlands | 1,057 |
-| 7 | Chester Beatty | Dublin, Ireland | 827 |
-| 8 | Museum of Gothenburg | Göteborg, Sweden | 710 |
-| 9 | East Asian Collections in Slovenia | Ljubljana, Slovenia | 250 |
-| 10 | Vänersborgs museum | Vänersborg, Sweden | 206 |
-| 11 | Sörmland Museum | Nyköping, Sweden | 140 |
-| 12 | Army Museum | Stockholm, Sweden | 91 |
-| 13 | Manos & Anastasia Faltaits Folk Art & Ethnographic Museum | Skýros, Greece | 77 |
-| 14 | Skansen | Stockholm, Sweden | 53 |
-| 15 | National Museum of Art of Romania | Bucharest, Romania | 38 |
-| 16 | Peleș National Museum | Sinaia, Romania | 32 |
-| 17 | Lusto - The Finnish Forest Museum | Kerimäki, Finland | 31 |
-| 18 | Museum for Sepulchral Culture | Kassel, Germany | 24 |
-| 19 | Asia and Pacific Museum | Warszawa, Poland | 22 |
-| 20 | Amsterdam Museum | Amsterdam, Netherlands | 20 |
-| 21 | Naval Museum | Karlskrona, Sweden | 18 |
-| 22 | Riksidrottsmuseum | Stockholm, Sweden | 16 |
-| 23 | Skelleftea museum | Skellefteå, Sweden | 14 |
-| 24 | ASTRA National Museum Complex | Sibiu, Romania | 12 |
-| 25 | National Museum of Lithuania | Vilnius, Lithuania | 12 |
-| 26 | GoTellGo Cultural Association | Roma, Italy | 8 |
-| 27 | Ploiești Museum of History and Archeology | Ploiești, Romania | 7 |
-| 28 | Blekinge Museum | Karlskrona, Sweden | 6 |
-| 29 | Museum of Arts and Crafts, Zagreb | Zagreb, Croatia | 5 |
-| 30 | Iron Gates Region Museum | Drobeta-Turnu Severin, Romania | 5 |
-| 31 | Trakai History Museum | Trakai, Lithuania | 5 |
-| 32 | Norrbottens Museum | Lulea, Sweden | 4 |
-| 33 | Vytautas the Great War Museum | Kaunas, Lithuania | 4 |
-| 34 | Constanța Folk Art Museum | Constanța, Romania | 4 |
-| 35 | Swedish Railway Museum | Gävle, Sweden | 4 |
-| 36 | OTE Museum of Telecommunications | Athens, Greece | 4 |
-| 37 | National Maritime Museum | Stockholm, Sweden | 3 |
-| 38 | National Museum of Romanian History | Bucharest, Romania | 3 |
-| 39 | Brașov County History Museum | Brașov, Romania | 3 |
-| 40 | Hochschule Luzern – Design Film Kunst | Emmen, Switzerland | 2 |
-| 41 | Malmö Museum | Malmö, Sweden | 2 |
-| 42 | National Museum of Transylvanian History | Cluj-Napoca, Romania | 2 |
-| 43 | Hälsinglands Museum | Hudiksvall, Sweden | 2 |
-| 44 | Paul Păltănea Galați History Museum | Galați, Romania | 2 |
-| 45 | German Clock Museum | Furtwangen, Germany | 2 |
-| 46 | George Enescu National Museum | Bucharest, Romania | 1 |
-| 47 | Teohari Antonescu Giurgiu County Museum | Giurgiu, Romania | 1 |
-| 48 | Kulturparken Småland | Vaxjo, Sweden | 1 |
-| 49 | Brukenthal National Museum | Sibiu, Romania | 1 |
-| 50 | Jönköping County Museum | Jönköping, Sweden | 1 |
-| 51 | National Museum of Banat | Timișoara, Romania | 1 |
-| 52 | Székely National Museum | Sfântu Gheorghe, Romania | 1 |
+| 6 | Chester Beatty | Dublin, Ireland | 827 |
+| 7 | Museum of Gothenburg | Göteborg, Sweden | 710 |
+| 8 | East Asian Collections in Slovenia | Ljubljana, Slovenia | 250 |
+| 9 | Vänersborgs museum | Vänersborg, Sweden | 206 |
+| 10 | Sörmland Museum | Nyköping, Sweden | 140 |
+| 11 | Army Museum | Stockholm, Sweden | 91 |
+| 12 | Manos & Anastasia Faltaits Folk Art & Ethnographic Museum | Skýros, Greece | 77 |
+| 13 | Skansen | Stockholm, Sweden | 53 |
+| 14 | National Museum of Art of Romania | Bucharest, Romania | 38 |
+| 15 | Peleș National Museum | Sinaia, Romania | 32 |
+| 16 | Lusto - The Finnish Forest Museum | Kerimäki, Finland | 31 |
+| 17 | Museum for Sepulchral Culture | Kassel, Germany | 24 |
+| 18 | Asia and Pacific Museum | Warszawa, Poland | 22 |
+| 19 | Amsterdam Museum | Amsterdam, Netherlands | 20 |
+| 20 | Naval Museum | Karlskrona, Sweden | 18 |
+| 21 | Riksidrottsmuseum | Stockholm, Sweden | 16 |
+| 22 | Skelleftea museum | Skellefteå, Sweden | 14 |
+| 23 | ASTRA National Museum Complex | Sibiu, Romania | 12 |
+| 24 | National Museum of Lithuania | Vilnius, Lithuania | 12 |
+| 25 | GoTellGo Cultural Association | Roma, Italy | 8 |
+| 26 | Ploiești Museum of History and Archeology | Ploiești, Romania | 7 |
+| 27 | Blekinge Museum | Karlskrona, Sweden | 6 |
+| 28 | Museum of Arts and Crafts, Zagreb | Zagreb, Croatia | 5 |
+| 29 | Iron Gates Region Museum | Drobeta-Turnu Severin, Romania | 5 |
+| 30 | Trakai History Museum | Trakai, Lithuania | 5 |
+| 31 | Norrbottens Museum | Lulea, Sweden | 4 |
+| 32 | Vytautas the Great War Museum | Kaunas, Lithuania | 4 |
+| 33 | Constanța Folk Art Museum | Constanța, Romania | 4 |
+| 34 | Swedish Railway Museum | Gävle, Sweden | 4 |
+| 35 | OTE Museum of Telecommunications | Athens, Greece | 4 |
+| 36 | National Maritime Museum | Stockholm, Sweden | 3 |
+| 37 | National Museum of Romanian History | Bucharest, Romania | 3 |
+| 38 | Brașov County History Museum | Brașov, Romania | 3 |
+| 39 | Hochschule Luzern – Design Film Kunst | Emmen, Switzerland | 2 |
+| 40 | Malmö Museum | Malmö, Sweden | 2 |
+| 41 | National Museum of Transylvanian History | Cluj-Napoca, Romania | 2 |
+| 42 | Hälsinglands Museum | Hudiksvall, Sweden | 2 |
+| 43 | Paul Păltănea Galați History Museum | Galați, Romania | 2 |
+| 44 | German Clock Museum | Furtwangen, Germany | 2 |
+| 45 | George Enescu National Museum | Bucharest, Romania | 1 |
+| 46 | Teohari Antonescu Giurgiu County Museum | Giurgiu, Romania | 1 |
+| 47 | Kulturparken Småland | Vaxjo, Sweden | 1 |
+| 48 | Brukenthal National Museum | Sibiu, Romania | 1 |
+| 49 | Jönköping County Museum | Jönköping, Sweden | 1 |
+| 50 | National Museum of Banat | Timișoara, Romania | 1 |
+| 51 | Székely National Museum | Sfântu Gheorghe, Romania | 1 |
 
 Not included for now:
 
@@ -112,7 +112,6 @@ Easy to integrate. API key required where noted.
 | 9 | Smithsonian NMNH | Washington | ~500k filtered | REST API, key needed | Single key covers 19 Smithsonian museums |
 | 10 | Smithsonian NMAI | Washington | ~800k | Same API | Native American collections |
 | 11 | Smithsonian Freer/Sackler | Washington | ~40k | Same API | Asian + Islamic art |
-| 12 | Rijksmuseum | Amsterdam | ~15k filtered | REST API, key needed | Filter by non-European origin |
 | 14 | Cleveland Museum of Art | Cleveland | ~30k filtered | REST API (CC0) | — |
 | 15 | Harvard Art Museums | Cambridge | ~250k filtered | REST API, key needed | — |
 | 16 | Cooper Hewitt | New York | ~50k | REST API (CC0) | — |
@@ -194,6 +193,7 @@ Open an issue before starting work to avoid duplication.
 | v0.1.0 | May 2026 | 8 | 111,497 |
 | v1.1.0 | July 2026 | 9 | 200,552 |
 | v1.2.0 | October 2026 | 61 | 227,872 on the map (265,166 indexed) |
+| v1.3.0 | October 2026 | 61 | 280,763 on the map (318,828 indexed); Rijksmuseum indexed directly |
 
 ---
 
