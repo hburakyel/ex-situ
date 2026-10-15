@@ -52,6 +52,7 @@ export const INSTITUTION_CITIES: Record<string, string> = {
   "Victoria and Albert Museum": "London",
   "The Metropolitan Museum of Art": "New York",
   "Art Institute of Chicago": "Chicago",
+  "Rijksmuseum": "Amsterdam",
 }
 
 export const WIKIPEDIA_COLLECTION = "Wikipedia"

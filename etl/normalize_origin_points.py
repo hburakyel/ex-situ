@@ -59,9 +59,16 @@ def un_country(lat, lon, country, label=None):
     # which cannot tell East from West. Such records are listed under Palestine:
     # the historic city, the Old City, lies in East Jerusalem, occupied since
     # 1967, whose annexation the Security Council declared null and void
-    # (resolution 478, 1980). Other points in the city are left as recorded.
-    if 31.70 < lat < 31.88 and 35.13 < lon < 35.30:
-        if (label or "").strip().rstrip("?").strip().lower() == "jerusalem" and country != "Palestine":
+    # (resolution 478, 1980). Points inside the Old City walls or east of them
+    # (Temple Mount, Holy Sepulchre, Mount of Olives, Gethsemane, Kidron Valley)
+    # lie in East Jerusalem as well. Other points in the city are left as
+    # recorded. The box ends north of Bethlehem (31.70), a West Bank city of its
+    # own, which the Palestine polygon below decides.
+    if 31.74 < lat < 31.88 and 35.13 < lon < 35.30:
+        name = (label or "").strip().rstrip("?").strip().lower()
+        old_city = 31.7735 < lat < 31.7820 and 35.2265 < lon < 35.2375
+        east_of_old_city = 31.765 < lat < 31.80 and lon >= 35.2375
+        if (name == "jerusalem" or old_city or east_of_old_city) and country != "Palestine":
             return ("country", "Palestine")
         return None
     geom = UN["Palestine"]

@@ -61,6 +61,8 @@ RENAMES = {
     ("Miletus", "Turkey"): "Milet",
     ("Sardis", "Turkey"): "Sart",
     ("Theben", "Greece"): "Thiva",
+    ("Natal", "South Africa"): "KwaZulu-Natal",
+    ("Natal Province", "South Africa"): "KwaZulu-Natal",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -76,6 +78,13 @@ LABELS = {
     "Jerusalem District": ("Jerusalem", None),
     "Jerusalem, present-day Israel": ("Jerusalem", None),  # the Met's phrasing stays in place_name
     "Kertsch/Pantikapaion": ("Kerch", None),
+    # German site labels from SMB records, translated (2026-10-15); no renaming of the site.
+    "Artemistempel": ("Temple of Artemis", None),
+    "Sepik-Gebiet": ("Sepik", None),
+    "Sansibar-Stadt": ("Zanzibar City", None),
+    "Idalion (Nekropolen)": ("Idalion necropoleis", None),
+    "Esquilin-Nekropole": ("Esquiline necropolis", None),
+    "Jiaohe (Ruinenstadt)": ("Jiaohe ruins", None),
 }
 
 AREAS = {"Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa"}

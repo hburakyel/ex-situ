@@ -30,6 +30,7 @@ import { placeDisplayLabels } from "@/lib/place-label"
 import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
 import { track } from "@/lib/analytics"
+import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -1228,20 +1229,29 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 })()
               )}
             </div>
-            <div className="mb-1">
-              <span className="text-muted-foreground mr-2">to:</span>
-              <span className="text-foreground">{hoveredArc.toName}</span>
-              {(hoveredArc.toCity || hoveredArc.toCountry) && (
-                (() => {
-                  const city = hoveredArc.toCity && hoveredArc.toCity.toLowerCase() !== hoveredArc.toName.toLowerCase() ? hoveredArc.toCity : null
-                  const country = hoveredArc.toCountry && hoveredArc.toCountry.toLowerCase() !== hoveredArc.toName.toLowerCase() ? hoveredArc.toCountry : null
-                  const sub = city && country ? `${city}, ${country}` : city || country
-                  return sub ? <div className="text-[10px] text-muted-foreground">{sub}</div> : null
-                })()
-              )}
-            </div>
+            {/* Same terms as the artifact panel: "to" is a place, the museum is the collection. */}
+            {(() => {
+              const toPlace = hoveredArc.toCity || INSTITUTION_CITIES[hoveredArc.toName] || ""
+              return (
+                <>
+                  {toPlace && (
+                    <div className="mb-1">
+                      <span className="text-muted-foreground mr-2">to:</span>
+                      <span className="text-foreground">{toPlace}</span>
+                      {hoveredArc.toCountry && hoveredArc.toCountry.toLowerCase() !== toPlace.toLowerCase() && (
+                        <div className="text-[10px] text-muted-foreground">{hoveredArc.toCountry}</div>
+                      )}
+                    </div>
+                  )}
+                  <div className="mb-1">
+                    <span className="text-muted-foreground mr-2">collection:</span>
+                    <span className="text-foreground">{hoveredArc.toName}</span>
+                  </div>
+                </>
+              )
+            })()}
             <div>
-              <span className="text-muted-foreground mr-2">artifact:</span>
+              <span className="text-muted-foreground mr-2">{hoveredArc.count === 1 ? "artifact:" : "artifacts:"}</span>
               <span className="text-foreground">
                 {hoveredArc.count}
               </span>

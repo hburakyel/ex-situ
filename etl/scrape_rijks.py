@@ -364,7 +364,9 @@ def map_record(rdf: ET.Element, gaz: Gazetteer, institution: dict, hierarchy: Op
     res = lambda el, tag: (el.find(tag, NS).get(RDF_RESOURCE) if el.find(tag, NS) is not None else None)
     rights = res(agg, "edm:rights") or ""
     image = image_url(res(agg, "edm:isShownBy")) if any(r in rights for r in OPEN_RIGHTS) else None
-    shown_at = res(agg, "edm:isShownAt")
+    # edm:isShownAt uses an old page URL the museum's site no longer resolves ("Oops");
+    # the persistent identifier (id.rijksmuseum.nl) redirects to the current object page.
+    shown_at = rid or res(agg, "edm:isShownAt")
 
     labels = place_labels(resolved, gaz.country_name)
     countries = sorted({r["iso2"] for r in resolved})
