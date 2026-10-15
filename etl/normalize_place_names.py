@@ -153,6 +153,34 @@ _LOOKUP_RAW: dict[str, str] = {
     "bengalischer meerbusen": "Bay of Bengal",
     "arabisches meer": "Arabian Sea",
     "mittelmeer": "Mediterranean",
+    "jordanien": "Jordan",
+    "armenien": "Armenia",
+    "australien": "Australia",
+    "albanien": "Albania",
+    "bulgarien": "Bulgaria",
+    "kroatien": "Croatia",
+    "serbien": "Serbia",
+    "slowenien": "Slovenia",
+    "bosnien": "Bosnia",
+    "zypern": "Cyprus",
+    "mauretanien": "Mauritania",
+    "saudi-arabien": "Saudi Arabia",
+    "neukaledonien": "New Caledonia",
+    "anatolien": "Anatolia",
+    "kreta": "Crete",
+    "attika": "Attica",
+    "athen": "Athens",
+    "rom": "Rome",
+    "tarent": "Taranto",
+    "ephesos": "Ephesus",
+    "rheinland": "Rhineland",
+    "vorderasien": "Western Asia",
+    "westasien": "Western Asia",
+    "nordsyrien": "Northern Syria",
+    "zentralbrasilien": "Central Brazil",
+    "nordwest-brasilien": "Northwest Brazil",
+    "mittel-sibirien": "Central Siberia",
+    "nord-kalifornien": "Northern California",
 
     # ── Group B: Historical → Modern ───────────────────────────────────────
     "milet": "Miletus",
@@ -266,7 +294,7 @@ _LOOKUP_RAW: dict[str, str] = {
     "dänemark": "Denmark",
     "großbritannien": "Great Britain",
     "palästina": "Palestine",
-    "palästinensische gebiete": "Palestinian Territories",
+    "palästinensische gebiete": "Palestine",  # same name as the map's country label
     "äquatorialguinea": "Equatorial Guinea",
     "russische föderation": "Russia",
     "böotien": "Boeotia",
@@ -522,6 +550,9 @@ def normalize(
     #    clobbered by the descriptive filter below) ───────────────────────────
     if key in LOOKUP:
         return LOOKUP[key], "lookup"
+    # "Zypern?" → "Cyprus?": a trailing "?" marks an uncertain attribution (METHODOLOGY)
+    if key.endswith("?") and LOOKUP.get(key[:-1].strip()):
+        return LOOKUP[key[:-1].strip()] + "?", "lookup"
 
     # ── Step e: descriptive / too long / German stopword filter → NULL ──────
     if len(stripped) > MAX_PLACE_NAME_LEN or _DESCRIPTIVE_RE.search(stripped):

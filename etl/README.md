@@ -18,6 +18,7 @@ etl/
 ├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
 ├── import_gazetteer.sh        # Loads a GeoNames extract into gazetteer_places
 ├── normalize_place_names.py   # Place name normalization + deduplication
+├── normalize_country_names.py # One spelling per country_en: the map's country label name
 ├── fill_place_name_normalized.py # Fills remaining NULLs from city_en (map/MCP grouping)
 ├── normalize_place_labels.py  # Clean display labels (strip/translate tags), flags for review
 ├── audit_places.py            # Finds wrong labels (Lagos → Laos) and wrong-country coordinates
@@ -150,6 +151,19 @@ python normalize_place_names.py
 
 # Apply updates
 python normalize_place_names.py --apply
+```
+
+Next, give every origin country the name its map label uses, so each country is
+one entry in the Places list ("People's Republic of China" and "china" → `China`,
+"Palestinian Territories" → `Palestine`, "Ivory Coast" → `Côte d'Ivoire`). It reads
+the labels' `keys` from `frontend/public/country-labels.geojson`, also renames a
+`place_name_normalized` that names the row's own country, and clears a `city_en`
+that only copies a raw country name ("Jordanien") so the English label shows.
+Each changed row gets a `[country-name]` note with the old value:
+
+```bash
+python normalize_country_names.py            # dry run: changes + Places count, rolled back
+python normalize_country_names.py --apply
 ```
 
 Then fill the rows it left `NULL`, so spelling variants of one place group

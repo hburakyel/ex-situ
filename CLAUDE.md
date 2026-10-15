@@ -39,8 +39,8 @@ Live integration tests against production:
   (`etl/build_country_labels.py`, METHODOLOGY "Country labels"), not the basemap's, and follow
   UN/ICJ usage; public text explains choices by their sources, not by stance.
 - ETL scripts: dry run first, `--apply` only after reviewing output.
-- After a data import: normalize_place_names.py → fill_place_name_normalized.py →
-  normalize_place_labels.py → audit_places.py, then restart Strapi.
+- After a data import: normalize_place_names.py → normalize_country_names.py →
+  fill_place_name_normalized.py → normalize_place_labels.py → audit_places.py, then restart Strapi.
 - Answer data questions via the public API / MCP tools, not by reading the large `etl/*.json` dumps.
 
 ## Conventions
