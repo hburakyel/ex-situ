@@ -84,6 +84,19 @@ RENAMES = {
     ("Tandjong Poera", "Indonesia"): "Tanjung Pura",
     ("Constantinople", "Turkey"): "Istanbul",
     ("Kanton", "China"): "Guangzhou",
+    ("Canton", "China"): "Guangzhou",
+    ("South Celebes", "Indonesia"): "South Sulawesi",
+    # French colonial divisions of Vietnam; Vietnamese regions Bắc Bộ and Trung Bộ.
+    ("Tonkin", "Vietnam"): "Northern Vietnam",
+    ("Annam", "Vietnam"): "Central Vietnam",
+    ("Bône", "Algeria"): "Annaba",
+    ("Thebes", "Egypt"): "Luxor",
+    ("Aboe Simbel", "Egypt"): "Abu Simbel",
+    ("Banda Atjeh", "Indonesia"): "Banda Aceh",
+    ("Negapatnam", "India"): "Nagapattinam",
+    ("Kotah", "India"): "Kota",
+    ("Mysore", "India"): "Mysuru",
+    ("Deshima", "Japan"): "Dejima",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -119,9 +132,18 @@ LABELS = {
     "Nord-Bali": ("North Bali", None),
     "Kandy (voormalige natie)": ("Kingdom of Kandy", None),
     "Mariënburg (Suriname)": ("Mariënburg", None),
+    "Tambaram (Madras Presidency)": ("Tambaram", None),
+    "Rijswijk (Batavia)": ("Rijswijk (Jakarta)", None),
+    "Waterlooplein (Batavia)": ("Waterlooplein (Jakarta)", None),
+    "Zwischen Tanganyikasee und Kivusee": ("Between Lake Tanganyika and Lake Kivu", None),
+    "Mantsjoerije": ("Manchuria", None),
+    "USA": ("United States", None),
+    "Guinea-Conakry": ("Guinea", None),
+    "Zuid-China": ("South China", None),
 }
 
-AREAS = {"Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa"}
+# Korea before 1945 lies in both present-day Koreas.
+AREAS = {"Korea", "Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa"}
 
 # (label, country_en, rounded lat, lon) of a wrong point → new label. The Met's
 # "Khotan" sat at Aksu, 450 km from Hotan.
