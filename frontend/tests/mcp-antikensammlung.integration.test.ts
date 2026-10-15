@@ -86,12 +86,13 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     expect(page2.flows.some((f: any) => firstKeys.has(`${f.origin}|${f.country}`))).toBe(false)
   })
 
-  it("flags Turkish Republic of Northern Cyprus origins at both detail levels", async () => {
+  // Since 2026-10-15 the data names Northern Cyprus origins Cyprus, as the map's
+  // country labels do (etl/normalize_country_names.py, METHODOLOGY "Country labels").
+  it("lists Northern Cyprus origins under Cyprus, without a disputed-territory flag", async () => {
     for (const detail of ["site", "country"]) {
       const r = await call("get_origins", { institution: "Antikensammlung", detail })
-      expect(r.flags, detail).toEqual(
-        expect.arrayContaining([expect.stringContaining("(Turkish Republic of Northern Cyprus)")]),
-      )
+      expect(r.flows.some((f: any) => (f.country ?? f.origin) === "Cyprus"), detail).toBe(true)
+      expect((r.flags ?? []).some((f: string) => f.includes("Northern Cyprus")), detail).toBe(false)
     }
   })
 

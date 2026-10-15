@@ -162,6 +162,20 @@ const MV_ACQUISITION_YEAR_SQL = `
   WITH DATA;
 `;
 
+// Called after data imports (services/museum-object.js refreshGeospatialViews,
+// etl/normalize_country_names.py). Not CONCURRENTLY: the views have no unique
+// index, so a concurrent refresh always failed; a plain refresh takes about
+// two seconds and only holds readers of these two views for that long.
+const REFRESH_FUNCTION_SQL = `
+  CREATE OR REPLACE FUNCTION public.refresh_geospatial_views() RETURNS void
+  LANGUAGE plpgsql AS $$
+  BEGIN
+    REFRESH MATERIALIZED VIEW public.mv_country_institution_stats;
+    REFRESH MATERIALIZED VIEW public.mv_city_institution_stats;
+  END;
+  $$;
+`;
+
 module.exports = {
   register() {},
 
@@ -201,6 +215,8 @@ module.exports = {
         "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_acquisition_year_stats') AS exists"
       )).rows;
       if (!mvAcqYear) await db.raw(MV_ACQUISITION_YEAR_SQL);
+
+      await db.raw(REFRESH_FUNCTION_SQL);
 
       strapi.log.info('[lifecycle] Restored manual-coord columns + dependent objects (post-sync)');
     } catch (err) {
