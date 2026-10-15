@@ -122,6 +122,7 @@ node scripts/populate-institution-locality.js
 | `publishEntries.js` | Bulk-publish all draft entries | ❌ | ✅ |
 | `bulkUnpublishExcept.js` | Unpublish entries outside a given set | ❌ | ✅ |
 | `updateImgUrlAntik.js` | One-off image URL update for Antikensammlung | ❌ | ✅ |
+| `etl/backfill_smb_event_attribution.py` | SMB rows without coordinates: findspot/production place from the museum-digital record (fetch → report → apply); then the place pipeline in CLAUDE.md | ✅ (`apply` without `--apply`) | ✅ (only writes rows unchanged since fetch) |
 
 ---
 
