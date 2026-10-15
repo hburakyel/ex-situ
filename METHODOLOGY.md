@@ -30,6 +30,10 @@ Object dates come from source institutions, shown at whatever precision they pro
 
 Place names are resolved to coordinates through a lookup table of known variants and a gazetteer. Fuzzy string matching is off by default and only used when explicitly enabled, because it produced false matches (Lagos → Laos, Delphi → Delhi); ambiguous places are flagged rather than guessed. Historical or ambiguous place names sometimes resolve imprecisely — corrections happen as they're found, not systematically.
 
+## Origin checks
+
+Each origin is checked against its own source record and the GeoNames gazetteer (`etl/audit_data_quality.py`). Where the stored point contradicts the source — a record naming "Peru, North Coast" placed in Canada, "Gallipoli, Turkey" placed at Gallipoli in Italy — the point is removed and the record is flagged for review; the artifact stays in the index as unlocated rather than shown in the wrong place. Where the source names a country and the point lies in it, that country is recorded. Cultural areas that span several present-day countries ("Middle East", "Polynesia", "Ottoman Empire") are not given a point at all. Exceptions are checked by hand and listed in `etl/normalize_origin_points.py`.
+
 ## Country labels
 
 Country names on the map follow one rule for every country: the usage of the United Nations and the International Court of Justice. The basemap's own labels come from OpenStreetMap and treat neighbouring countries differently by zoom level, so Ex Situ draws country labels itself, from Natural Earth v5.1.2 (public domain), in the basemap's style.
