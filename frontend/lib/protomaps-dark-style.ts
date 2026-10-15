@@ -141,7 +141,7 @@ export function protomapsCustomStyle(): StyleSpecification {
     name: "Ex Situ Dark",
     sources: { protomaps: protomapsSource, ...exSituLabelSources },
     glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
-    layers: [...baseLayers, ...exSituLabelLayers],
+    layers: withArcAnchor([...baseLayers, ...exSituLabelLayers]),
   } as StyleSpecification
 }
 
@@ -182,6 +182,22 @@ const countryLabel = basemapLabel("places_country")
 const { "icon-image": _icon, "icon-size": _iconSize, "icon-padding": _iconPadding, ...townLabelLayout } =
   basemapLabel("places_locality").layout
 const townLabelPaint = basemapLabel("places_locality").paint
+
+// deck.gl draws the arcs just beneath this invisible layer, so every label stays
+// above them. The style is reordered so that all labels come after all fills and
+// lines: the low-zoom (local) and CDN basemap groups each have their own labels,
+// and an anchor at the first label sat below the CDN group's land and water,
+// which covered the arcs from zoom 6 on. The groups' zoom ranges don't overlap,
+// so the reordering changes nothing else.
+export const ARC_ANCHOR_LAYER = "arcs-beneath-labels"
+function withArcAnchor(styleLayers: LayerSpecification[]): LayerSpecification[] {
+  const anchor: LayerSpecification = { id: ARC_ANCHOR_LAYER, type: "background", paint: { "background-opacity": 0 } }
+  return [
+    ...styleLayers.filter((l) => l.type !== "symbol"),
+    anchor,
+    ...styleLayers.filter((l) => l.type === "symbol"),
+  ]
+}
 
 const exSituLabelSources: Record<string, SourceSpecification> = {
   [COUNTRY_LABELS_SOURCE]: { type: "geojson", data: COUNTRY_LABELS_URL },
@@ -257,7 +273,7 @@ export function protomapsBlackStyle(): StyleSpecification {
         },
         ...exSituLabelSources,
       },
-      layers: [...blackFinalLayers, ...exSituLabelLayers],
+      layers: withArcAnchor([...blackFinalLayers, ...exSituLabelLayers]),
     } as StyleSpecification
   }
 
@@ -285,7 +301,7 @@ export function protomapsBlackStyle(): StyleSpecification {
       },
       ...exSituLabelSources,
     },
-    layers: [...localLowZoomLayers, ...cdnLayersAboveLowZoom, ...exSituLabelLayers],
+    layers: withArcAnchor([...localLowZoomLayers, ...cdnLayersAboveLowZoom, ...exSituLabelLayers]),
   } as StyleSpecification
 }
 

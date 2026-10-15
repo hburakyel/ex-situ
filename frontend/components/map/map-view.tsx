@@ -22,7 +22,7 @@ import { useArcWorker, type ArcDatum } from "@/hooks/use-arc-worker"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { WIKIPEDIA_COLLECTION, ENABLE_WIKIPEDIA } from "@/components/faceted-filter"
-import { protomapsDarkStyle } from "@/lib/protomaps-dark-style"
+import { ARC_ANCHOR_LAYER, protomapsDarkStyle } from "@/lib/protomaps-dark-style"
 import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
@@ -261,7 +261,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const [isStreetZoom, setIsStreetZoom] = useState((initialZoom || 2) >= 7)
     const currentZoomRef = useRef(initialZoom || 2)
     const [isMapReady, setIsMapReady] = useState(false)
-    const [labelLayerId, setLabelLayerId] = useState<string | null>(null)
     const initialBoundsSet = useRef(false)
     const prevViewStateRef = useRef(initialViewState)
     const [mapLoaded, setMapLoaded] = useState(false)
@@ -533,8 +532,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       }
 
       mapInstance.on("load", () => {
-        // Arcs are drawn beneath the first label layer, so every name stays legible.
-        setLabelLayerId(mapInstance.getStyle().layers.find((l) => l.type === "symbol")?.id ?? null)
         setMapLoaded(true)
         setIsMapReady(true)
         setMapError(null)
@@ -1136,10 +1133,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       if (drillArcLayer) result.push(...drillArcLayer)
       if (arcLayer) result.push(...arcLayer)
       if (wikiLayer) result.push(wikiLayer)
-      return labelLayerId
-        ? result.map((layer) => layer instanceof ArcLayer ? layer.clone({ beforeId: labelLayerId }) : layer)
-        : result
-    }, [isMapReady, arcLayer, drillArcLayer, wikiLayer, labelLayerId])
+      // Arcs go beneath every label, so all names stay legible.
+      return result.map((layer) => layer instanceof ArcLayer ? layer.clone({ beforeId: ARC_ANCHOR_LAYER }) : layer)
+    }, [isMapReady, arcLayer, drillArcLayer, wikiLayer])
 
     // Push layers to MapboxOverlay
     useEffect(() => {
