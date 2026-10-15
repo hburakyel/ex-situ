@@ -54,7 +54,15 @@ def _in_ring(lon, lat, ring):
 
 
 def un_country(lat, lon, country, label=None):
-    """(action, country) when the point's country under UN usage differs from country_en."""
+    """For a point in an occupied territory, UN usage settles the country:
+    ("country", X) to record X, ("keep", X) when it is already right — either way
+    the record skips the other checks, which would read a source's "Israël" or
+    "Morocco" as the country — ("outside", "Morocco") for Western Sahara points
+    recorded as Morocco. None for points elsewhere."""
+
+    def settle(c):
+        return ("keep", c) if country == c else ("country", c)
+
     # Jerusalem: a record that names only the city carries its generic point,
     # which cannot tell East from West. Such records are listed under Palestine:
     # the historic city, the Old City, lies in East Jerusalem, occupied since
@@ -68,19 +76,21 @@ def un_country(lat, lon, country, label=None):
         name = (label or "").strip().rstrip("?").strip().lower()
         old_city = 31.7735 < lat < 31.7820 and 35.2265 < lon < 35.2375
         east_of_old_city = 31.765 < lat < 31.80 and lon >= 35.2375
-        if (name == "jerusalem" or old_city or east_of_old_city) and country != "Palestine":
-            return ("country", "Palestine")
-        return None
+        if name == "jerusalem" or old_city or east_of_old_city:
+            return settle("Palestine")
+        return ("keep", country)
     geom = UN["Palestine"]
     polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
     if any(_in_ring(lon, lat, p[0]) and not any(_in_ring(lon, lat, h) for h in p[1:]) for p in polys):
-        return None if country == "Palestine" else ("country", "Palestine")
-    if country == "Israel" and 32.55 < lat < 33.35 and lon > 35.62:
-        return ("country", "Syria")
-    if country == "Russia" and 44.3 < lat < 46.25 and 32.4 < lon < 36.7:
-        return ("country", "Ukraine")
-    if country == "Morocco" and lat < 27.67 and lon < -8.67:
-        return ("outside", "Morocco")
+        return settle("Palestine")
+    # Golan Heights; the country condition keeps northern Jordan (Umm Qais) out.
+    if country in ("Israel", "Syria", None, "") and 32.55 < lat < 33.35 and lon > 35.62:
+        return settle("Syria")
+    # Crimea; lon < 36.62 keeps Russia's Taman peninsula, across the Kerch strait, out.
+    if country in ("Russia", "Ukraine", None, "") and 44.3 < lat < 46.25 and 32.4 < lon < 36.62:
+        return settle("Ukraine")
+    if lat < 27.67 and lon < -8.67 and country in ("Morocco", "Western Sahara"):
+        return ("outside", "Morocco") if country == "Morocco" else ("keep", country)
     return None
 
 # Checked by hand (2026-10-15, every "outside" finding): the rule would be wrong
@@ -134,8 +144,9 @@ def plan(cur, classifier):
         raw = raw or ""
         un = un_country(lat, lon, country, label or raw)
         if un:
-            actions[un].append(oid)
-            examples[un[0]][f"{raw} → {un[1]} (UN usage)"] += 1
+            if un[0] != "keep":
+                actions[un].append(oid)
+                examples[un[0]][f"{raw} → {un[1]} (UN usage)"] += 1
             continue
         if raw in SKIP or raw.startswith(SKIP_PREFIXES):
             continue
