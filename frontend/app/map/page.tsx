@@ -22,7 +22,13 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   // Narrower views (a site, an object) aren't indexed separately. lat/lng/zoom are only the
   // viewport the map writes back into the URL, so the place keeps its title.
   const narrowed = ["site", "artifactId"].some((k) => params[k] !== undefined)
-  if ((!place && !institution) || narrowed || (place && institution)) return {}
+  if (!place && !institution) return {}
+  if (narrowed || (place && institution)) {
+    // Not indexed separately, but the tab still names the view: Next re-applies this
+    // title on client navigations, so an empty one would reset it to "Ex Situ".
+    const title = mapTitle({ place, site: first(params.site), institution })
+    return { title: `${title} | Ex Situ` }
+  }
 
   const arcs = await fetchArcTotals()
   const group = place ? findGroup(groupByPlace(arcs), place) : findGroup(groupByInstitution(arcs), institution!)
