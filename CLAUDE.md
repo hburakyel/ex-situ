@@ -32,6 +32,9 @@ Live integration tests against production:
 ## Data rules (don't break these)
 
 - `place_name` is raw source data and is never changed; `place_name_normalized` is the English label.
+- `place_name` may only be refreshed from the institution's own current record (e.g.
+  `etl/backfill_smb_event_attribution.py`: museum-digital event place); the old value goes into
+  `geocoding_notes`. Normalization scripts never change it.
 - Never invent coordinates or precision. Ambiguous places get flagged, not guessed.
 - Rows with `review_status = 'verified'` are never touched by scripts.
 - Fuzzy place matching is opt-in (`--fuzzy`); it produced Lagos→Laos, Delphi→Delhi.
