@@ -35,14 +35,32 @@ from audit_places import get_conn
 
 NOTE_TAG = "[origin-audit]"
 
-# Checked by hand (2026-10-15): the rule would be wrong for these place_name values.
+# Checked by hand (2026-10-15, every "outside" finding): the rule would be wrong
+# for these place_name values, mostly because the point is right.
 SKIP = {
-    "Cook Islands, Cook Islands",  # coordinates are in the Cook Islands; GeoNames' town extent is too small
-    "New Caledonia",               # likewise (outlying islands of New Caledonia)
+    "Cook Islands, Cook Islands",  # point in the Cook Islands; GeoNames' town extent is too small
+    "New Caledonia",               # likewise (outlying islands)
     "Niger (Fluss)",               # the Niger river, not the country; left for review
+    "Sbaita, Palestine",           # Shivta in the Negev; the source uses the historical region name
+    "Herat, Iran",                 # Herat (Afghanistan); a historical Khurasan attribution
+    "Laos",                        # country point near the Mekong border
+    "Jordan",                      # country point near the Saudi border
+    "Lago de Güija (Guatemala)",   # the lake lies on the Guatemala–El Salvador border
+    "Costa Rica, Burica Peninsula",  # the peninsula is shared with Panama
+    "Puerto González Víquez, Costa Rica, Burica Peninsula",
+    "Kailahun (Liberia)",          # Kailahun is in Sierra Leone; source and point disagree — for review
 }
+SKIP_PREFIXES = (
+    "Republic of the Congo or Cabinda",        # Chiloango river, on the border
+    "Northwest Territories and Nunavut, Canada",  # Melville Island; beyond GeoNames' town extent
+)
 COUNTRY = {
-    "Bahrain (Swat)": "Pakistan",  # Bahrain, a town in the Swat valley; the coordinates are right
+    "Bahrain (Swat)": "Pakistan",  # Bahrain, a town in the Swat valley; the point is right
+    "Faras (Sudan)": "Sudan",      # Faras, on the Sudanese side of the border; the point is right
+    "Malaysia": "Malaysia",        # country point at sea between Malaya and Borneo
+}
+AREA = {
+    "Guinea (Region)",             # the Guinea coast region, not the country Guinea
 }
 
 
@@ -66,7 +84,11 @@ def plan(cur, classifier):
     cache = {}
     for oid, raw, label, country, lat, lon in cur.fetchall():
         raw = raw or ""
-        if raw in SKIP:
+        if raw in SKIP or raw.startswith(SKIP_PREFIXES):
+            continue
+        if raw in AREA:
+            actions[("area", None)].append(oid)
+            examples["area"][raw] += 1
             continue
         if raw in COUNTRY:
             if country != COUNTRY[raw]:
