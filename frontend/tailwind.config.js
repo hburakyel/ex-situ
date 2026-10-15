@@ -18,6 +18,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: [
+          "var(--font-mono)",
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",
@@ -28,6 +29,7 @@ module.exports = {
           "monospace",
         ],
         mono: [
+          "var(--font-mono)",
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",

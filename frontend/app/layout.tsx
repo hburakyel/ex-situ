@@ -3,6 +3,16 @@ import type React from "react"
 import ClientMapLibreCSS from "@/components/client-maplibre-css"
 import { Theme } from "@radix-ui/themes"
 import AnalyticsScript from "@/components/analytics-script"
+import { Noto_Sans_Mono } from "next/font/google"
+
+// The map labels are Noto Sans Mono Regular (lib/protomaps-dark-style.ts); the
+// interface uses the same open-licence (OFL) font, served from this site.
+const notoSansMono = Noto_Sans_Mono({
+  weight: "400",
+  subsets: ["latin", "latin-ext", "greek", "cyrillic"],
+  display: "swap",
+  variable: "--font-mono",
+})
 
 export default function RootLayout({
   children,
@@ -10,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={notoSansMono.variable} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

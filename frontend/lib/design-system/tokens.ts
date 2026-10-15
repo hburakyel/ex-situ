@@ -318,7 +318,7 @@ export const typography = {
    *  @source tailwind.config.js (fontFamily.sans / fontFamily.mono)
    */
   fontFamily:
-    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
 
   /** Global base font-size. Set on * selector.
    *  @source app/globals.css (* { font-size: 0.875rem })  → 14px
