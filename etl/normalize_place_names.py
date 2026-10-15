@@ -768,7 +768,9 @@ def main() -> None:
             else ""
         )
         try:
-            cur.execute("ALTER TABLE museum_objects DISABLE TRIGGER ALL")
+            # USER, not ALL: ALL also turns off foreign-key checks, which needs a
+            # superuser and should stay on anyway.
+            cur.execute("ALTER TABLE museum_objects DISABLE TRIGGER USER")
             total_rows = 0
             for normalized_val, original in updates:
                 cur.execute(
@@ -780,12 +782,13 @@ def main() -> None:
                           place_name_normalized IS NULL
                           OR place_name_normalized = place_name
                       )
+                      AND COALESCE(review_status, '') <> 'verified'
                       {verified_and}
                     """,
                     (normalized_val, original),
                 )
                 total_rows += cur.rowcount
-            cur.execute("ALTER TABLE museum_objects ENABLE TRIGGER ALL")
+            cur.execute("ALTER TABLE museum_objects ENABLE TRIGGER USER")
             conn.commit()
             log.info(
                 "Committed. %d distinct values updated → %d total rows affected.",
@@ -798,7 +801,7 @@ def main() -> None:
             try:
                 plain_cur = conn.cursor()
                 plain_cur.execute(
-                    "ALTER TABLE museum_objects ENABLE TRIGGER ALL"
+                    "ALTER TABLE museum_objects ENABLE TRIGGER USER"
                 )
                 conn.commit()
             except Exception:
