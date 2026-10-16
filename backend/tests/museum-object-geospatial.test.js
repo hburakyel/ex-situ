@@ -23,6 +23,7 @@ require.cache[strapiPath] = {
 };
 
 const serviceFactory = require(path.join(__dirname, '../src/api/museum-object/services/museum-object.js'));
+const { SITE_KEY } = require('../src/api/museum-object/services/place-group');
 
 const noop = () => {};
 const fakeStrapi = { log: { info: noop, debug: noop, error: noop, warn: noop } };
@@ -90,7 +91,8 @@ test('buildMultiValueFilter: values are bound, never inlined into SQL', () => {
 test('buildSiteFilter: splits on "|" so site names keep their commas', () => {
   const s = makeService();
   const { clause, bindings } = s.buildSiteFilter('Mortuary Temple of Sahure, Abusir | Giza', 'site', 'LOWER(origin_city)');
-  assert.equal(clause, 'AND LOWER(origin_city) IN (LOWER(:site_0), LOWER(:site_1)) ');
+  // Values go through the same site key as the grouping ("Çorum" = "Corum (Province)").
+  assert.equal(clause, `AND LOWER(origin_city) IN (${SITE_KEY(':site_0')}, ${SITE_KEY(':site_1')}) `);
   assert.deepEqual(bindings, { site_0: 'Mortuary Temple of Sahure, Abusir', site_1: 'Giza' });
   assert.deepEqual(s.buildSiteFilter(undefined, 'site'), { clause: '', bindings: {} });
 });
@@ -233,7 +235,7 @@ test('getClusteredData: maps rows and keeps place_variants only when an array', 
   const { type, data } = await s.getClusteredData(db, 5, { minLat: 20, maxLat: 30, minLon: 25, maxLon: 35 }, { city: 'Thebes' });
 
   assert.equal(type, 'clusters');
-  assert.match(db.calls[0].query, /LOWER\(origin_city\) IN \(LOWER\(:cl_city_0\)\)/);
+  assert.ok(db.calls[0].query.includes(`${SITE_KEY('origin_city')} IN (${SITE_KEY(':cl_city_0')})`));
   assert.deepEqual(data[0].place_variants, ['Thebes', 'Theben']);
   assert.equal(data[0].latitude, 25.7);
   assert.equal(data[0].cluster_id, 'arc_city_Thebes_Ägyptisches Museum und Papyrussammlung');

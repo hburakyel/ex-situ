@@ -349,7 +349,9 @@ export default function ImageGallery({
               const to = at.institution_city_en || INSTITUTION_CITIES[at.institution_name || ""] || at.institution_place
               const time = displayObjectDate(at.object_date)
               const items: [string, string][] = []
-              if (from) items.push(["From", from])
+              // Former name after the present-day one: "Al-Shirqat (Assur)"
+              const former = at.historical_name && at.historical_name.toLowerCase() !== (from || "").toLowerCase() ? at.historical_name : null
+              if (from) items.push(["From", former ? `${from} (${former})` : from])
               if (to) items.push(["To", to])
               if (time) items.push(["Time", time])
               if (at.institution_name) items.push(["Collection", at.institution_name])

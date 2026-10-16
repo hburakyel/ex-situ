@@ -105,7 +105,11 @@
     },
     "geocoding_status": {
       "type": "enumeration",
-      "enum": ["ok", "ambiguous", "disputed"]
+      "enum": [
+        "ok",
+        "ambiguous",
+        "disputed"
+      ]
     },
     "geocoding_notes": {
       "type": "text"
@@ -121,11 +125,21 @@
     },
     "review_status": {
       "type": "enumeration",
-      "enum": ["pending", "verified", "rejected"]
+      "enum": [
+        "pending",
+        "verified",
+        "rejected"
+      ]
     },
     "origin_type": {
       "type": "enumeration",
-      "enum": ["valid_location", "historical_toponym", "cultural_area", "archaeological_micro_location", "invalid"]
+      "enum": [
+        "valid_location",
+        "historical_toponym",
+        "cultural_area",
+        "archaeological_micro_location",
+        "invalid"
+      ]
     },
     "cultural_context": {
       "type": "text"
@@ -138,7 +152,11 @@
     },
     "enrichment_confidence": {
       "type": "enumeration",
-      "enum": ["high", "medium", "low"]
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
     },
     "inventory_number_normalized": {
       "type": "string"
@@ -157,7 +175,14 @@
     },
     "object_date_precision": {
       "type": "enumeration",
-      "enum": ["exact", "circa", "range", "before", "after", "unknown"]
+      "enum": [
+        "exact",
+        "circa",
+        "range",
+        "before",
+        "after",
+        "unknown"
+      ]
     },
     "object_date_display": {
       "type": "text"
@@ -170,11 +195,18 @@
     },
     "acquisition_date_precision": {
       "type": "enumeration",
-      "enum": ["exact", "range", "unknown"]
+      "enum": [
+        "exact",
+        "range",
+        "unknown"
+      ]
     },
     "acquisition_date_confidence": {
       "type": "enumeration",
-      "enum": ["confirmed", "inferred"]
+      "enum": [
+        "confirmed",
+        "inferred"
+      ]
     },
     "origin_event_type_id": {
       "type": "integer"
@@ -186,6 +218,9 @@
       "type": "boolean"
     },
     "origin_person_name": {
+      "type": "string"
+    },
+    "historical_name": {
       "type": "string"
     }
   }

@@ -36,9 +36,21 @@ const PLACE_GROUP_EXPR = `COALESCE(
   COALESCE(NULLIF(country_en::text, ''), 'Unknown')
 )`;
 
-const PLACE_GROUP_KEY = `LOWER(${PLACE_GROUP_EXPR})`;
+// One place written several ways is one site: case, accents ("Çorum" / "Corum"),
+// a trailing "?" (the source's uncertainty, kept in the record) and a type suffix
+// ("Tokyo (city)", "Corum (Province)") don't make a new site. Mirrored by
+// siteKey() in frontend/lib/site-key.ts.
+const SITE_KEY = (expr) => `BTRIM(REGEXP_REPLACE(REGEXP_REPLACE(
+  TRANSLATE(LOWER(BTRIM(${expr})), 'çğıöşüâêîôûáàäãåéèëíìïóòõúùñýÿčšžřďťňěůłńśźżćęāēīōūșțőűøđ', 'cgiosuaeiouaaaaaeeeiiiooouunyycszrdtneulnszzceaeioustouod'),
+  '\\s*\\((city|province|provinz|stad|state|district|region|prov\\.)\\)\\s*$', '', 'i'),
+  '\\s*\\?+\\s*$', ''))`;
+
+const PLACE_GROUP_KEY = SITE_KEY(PLACE_GROUP_EXPR);
 
 /** Raw city_en spellings merged into a group (for the MCP server's `variants`). */
 const PLACE_VARIANTS_AGG = `array_agg(DISTINCT BTRIM(city_en)) FILTER (WHERE NULLIF(BTRIM(city_en), '') IS NOT NULL)`;
 
-module.exports = { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG };
+// Historical names of the places grouped here ("Assur" for Al-Shirqat), for the arc tooltip.
+const HISTORICAL_NAMES_AGG = `array_agg(DISTINCT BTRIM(historical_name)) FILTER (WHERE NULLIF(BTRIM(historical_name), '') IS NOT NULL)`;
+
+module.exports = { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG, SITE_KEY };

@@ -19,7 +19,8 @@ everywhere; where a rename is itself contested (Allahabad → Prayagraj, 2018),
 METHODOLOGY.md says so. Palestine keeps its name (country labels).
 
 Rows with review_status = 'verified' or a manual coordinate are never touched;
-place_name is never changed. Each changed row gets a "[present-day] <date> …"
+place_name is never changed; a rename keeps the old name in historical_name, which the
+map shows after the present-day one ("Al-Shirqat (Assur)"). Each changed row gets a "[present-day] <date> …"
 note in geocoding_notes with the old values.
 
 Usage:
@@ -178,9 +179,10 @@ def run(cur):
     for (old, country), new in RENAMES.items():
         for suffix in ("", "?"):
             cur.execute(
-                f"""UPDATE museum_objects SET {note('place_name_normalized')}, place_name_normalized = %s
+                f"""UPDATE museum_objects SET {note('place_name_normalized')}, place_name_normalized = %s,
+                      historical_name = COALESCE(historical_name, %s)
                     WHERE {LABEL} = %s AND country_en = %s AND {GUARD}""",
-                (new + suffix, old + suffix, country),
+                (new + suffix, old, old + suffix, country),
             )
             if cur.rowcount:
                 print(f"  {cur.rowcount:>5}  {old + suffix!r} → {new + suffix!r}  ({country})")

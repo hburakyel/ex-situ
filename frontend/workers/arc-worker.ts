@@ -167,6 +167,7 @@ function processStatisticsOrClusters(
     const toCity = arc.institution_city_en || ""
     const toCountry = arc.institution_country_en || ""
     const count = arc.object_count || 1
+    const fromHistorical = (arc.historical_names?.length ? arc.historical_names.join(", ") : arc.historical_name) || undefined
 
     arcLayerData.push({
       sourcePosition: [originLon, originLat],
@@ -175,6 +176,7 @@ function processStatisticsOrClusters(
       toName,
       fromCity,
       fromCountry,
+      fromHistorical,
       toCity,
       toCountry,
       count,

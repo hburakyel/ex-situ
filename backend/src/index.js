@@ -8,7 +8,7 @@
  */
 
 const { buildEraBuckets } = require('./api/museum-object/services/era-buckets');
-const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG } = require('./api/museum-object/services/place-group');
+const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG } = require('./api/museum-object/services/place-group');
 
 const DROP_DEPENDENCIES_SQL = `
   DROP INDEX IF EXISTS idx_museum_objects_resolved_lat;
@@ -92,6 +92,7 @@ const MV_CITY_SQL = `
   SELECT
       mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) AS origin_city,
       ${PLACE_VARIANTS_AGG}                      AS place_variants,
+      ${HISTORICAL_NAMES_AGG}                    AS historical_names,
       country_en,
       avg(COALESCE(manual_latitude, latitude))   AS origin_lat,
       avg(COALESCE(manual_longitude, longitude)) AS origin_lon,

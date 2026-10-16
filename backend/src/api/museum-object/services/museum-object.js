@@ -4,7 +4,7 @@
  * museum-object service
  */
 
-const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG } = require('./place-group');
+const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG, SITE_KEY } = require('./place-group');
 const { createCoreService } = require('@strapi/strapi').factories;
 const { buildPublicDateFields } = require('./date-display');
 const { buildEraBuckets } = require('./era-buckets');
@@ -121,7 +121,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     const placeholders = values.map((v, i) => {
       const key = `${bindingPrefix}_${i}`;
       bindings[key] = v;
-      return `LOWER(:${key})`;
+      return SITE_KEY(`:${key}`);
     });
     return { clause: `AND ${column} IN (${placeholders.join(', ')}) `, bindings };
   },
@@ -616,7 +616,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
       // Build filter clauses
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'cl_inst');
-      const cityFilter = this.buildSiteFilter(filters.city, 'cl_city', 'LOWER(origin_city)');
+      const cityFilter = this.buildSiteFilter(filters.city, 'cl_city', SITE_KEY('origin_city'));
       const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'cl_country');
       const dateFilter = this.buildDateRangeFilter(filters, 'cl_date');
       const acqDateFilter = this.buildAcquisitionDateRangeFilter(filters, 'cl_acq');
@@ -633,7 +633,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         // ── Fast path: materialized view with bbox filter on pre-computed coords ──
         const query = `
           SELECT
-            origin_city, place_variants, country_en, origin_lat, origin_lon,
+            origin_city, place_variants, historical_names, country_en, origin_lat, origin_lon,
             institution_name, inst_lat, inst_lon,
             object_count, sample_img_url
           FROM mv_city_institution_stats
@@ -673,6 +673,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               ${lonExpr} as longitude,
               city_en,
               place_name_normalized,
+              historical_name,
               country_en,
               institution_name,
               institution_latitude,
@@ -696,6 +697,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             SELECT
               mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) as origin_city,
               ${PLACE_VARIANTS_AGG} as place_variants,
+              ${HISTORICAL_NAMES_AGG} as historical_names,
               country_en,
               AVG(latitude) as origin_lat,
               AVG(longitude) as origin_lon,
@@ -731,6 +733,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           place_name: row.origin_city,
           // Raw city_en spellings grouped into this place (see place-group.js).
           place_variants: Array.isArray(row.place_variants) ? row.place_variants : [],
+          historical_names: Array.isArray(row.historical_names) ? row.historical_names : [],
           country: row.country_en || null,
           latitude: parseFloat(row.origin_lat) || 0,
           longitude: parseFloat(row.origin_lon) || 0,
@@ -815,6 +818,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_event_type_en,
           origin_is_findspot,
           origin_person_name,
+          historical_name,
           ${manualSelect},
           (SELECT ol.link_text FROM museum_objects_components moc
            JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
@@ -887,6 +891,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_event_type_en: row.origin_event_type_en || null,
           origin_is_findspot: row.origin_is_findspot,
           origin_person_name: row.origin_person_name || null,
+          historical_name: row.historical_name || null,
           manual_latitude: row.manual_latitude ? parseFloat(row.manual_latitude) : null,
           manual_longitude: row.manual_longitude ? parseFloat(row.manual_longitude) : null,
           object_links: row.object_link_url ? [{ link_text: row.object_link_url, link_display: row.object_link_display }] : null,
@@ -946,7 +951,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       if (site) {
         // Same site name as the map's Sites list (place-group.js) — an exact,
         // case-insensitive match, so "Kano" doesn't also pull in "Kano (City)".
-        whereClause += ` AND ${PLACE_GROUP_KEY} = LOWER(:site)`;
+        whereClause += ` AND ${PLACE_GROUP_KEY} = ${SITE_KEY(':site')}`;
         bindings.site = site;
       }
 
@@ -1030,6 +1035,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             origin_event_type_en,
             origin_is_findspot,
             origin_person_name,
+            historical_name,
             (SELECT ti.time_name FROM museum_objects_components moc
              JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
              WHERE moc.entity_id = m.id AND moc.field = 'time'
@@ -1095,6 +1101,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             origin_event_type_en: row.origin_event_type_en || null,
             origin_is_findspot: row.origin_is_findspot,
             origin_person_name: row.origin_person_name || null,
+            historical_name: row.historical_name || null,
             institution_name: row.institution_name,
             institution_place: row.institution_place,
             institution_city_en: row.institution_city_en || null,
@@ -1177,6 +1184,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_event_type_en,
           origin_is_findspot,
           origin_person_name,
+          historical_name,
           ${latExpr} as latitude,
           ${lonExpr} as longitude,
           institution_latitude,
@@ -1250,6 +1258,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_event_type_en: row.origin_event_type_en || null,
           origin_is_findspot: row.origin_is_findspot,
           origin_person_name: row.origin_person_name || null,
+          historical_name: row.historical_name || null,
           latitude: row.latitude ? parseFloat(row.latitude) : null,
           longitude: row.longitude ? parseFloat(row.longitude) : null,
           institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,

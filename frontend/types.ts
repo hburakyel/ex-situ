@@ -38,6 +38,8 @@ export interface MuseumObject {
     institution_latitude: number
     place_name?: string
     place_name_normalized?: string
+    /** Former name of a renamed place ("Assur" for Al-Shirqat); shown after it */
+    historical_name?: string | null
     origin_event_type_en?: string
     origin_is_findspot?: boolean | null
     origin_person_name?: string
@@ -135,6 +137,7 @@ export interface GeospatialBbox {
 // Matches backend API response from getCountryStatistics and getClusteredData
 export interface AggregatedArc {
   place_name: string           // origin place name (country at zoom<5, city at zoom 5-9)
+  historical_names?: string[]  // former names of the places grouped here (zoom 5-9)
   place_name_normalized?: string // normalized canonical form of place_name
   latitude: number             // origin latitude
   longitude: number            // origin longitude
@@ -176,6 +179,7 @@ export interface GeospatialObject {
   institution_name: string
   place_name?: string
   place_name_normalized?: string
+  historical_name?: string | null
   origin_event_type_en?: string
   origin_is_findspot?: boolean | null
   origin_person_name?: string

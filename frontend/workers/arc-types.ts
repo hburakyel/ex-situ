@@ -14,6 +14,8 @@ export interface ArcDatum {
   toName: string
   fromCity: string
   fromCountry: string
+  /** Former name(s) of the origin place, shown after it ("Al-Shirqat (Assur)") */
+  fromHistorical?: string
   toCity: string
   toCountry: string
   count: number

@@ -24,6 +24,7 @@ import { siteLabel } from "@/lib/site-label"
 import { track } from "@/lib/analytics"
 import { mapTitle } from "@/lib/map-title"
 import { useInstitutionPlaces } from "@/lib/institution-places"
+import { siteKey } from "@/lib/site-key"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -56,9 +57,8 @@ async function fetchSubArcs(country: string, dateFilters?: EraDateFilters): Prom
   } catch { return [] }
 }
 
-function normalizePlaceKey(value?: string | null): string {
-  return (value || "").trim().toLocaleLowerCase()
-}
+// Same place, same key: "Çorum" / "Corum (Province)", "Istanbul" / "Istanbul?" (lib/site-key.ts)
+const normalizePlaceKey = siteKey
 
 function hasValidCoordinates(lat?: number | null, lng?: number | null): boolean {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false

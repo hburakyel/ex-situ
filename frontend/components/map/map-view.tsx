@@ -31,6 +31,7 @@ import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
 import { track } from "@/lib/analytics"
 import { useInstitutionPlaces } from "@/lib/institution-places"
+import { siteKey } from "@/lib/site-key"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -105,9 +106,8 @@ const HEADER_ACCORDION_TOP_FADE_STYLE = {
   background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
 }
 
-function normalizePlaceKey(value?: string | null): string {
-  return (value || "").trim().toLocaleLowerCase()
-}
+// Same place, same key: "Çorum" / "Corum (Province)", "Istanbul" / "Istanbul?" (lib/site-key.ts)
+const normalizePlaceKey = siteKey
 
 function hasValidCoordinates(lat?: number | null, lng?: number | null): boolean {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
@@ -276,7 +276,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const [showTime, setShowTime] = useState(true)
     type HoveredArc = {
       fromName: string; toName: string; count: number
-      fromCity?: string; fromCountry?: string
+      fromCity?: string; fromCountry?: string; fromHistorical?: string
       toCity?: string; toCountry?: string
     }
     const [hoveredArc, setHoveredArc] = useState<HoveredArc | null>(null)
@@ -342,6 +342,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const [isRateLimited, setIsRateLimited] = useState(false)
 
     // ── New backend: geospatial data pipeline ──
+    // Bumped at the end of every move, programmatic ones included: the arc viewport
+    // filter reads the map's bounds, and a fly-to sets viewportState before the map has
+    // moved, so without this the new site's arcs stayed filtered out after the flight.
+    const [moveEndTick, setMoveEndTick] = useState(0)
     const [viewportState, setViewportState] = useState({
       longitude: initialViewState.longitude || 0,
       latitude: initialViewState.latitude || 20,
@@ -559,6 +563,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       })
 
       mapInstance.on("moveend", () => {
+        setMoveEndTick((t) => t + 1)
         const wasProgrammatic = isProgrammaticMove.current
         if (wasProgrammatic) { isProgrammaticMove.current = false }
         setSelectedDoc(null)
@@ -855,7 +860,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         lat >= south && lat <= north && (((lng - west) % 360) + 360) % 360 <= width
       return (source: [number, number], target: [number, number]) =>
         inView(source) || (!!activeInstitution && inView(target))
-    }, [isMapReady, isLowZoomArcView, viewportState, activeInstitution])
+    }, [isMapReady, isLowZoomArcView, viewportState, moveEndTick, activeInstitution])
 
     // Highlighted and selected arcs are drawn again in a layer of their own on
     // top, without the depth test: inside the main layer, the arcs around them
@@ -1017,7 +1022,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         onHover: (info: any) => {
           if (info.object) {
             const d = info.object
-            showArcTooltip({ fromName: d.fromName, toName: d.toName, count: d.count, fromCity: d.fromCity, fromCountry: d.fromCountry, toCity: d.toCity, toCountry: d.toCountry }, info.x, info.y)
+            showArcTooltip({ fromName: d.fromName, toName: d.toName, count: d.count, fromCity: d.fromCity, fromCountry: d.fromCountry, fromHistorical: d.fromHistorical, toCity: d.toCity, toCountry: d.toCountry }, info.x, info.y)
           } else {
             setHoveredArc(null)
           }
@@ -1101,7 +1106,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         onHover: (info: any) => {
           if (info.object) {
             const d = info.object
-            showArcTooltip({ fromName: d.place_name, toName: d.institution_name, count: d.object_count }, info.x, info.y)
+            showArcTooltip({ fromName: d.place_name, toName: d.institution_name, count: d.object_count, fromHistorical: d.historical_names?.length ? d.historical_names.join(", ") : undefined }, info.x, info.y)
           } else {
             setHoveredArc(null)
           }
@@ -1229,6 +1234,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             <div className="mb-1">
               <span className="text-muted-foreground mr-2">from:</span>
               <span className="text-foreground">{hoveredArc.fromName}</span>
+              {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
+              {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
+                <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
+              )}
               {(hoveredArc.fromCity || hoveredArc.fromCountry) && (
                 (() => {
                   const city = hoveredArc.fromCity && hoveredArc.fromCity.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCity : null
