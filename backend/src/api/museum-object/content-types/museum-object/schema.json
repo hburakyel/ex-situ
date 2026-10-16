@@ -222,6 +222,9 @@
     },
     "historical_name": {
       "type": "string"
+    },
+    "precise_place": {
+      "type": "string"
     }
   }
 }
