@@ -673,6 +673,7 @@ export async function fetchObjectsByCountry(
   institution?: string,
   onlyWithImages = false,
   dateFilters?: ByCountryDateFilters,
+  precise?: string,
 ): Promise<{ objects: MuseumObject[]; pagination: { page: number; pageSize: number; pageCount: number; total: number } }> {
   if (!country && !institution) throw new Error("fetchObjectsByCountry: country or institution is required")
   const params = new URLSearchParams({
@@ -681,6 +682,7 @@ export async function fetchObjectsByCountry(
   })
   if (country) params.set('country', country)
   if (site) params.append('site', site)
+  if (precise) params.append('precise', precise)
   if (institution) params.append('institution', institution)
   if (onlyWithImages) params.append('onlyWithImages', 'true')
   if (dateFilters?.undated) {
@@ -698,7 +700,7 @@ export async function fetchObjectsByCountry(
 
   const dateKey = dateFilters?.undated ? 'undated' : `${dateFilters?.dateStart ?? ''}-${dateFilters?.dateEnd ?? ''}`
   const acqDateKey = dateFilters?.acqUndated ? 'undated' : `${dateFilters?.acqDateStart ?? ''}-${dateFilters?.acqDateEnd ?? ''}`
-  const cacheKey = `by-country:${country || ''}:${site || ''}:${institution || ''}:page:${page}:size:${pageSize}:images:${onlyWithImages}:${dateKey}:${acqDateKey}`
+  const cacheKey = `by-country:${country || ''}:${site || ''}:${precise || ''}:${institution || ''}:page:${page}:size:${pageSize}:images:${onlyWithImages}:${dateKey}:${acqDateKey}`
 
   try {
     const isServer = typeof window === "undefined"
@@ -837,5 +839,23 @@ export async function fetchSpatialDocuments(
   } catch (error) {
     console.error("Error fetching spatial documents:", error)
     throw error
+  }
+}
+
+
+export interface PrecisePlace { name: string; count: number; latitude: number | null; longitude: number | null }
+
+/** Precise places inside a site (Istanbul → Dolmabahçe Palace …); empty for most sites. */
+export async function fetchPrecisePlaces(site: string, country?: string | null, institution?: string | null): Promise<PrecisePlace[]> {
+  const params = new URLSearchParams({ site })
+  if (country) params.set("country", country)
+  if (institution) params.set("institution", institution)
+  try {
+    const res = await fetch(`/api/proxy/precise-places?${params.toString()}`)
+    if (!res.ok) return []
+    const d = await res.json()
+    return Array.isArray(d?.data) ? d.data : []
+  } catch {
+    return []
   }
 }

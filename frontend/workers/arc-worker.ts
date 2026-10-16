@@ -40,6 +40,7 @@ interface ArcDatum {
   toName: string
   fromCity: string
   fromCountry: string
+  fromHistorical?: string
   toCity: string
   toCountry: string
   count: number

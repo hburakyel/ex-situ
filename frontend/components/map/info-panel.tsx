@@ -19,6 +19,8 @@ import type {
   FacetedFilters
 } from "./object-panel"
 import { placeDisplayLabels } from "@/lib/place-label"
+import type { PrecisePlace } from "@/lib/api"
+import PrecisePlaceRows from "@/components/map/precise-place-rows"
 
 const PANEL_BOTTOM_FADE_STYLE = {
   background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
@@ -110,6 +112,9 @@ interface InfoPanelProps {
   onOriginClick?: (country: string, lat?: number, lng?: number) => void
   groupedSites: GroupedSite[]
   activeSite: string | null
+  precisePlaces?: PrecisePlace[]
+  activePrecise?: string | null
+  onTogglePrecise?: (place: PrecisePlace) => void
   onToggleSite?: (site: string, lat?: number, lng?: number) => void
   isLoadingSubArcs: boolean
   drillInstitutions: InstitutionItem[]
@@ -161,6 +166,9 @@ export default function InfoPanel({
   onOriginClick,
   groupedSites,
   activeSite,
+  precisePlaces = [],
+  activePrecise = null,
+  onTogglePrecise,
   onToggleSite,
   isLoadingSubArcs,
   drillInstitutions,
@@ -395,13 +403,18 @@ export default function InfoPanel({
                   {showSites && (
                     <FadedAccordionList>
                         {groupedSites.map((site, index) => (
-                          <div key={index}
+                          <React.Fragment key={index}>
+                          <div
                             className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
                             <span className="ml-2 text-gray-500 text-sm">{formatCount(site.totalCount)}</span>
                           </div>
+                          {activeSite === site.name && (
+                            <PrecisePlaceRows places={precisePlaces} active={activePrecise} onToggle={onTogglePrecise} />
+                          )}
+                          </React.Fragment>
                         ))}
                     </FadedAccordionList>
                   )}

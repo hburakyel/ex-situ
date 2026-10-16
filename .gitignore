@@ -128,3 +128,6 @@ frontend/public/fonts-local/
 
 # Notes for Claude (local only)
 CLAUDE.md
+
+# Local production test builds
+frontend/.next-local/

@@ -32,6 +32,8 @@ import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey
 import { track } from "@/lib/analytics"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
+import type { PrecisePlace } from "@/lib/api"
+import PrecisePlaceRows from "@/components/map/precise-place-rows"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -181,6 +183,9 @@ interface MapViewProps {
   drillInstitutions?: InstitutionItem[]
   activeCountry?: string | null
   activeSite?: string | null
+  precisePlaces?: PrecisePlace[]
+  activePrecise?: string | null
+  onTogglePrecise?: (place: PrecisePlace) => void
   activeInstitution?: string | null
   // Transient hover-only place name (from an object card in the grid) — highlights
   // the matching arc without the navigation/fetch side effects of activeSite.
@@ -238,6 +243,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       drillInstitutions = [],
       activeCountry = null,
       activeSite = null,
+      precisePlaces = [],
+      activePrecise = null,
+      onTogglePrecise,
       activeInstitution = null,
       hoveredObjectPlace = null,
       onToggleSite,
@@ -1454,7 +1462,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   <div className="mt-1 pl-0">
                     <HeaderAccordionList>
                       {groupedSites.map((site, index) => (
-                        <div key={index}
+                        <Fragment key={index}>
+                        <div
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           {...listHoverProps("site", site.name)}
@@ -1467,6 +1476,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           </Tooltip>
                           <span className="ml-2 text-gray-500 text-sm">{site.totalCount}</span>
                         </div>
+                        {activeSite === site.name && (
+                          <PrecisePlaceRows places={precisePlaces} active={activePrecise} onToggle={onTogglePrecise} padX="px-1" />
+                        )}
+                        </Fragment>
                       ))}
                     </HeaderAccordionList>
                   </div>
