@@ -213,9 +213,11 @@ export default function InfoPanel({
   // Institution is deliberately excluded: it's always shown as a filter chip
   // below (facetedFilters.institutions), so repeating it here as plain text
   // duplicated the same name twice in the panel header.
-  const displayName = (activeSite && activeSite !== activeCountry)
-    ? activeSite
-    : (activeCountry || '')
+  const displayName = activePrecise
+    ? activePrecise
+    : (activeSite && activeSite !== activeCountry)
+      ? activeSite
+      : (activeCountry || '')
 
   return (
     <div className={`${

@@ -1491,7 +1491,7 @@ function MapContent() {
           onExpandView={() => setContainerSize(prev => prev === "default" ? "expanded" : "default")}
           viewMode={viewMode}
           containerSize={containerSize}
-          locationName={drillLevel === "country" ? (activeCountry || locationName) : locationName}
+          locationName={activePrecise || (drillLevel === "country" ? (activeCountry || locationName) : locationName)}
           onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
           isObjectContainerVisible={isObjectContainerVisible}
           setObjects={setObjects}
