@@ -41,7 +41,9 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     // Warsaw lost their (wrong) coordinates and country and wait for review.
     // 2472 since 2026-10-13: 67 located objects (Samos, Kerch, Myrina, ...) got the
     // country of the GeoNames town their place name and point both match.
-    expect(r.flows_objects).toBe(2472)
+    // 2668 since 2026-10-16: 196 records without coordinates got the findspot of
+    // their museum-digital record (etl/backfill_smb_event_attribution.py).
+    expect(r.flows_objects).toBe(2668)
     expect(r.flows_objects).toBeLessThanOrEqual(r.coverage.located)
     expect(r.note).toMatch(/^\d+ of 5612 objects \(\d+%\) have a located origin/)
     expect(r.note).not.toMatch(/slightly higher/)
@@ -51,7 +53,7 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     const r = await call("get_origins", { institution: "Antikensammlung", detail: "site", limit: 5 })
     const olympia = r.flows.filter((f: any) => f.origin === "Olympia")
     expect(olympia).toHaveLength(1)
-    expect(olympia[0].objects).toBe(353)
+    expect(olympia[0].objects).toBe(372)
     expect(olympia[0].variants).toEqual(expect.arrayContaining(["Olympia, Greece", "Olympia"]))
   })
 
@@ -125,7 +127,7 @@ describe(`geospatial place grouping for Antikensammlung (${API_URL})`, () => {
   it("returns Olympia as one row with its raw spellings", () => {
     const olympia = rows!.filter((r) => r.place_name.toLowerCase().startsWith("olympia") && !r.place_name.endsWith("?"))
     expect(olympia).toHaveLength(1)
-    expect(olympia[0].object_count).toBe(353)
+    expect(olympia[0].object_count).toBe(372)
     expect(olympia[0].place_variants).toEqual(expect.arrayContaining(["Olympia", "Olympia, Greece"]))
   })
 

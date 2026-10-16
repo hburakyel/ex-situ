@@ -62,6 +62,7 @@ import argparse
 import csv
 import json
 import math
+import re
 import os
 import sys
 import time
@@ -100,6 +101,29 @@ RETRY_SLEEP_SECONDS = 5
 REQUEST_SLEEP_SECONDS = 0.3
 REQUEST_TIMEOUT_SECONDS = 15
 NOTE_TAG = "[smb-event]"
+ADMIN1 = os.path.join(HERE, "data", "gazetteer", "admin1CodesASCII.txt")
+MUSEUM_COUNTRY = "Germany"  # all SMB collections are in Berlin
+
+# Regions, not sites: museum-digital gives them a centre point ("Ostafrika" lies in
+# Kenya, "Melanesien" in the Solomon Islands). GeoNames continents, plus names.
+CONTINENT_GEONAMES = {6255146, 6255147, 6255148, 6255149, 6255150, 6255151, 6255152}
+REGION_NAMES = {
+    "afrika", "asien", "europa", "amerika", "ozeanien", "polynesien", "melanesien", "mikronesien",
+    "südsee", "anatolien", "arabien", "kleinasien", "vorderasien", "mesopotamien", "nubien", "levante",
+    "kaukasus", "sibirien", "turkestan", "sahara", "sahel", "orient", "etrurien", "ionien", "böotien",
+    "thessalien", "arkadien", "attika", "apulien", "kampanien", "maremma", "latium", "lykien", "karien",
+    "phrygien", "lydien", "makedonien", "thrakien", "gandhara", "grasland", "kameruner grasland", "rhein",
+    "magna graecia", "großgriechenland", "peloponnes", "kykladen", "dodekanes", "patagonien", "amazonien",
+    "andalusien", "khurasan", "chorasan", "transoxanien", "punjab", "pandschab", "bengalen", "dekkan",
+    "deutsch-ostafrika", "deutsch-südwestafrika", "deutsch-neuguinea", "kaiser-wilhelmsland", "korea",
+    "großbritannien", "feuerland", "anden", "andengebiet", "orissa", "sierra nevada de santa marta", "spreewald",
+    "bali (indonesien)", "kalahari", "molukken", "lateinamerika", "himalaya", "tibet", "herzegowina", "palawan",
+    "mesaoria", "sowjetunion", "rhodesien", "jemenitische arabische republik",
+}
+REGION_PREFIX = re.compile(r"^(nord|süd|ost|west|mittel|zentral|ober|unter|nieder|inner)(ost|west)?-?(?P<rest>.+)$")
+REGION_WORDS = re.compile(r"\((region|landschaft|gebiet|königreich|provinz|bundesstaat|staat|insel|inseln|halbinsel|küste|fluss|distrikt)\)"
+                          r"|\b(provinz|provincia|region|landschaft|gebiet|archipel|inseln)\b|küste\b|island$"
+                          r"|^(río|rio) (?!de janeiro|grande do)|^(fluss|sierra) |\briver$")  # rivers, mountain ranges
 
 
 def get_conn():
@@ -129,9 +153,16 @@ def fetch_object_details(object_id, session=None):
             continue
         if r.status_code == 200:
             try:
-                return r.json(), None
+                data = r.json()
             except json.JSONDecodeError:
                 return None, "invalid JSON response"
+            # When throttling, museum-digital answers 200 with {"status": "error", "code": 503};
+            # read as a record that would look like "no event with a place".
+            if data.get("status") == "error" or "object_events" not in data:
+                last_error = f"error body: {data.get('code')} {data.get('msg')}"
+                time.sleep(RETRY_SLEEP_SECONDS)
+                continue
+            return data, None
         elif r.status_code in (429, 503):
             last_error = f"HTTP {r.status_code}"
             time.sleep(RETRY_SLEEP_SECONDS)
@@ -241,7 +272,10 @@ def cmd_fetch(args):
         all_rows = fetch_rows(conn, institutions)
         conn.close()
 
-    already_done = {r["id"] for r in load_cache_records(args.cache)}
+    # A line with no inventory number was a museum-digital error body read as a record
+    # (before fetch_object_details checked for it): fetch it again; the new line wins.
+    already_done = {r["id"] for r in load_cache_records(args.cache)
+                    if not (r["status"] == "ok" and r.get("inventory_number") is None)}
     remaining = [r for r in all_rows if r["id"] not in already_done]
 
     print(f"Institutions:        {institutions}")
@@ -334,7 +368,35 @@ class Countries:
                 lat, lon = float(cols[4]), float(cols[5])
                 self.grid[(math.floor(lat), math.floor(lon))].append((lat, lon, cols[8], cols[1]))
         from normalize_place_names import _LOOKUP_RAW  # German country names ("Syrien") → English
+        from audit_data_quality import SUPRANATIONAL
         self.german = {k.lower(): v for k, v in _LOOKUP_RAW.items() if v}
+        self.supranational = SUPRANATIONAL
+        self.area_geonames = set(CONTINENT_GEONAMES)
+        with open(COUNTRY_INFO, encoding="utf-8") as f:
+            for line in f:
+                cols = line.rstrip("\n").split("\t")
+                if not line.startswith("#") and len(cols) > 16 and cols[16].isdigit():
+                    self.area_geonames.add(int(cols[16]))
+        with open(ADMIN1, encoding="utf-8") as f:
+            for line in f:
+                cols = line.rstrip("\n").split("\t")
+                if len(cols) > 3 and cols[3].isdigit():
+                    self.area_geonames.add(int(cols[3]))
+
+    def is_region(self, name, geonames_id=None):
+        """A continent, country, first-level region or named area rather than a site."""
+        if geonames_id and int(geonames_id) in self.area_geonames:
+            return True
+        n = (name or "").strip().rstrip("?").strip().lower()
+        if self.label_for_name(n) or n in REGION_NAMES or REGION_WORDS.search(n):
+            return True
+        if self.german.get(n, n).lower() in self.supranational:
+            return True
+        m = REGION_PREFIX.match(n)
+        if m:
+            rest = m.group("rest").strip(" -")
+            return bool(self.label_for_name(rest) or rest in REGION_NAMES)
+        return False
 
     def label_for_name(self, name):
         """Country label for a place_name/country_en that names a whole country, else None."""
@@ -404,6 +466,8 @@ def classify(records, countries):
                            else "skip: no Found/Created event with a place")
         elif countries.label_for_name(r["new_place_name"]):
             d["action"] = "skip: event place is a whole country (centre point, not a findspot)"
+        elif countries.is_region(r["new_place_name"], r.get("new_geonames_id")):
+            d["action"] = "skip: event place is a region (centre point, not a site)"
         else:
             country, reason, nearest = countries.findspot_country(r["new_latitude"], r["new_longitude"],
                                                                   r["new_place_name"])
@@ -417,6 +481,12 @@ def classify(records, countries):
                     d["set_country"] = country
             elif claimed and country and claimed != country:
                 d["action"] = "hold: findspot in another country"
+            elif not r["is_findspot"] and (country == MUSEUM_COUNTRY or (
+                    country == "Poland" and (r.get("inventory_number") or "").startswith("VII W"))):
+                # e.g. wax cylinders (VII W) recorded 1915–18 in German POW camps, also
+                # Sagan and Lamsdorf, now in Poland: the place of production would hide
+                # where the people and the objects came from.
+                d["action"] = "hold: made in the museum's country"
             elif r.get("old_country_en"):
                 d["action"] = "write (keep country)"
             elif claimed or country:
@@ -458,10 +528,10 @@ def cmd_report(args):
     print("New place:", Counter(d["new_place_name"] for d in writes).most_common(25))
     held = [d for d in rows if d["action"].startswith("hold")]
     if held:
-        print(f"\nHeld back ({len(held)}): the stored country differs from the findspot's")
+        print(f"\nHeld back ({len(held)}):")
         for d in held[: args.sample]:
-            print(f"  {d['inventory_number']} ({d['object_id']}): {d['old_place_name']!r}/{d['claimed_country']} → "
-                  f"{d['new_place_name']} in {d['findspot_country']} (nearest {d['nearest_town']})")
+            print(f"  [{d['action'][6:]}] {d['inventory_number']} ({d['object_id']}): {d['old_place_name']!r}/"
+                  f"{d['claimed_country']} → {d['new_place_name']} in {d['findspot_country']} (nearest {d['nearest_town']})")
     if args.csv:
         cols = ["action", "id", "object_id", "inventory_number", "old_place_name", "old_city_en", "old_country_en",
                 "new_place_name", "new_latitude", "new_longitude", "new_geonames_id", "event_type_en", "is_findspot",
