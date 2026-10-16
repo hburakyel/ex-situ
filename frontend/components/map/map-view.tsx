@@ -982,8 +982,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           return [...targetColor, restingAlpha(d)] as [number, number, number, number]
         },
         // Arcs rise toward the camera; zoomed in, a tall arc near the screen edge
-        // projects as a wide band. Lower arcs stay readable at regional zoom.
-        getHeight: isLowZoomArcView ? 1 : 0.35,
+        // projects as a wide band. Lower arcs stay readable at regional zoom. At street
+        // zoom an arc thousands of km long is already far above the map next to its
+        // origin, and perspective pushes it out of view, so it lies flat there instead.
+        getHeight: isLowZoomArcView ? 1 : isStreetZoom ? 0 : 0.35,
         getWidth: (d) => {
           const selectedOrActive = isSelectedOrActiveArc(d)
           const isHovered = hoveredArcKey === `${d.fromName}-${d.toName}`
@@ -1039,7 +1041,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         },
       })
       return withEmphasis(mainLayer, arcLayerData.filter((d) => isSelectedOrActiveArc(d) || isPanelHoveredArc(d)))
-    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, visibleArcData, listHoverKey, matchesListHover, activeCountry, activeInstitution])
+    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, isStreetZoom, visibleArcData, listHoverKey, matchesListHover, activeCountry, activeInstitution])
 
     // ── Drill arc layer: persistent city-cluster arcs ──
     // Shown at city zoom (< 7) always. At zoom 7+, shown only when arcLayer has
@@ -1077,7 +1079,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           (isActiveSiteDrillArc(d) || isPanelHoveredDrillArc(d)) ? [59, 130, 246, 255] : [239, 95, 0, drillAlpha(d)],
         getTargetColor: (d: any): [number, number, number, number] =>
           isActiveSiteDrillArc(d) ? [147, 51, 234, 255] : (isPanelHoveredDrillArc(d) ? [59, 130, 246, 255] : [239, 95, 0, drillAlpha(d)]),
-        getHeight: isLowZoomArcView ? 1 : 0.35,
+        getHeight: isLowZoomArcView ? 1 : isStreetZoom ? 0 : 0.35,
         getWidth: (d: any) =>
           isActiveSiteDrillArc(d) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
         widthMinPixels: isMobile ? 2.5 : 1.5,
