@@ -679,10 +679,16 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       }
 
       window.addEventListener("resize", handleResize)
+      // The mobile map card changes size (card, full screen, put away) without a window
+      // resize; MapLibre then keeps its old canvas size, stretching labels and drawing
+      // arcs away from their sites. Follow the container itself.
+      const containerObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => handleResize()) : null
+      if (containerObserver && mapContainer.current) containerObserver.observe(mapContainer.current)
       map.current = mapInstance
 
       return () => {
         window.removeEventListener("resize", handleResize)
+        containerObserver?.disconnect()
         // Cancel any pending debounced bounds change
         debouncedBoundsChangeRef.current.cancel()
         if (deckOverlay.current) {
