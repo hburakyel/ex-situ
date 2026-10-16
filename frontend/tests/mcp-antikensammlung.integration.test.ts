@@ -41,9 +41,9 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     // Warsaw lost their (wrong) coordinates and country and wait for review.
     // 2472 since 2026-10-13: 67 located objects (Samos, Kerch, Myrina, ...) got the
     // country of the GeoNames town their place name and point both match.
-    // 2668 since 2026-10-16: 196 records without coordinates got the findspot of
+    // 2673 since 2026-10-16: 201 records without coordinates got the findspot of
     // their museum-digital record (etl/backfill_smb_event_attribution.py).
-    expect(r.flows_objects).toBe(2668)
+    expect(r.flows_objects).toBe(2673)
     expect(r.flows_objects).toBeLessThanOrEqual(r.coverage.located)
     expect(r.note).toMatch(/^\d+ of 5612 objects \(\d+%\) have a located origin/)
     expect(r.note).not.toMatch(/slightly higher/)
