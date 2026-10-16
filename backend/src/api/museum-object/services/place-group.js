@@ -48,10 +48,16 @@ const SITE_KEY = (expr) => `BTRIM(REGEXP_REPLACE(REGEXP_REPLACE(
 
 const PLACE_GROUP_KEY = SITE_KEY(PLACE_GROUP_EXPR);
 
+// The name a site is listed under: the most common spelling with the trailing "?" and
+// type suffix taken off, so every collection lists Istanbul / Istanbul? as "Istanbul".
+const PLACE_DISPLAY_EXPR = `BTRIM(REGEXP_REPLACE(REGEXP_REPLACE(${PLACE_GROUP_EXPR},
+  '\\s*\\((city|province|provinz|stad|state|district|region|prov\\.)\\)\\s*$', '', 'i'),
+  '\\s*[' || CHR(63) || ']+\\s*$', ''))`;
+
 /** Raw city_en spellings merged into a group (for the MCP server's `variants`). */
 const PLACE_VARIANTS_AGG = `array_agg(DISTINCT BTRIM(city_en)) FILTER (WHERE NULLIF(BTRIM(city_en), '') IS NOT NULL)`;
 
 // Historical names of the places grouped here ("Assur" for Al-Shirqat), for the arc tooltip.
 const HISTORICAL_NAMES_AGG = `array_agg(DISTINCT BTRIM(historical_name)) FILTER (WHERE NULLIF(BTRIM(historical_name), '') IS NOT NULL)`;
 
-module.exports = { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG, SITE_KEY };
+module.exports = { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_DISPLAY_EXPR, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG, SITE_KEY };

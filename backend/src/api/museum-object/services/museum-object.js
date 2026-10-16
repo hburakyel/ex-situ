@@ -4,7 +4,7 @@
  * museum-object service
  */
 
-const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG, SITE_KEY } = require('./place-group');
+const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_DISPLAY_EXPR, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG, SITE_KEY } = require('./place-group');
 const { createCoreService } = require('@strapi/strapi').factories;
 const { buildPublicDateFields } = require('./date-display');
 const { buildEraBuckets } = require('./era-buckets');
@@ -695,7 +695,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ),
           city_aggregations AS (
             SELECT
-              mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) as origin_city,
+              mode() WITHIN GROUP (ORDER BY ${PLACE_DISPLAY_EXPR}) as origin_city,
               ${PLACE_VARIANTS_AGG} as place_variants,
               ${HISTORICAL_NAMES_AGG} as historical_names,
               country_en,
@@ -1837,7 +1837,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         // place label the map's Sites list shows (place-group.js).
         const result = await db.raw(`
           SELECT
-            mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) AS place_name,
+            mode() WITHIN GROUP (ORDER BY ${PLACE_DISPLAY_EXPR}) AS place_name,
             country_en,
             MIN(city_en)                               AS city_en,
             AVG(COALESCE(manual_latitude, latitude))  AS latitude,
@@ -1856,7 +1856,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         // Fallback: ILIKE on key columns before migration is applied
         const result = await db.raw(`
           SELECT
-            mode() WITHIN GROUP (ORDER BY ${PLACE_GROUP_EXPR}) AS place_name,
+            mode() WITHIN GROUP (ORDER BY ${PLACE_DISPLAY_EXPR}) AS place_name,
             country_en,
             MIN(city_en)                               AS city_en,
             AVG(COALESCE(manual_latitude, latitude))  AS latitude,

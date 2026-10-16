@@ -125,3 +125,6 @@ docs/DEPLOY.md
 
 # Licensed fonts (ABC Areal trial) — never commit
 frontend/public/fonts-local/
+
+# Notes for Claude (local only)
+CLAUDE.md
