@@ -97,6 +97,7 @@ RENAMES = {
     ("Kotah", "India"): "Kota",
     ("Mysore", "India"): "Mysuru",
     ("Deshima", "Japan"): "Dejima",
+    ("Elephantine", "Egypt"): "Aswan",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -140,6 +141,8 @@ LABELS = {
     "USA": ("United States", None),
     "Guinea-Conakry": ("Guinea", None),
     "Zuid-China": ("South China", None),
+    "Asia Minor": ("Anatolia", None),
+    "West Coast of Asia Minor": ("Western Anatolia", None),
 }
 
 # Korea before 1945 lies in both present-day Koreas.
