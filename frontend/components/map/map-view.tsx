@@ -30,7 +30,7 @@ import { placeDisplayLabels } from "@/lib/place-label"
 import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
 import { track } from "@/lib/analytics"
-import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
+import { useInstitutionPlaces } from "@/lib/institution-places"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -251,6 +251,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     ref,
   ) => {
     const mapContainer = useRef<HTMLDivElement>(null)
+    const institutionPlace = useInstitutionPlaces()
     const map = useRef<maplibregl.Map | null>(null)
     const lastBounds = useRef<MapBounds | null>(null)
     const deckOverlay = useRef<MapboxOverlay | null>(null)
@@ -1239,15 +1240,17 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             </div>
             {/* Same terms as the artifact panel: "to" is a place, the museum is the collection. */}
             {(() => {
-              const toPlace = hoveredArc.toCity || INSTITUTION_CITIES[hoveredArc.toName] || ""
+              const known = institutionPlace(hoveredArc.toName)
+              const toPlace = hoveredArc.toCity || known?.city || ""
+              const toCountry = hoveredArc.toCountry || known?.country || ""
               return (
                 <>
                   {toPlace && (
                     <div className="mb-1">
                       <span className="text-muted-foreground mr-2">to:</span>
                       <span className="text-foreground">{toPlace}</span>
-                      {hoveredArc.toCountry && hoveredArc.toCountry.toLowerCase() !== toPlace.toLowerCase() && (
-                        <div className="text-[10px] text-muted-foreground">{hoveredArc.toCountry}</div>
+                      {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
+                        <div className="text-[10px] text-muted-foreground">{toCountry}</div>
                       )}
                     </div>
                   )}

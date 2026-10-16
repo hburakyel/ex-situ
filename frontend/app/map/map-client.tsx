@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import debounce from "lodash/debounce"
-import { useUnifiedSearch, INSTITUTION_CITIES, type ArcData } from "@/hooks/use-unified-search"
+import { useUnifiedSearch, type ArcData } from "@/hooks/use-unified-search"
 import ObjectImage from "@/components/object-image"
 import { Spinner } from "@/components/ui/spinner"
 import { isWithdrawn } from "@/lib/withdrawn"
@@ -23,6 +23,7 @@ import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
 import { track } from "@/lib/analytics"
 import { mapTitle } from "@/lib/map-title"
+import { useInstitutionPlaces } from "@/lib/institution-places"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -1378,9 +1379,12 @@ function MapContent() {
   }, [drillLevel, isGlobalInstitutionDrill, aggregateInstitutions, arcObjectsTotal, mapTotalCount, isWikipediaActive, wikiObjects.length])
 
   // Mobile full-screen map: preview card for the current pick (see mapPreviewOpen).
+  // An arc reads place → place (as in the tooltip); the collection goes on the count line.
+  const institutionPlace = useInstitutionPlaces()
   const mapPreviewTitle = selectedArc
-    ? `${placeDisplayLabel(selectedArc.from, [])} → ${INSTITUTION_CITIES[selectedArc.to] || selectedArc.to}`
+    ? `${placeDisplayLabel(selectedArc.from, [])} → ${institutionPlace(selectedArc.to)?.city || selectedArc.to}`
     : (activeSite ? placeDisplayLabel(activeSite, groupedSites.map((s) => s.name)) : activeCountry || "")
+  const mapPreviewCollection = selectedArc && institutionPlace(selectedArc.to) ? selectedArc.to : null
   const mapPreviewObjects = useMemo(
     () => containerObjects.filter((o) => !isWithdrawn(o) && typeof o.attributes?.img_url === "string" && o.attributes.img_url.trim() !== "").slice(0, 12),
     [containerObjects],
@@ -1503,7 +1507,7 @@ function MapContent() {
                   <div className="min-w-0 text-sm leading-normal">
                     <div className="truncate text-black">{mapPreviewTitle}</div>
                     <div className="text-gray-500">
-                      {arcObjectsLoading && containerObjects.length === 0 ? "Loading…" : `${containerTotalCount.toLocaleString("en-US")} artifact${containerTotalCount === 1 ? "" : "s"}`}
+                      {arcObjectsLoading && containerObjects.length === 0 ? "Loading…" : `${mapPreviewCollection ? `${mapPreviewCollection} · ` : ""}${containerTotalCount.toLocaleString("en-US")} artifact${containerTotalCount === 1 ? "" : "s"}`}
                     </div>
                   </div>
                   <Button variant="ghost" size="icon" className="-mr-1 -mt-1 h-8 w-8 flex-shrink-0" onClick={() => setMapPreviewOpen(false)} aria-label="Close preview">
