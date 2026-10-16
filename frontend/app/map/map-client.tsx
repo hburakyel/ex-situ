@@ -1161,6 +1161,9 @@ function MapContent() {
     }
   }, [])
 
+  // The objects shown in the panel, for the image-click zoom (filled below, where
+  // containerObjects is built).
+  const containerObjectsRef = useRef<MuseumObject[]>([])
   const handleObjectClick = useCallback((longitude: number, latitude: number, object?: MuseumObject) => {
     const drill = drillLevelRef.current
 
@@ -1251,9 +1254,23 @@ function MapContent() {
       if (site === "Unknown" || (country && normalizePlaceKey(site) === normalizePlaceKey(country))) return
     }
 
-    // ── Step 2: Country level → fly to object detail ──
-    mapRef.current.flyToLocation(longitude, latitude, 14, 1200)
-    setViewState(prev => ({ ...prev, longitude, latitude, zoom: 14 }))
+    // ── Step 2: fly to the object ──
+    // An object with its own precise point (Dolmabahçe Mosque, within Istanbul) gets
+    // building-level zoom; one that only sits on its site's centre (located to
+    // "Istanbul") stays at city level instead of landing on an arbitrary street.
+    let targetZoom = 14
+    if (object && hasValidCoordinates(latitude, longitude)) {
+      // A point shared by several of the place's objects is the place's own point
+      // (a city centre); a point of its own is a precise location.
+      const key = (lat: number, lng: number) => `${lat.toFixed(3)},${lng.toFixed(3)}`
+      const here = key(latitude, longitude)
+      const sharing = containerObjectsRef.current.filter((o) =>
+        hasValidCoordinates(o.attributes.latitude, o.attributes.longitude) &&
+        key(o.attributes.latitude, o.attributes.longitude) === here).length
+      targetZoom = sharing >= 3 ? 11 : 16
+    }
+    mapRef.current.flyToLocation(longitude, latitude, targetZoom, 1200)
+    setViewState(prev => ({ ...prev, longitude, latitude, zoom: targetZoom }))
     debouncedGeocode(longitude, latitude)
   }, [groupedOrigins, handleOriginClick, debouncedGeocode])
 
@@ -1352,6 +1369,7 @@ function MapContent() {
     })
     return combined
   }, [drillLevel, isGlobalInstitutionDrill, arcObjects, objects, filteredGlobalPreviewObjects, allObjects, isWikipediaActive, wikiObjects])
+  useEffect(() => { containerObjectsRef.current = containerObjects }, [containerObjects])
 
   // Effective location name: derived from drill state, with manual fallback
   // This ensures the object panel header ALWAYS reflects the current drill-down
