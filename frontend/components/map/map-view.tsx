@@ -1239,38 +1239,38 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             className="absolute bg-white p-3 rounded-xl text-sm z-50 pointer-events-none border shadow-lg"
             style={{ left: arcTooltipPosRef.current.x + 10, top: arcTooltipPosRef.current.y + 10, maxWidth: "300px" }}
           >
-            <div className="mb-1">
-              <span className="text-muted-foreground mr-2">from:</span>
-              <span className="text-foreground">{hoveredArc.fromName}</span>
-              {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
-              {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
-                <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
-              )}
-              {(hoveredArc.fromCity || hoveredArc.fromCountry) && (
-                (() => {
-                  const city = hoveredArc.fromCity && hoveredArc.fromCity.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCity : null
-                  const country = hoveredArc.fromCountry && hoveredArc.fromCountry.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCountry : null
-                  const sub = city && country ? `${city}, ${country}` : city || country
-                  return sub ? <div className="text-[10px] text-muted-foreground">{sub}</div> : null
-                })()
-              )}
-            </div>
             {/* Same terms as the artifact panel: "to" is a place, the museum is the collection. */}
             {(() => {
               const known = institutionPlace(hoveredArc.toName)
               const toPlace = hoveredArc.toCity || known?.city || ""
               const toCountry = hoveredArc.toCountry || known?.country || ""
+              const city = hoveredArc.fromCity && hoveredArc.fromCity.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCity : null
+              const country = hoveredArc.fromCountry && hoveredArc.fromCountry.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCountry : null
+              const fromSub = city && country ? `${city}, ${country}` : city || country
               return (
                 <>
-                  {toPlace && (
-                    <div className="mb-1">
-                      <span className="text-muted-foreground mr-2">to:</span>
-                      <span className="text-foreground">{toPlace}</span>
-                      {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
-                        <div className="text-[10px] text-muted-foreground">{toCountry}</div>
-                      )}
+                  <div className="grid grid-cols-2 gap-x-4 mb-2">
+                    <div>
+                      <div className="text-muted-foreground">from:</div>
+                      <div>
+                        <span className="text-foreground">{hoveredArc.fromName}</span>
+                        {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
+                        {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
+                          <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
+                        )}
+                      </div>
+                      {fromSub && <div className="text-[10px] text-muted-foreground">{fromSub}</div>}
                     </div>
-                  )}
+                    {toPlace && (
+                      <div>
+                        <div className="text-muted-foreground">to:</div>
+                        <div className="text-foreground">{toPlace}</div>
+                        {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
+                          <div className="text-[10px] text-muted-foreground">{toCountry}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="mb-1">
                     <span className="text-muted-foreground mr-2">collection:</span>
                     <span className="text-foreground">{hoveredArc.toName}</span>
