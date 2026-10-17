@@ -123,6 +123,7 @@ node scripts/populate-institution-locality.js
 | `bulkUnpublishExcept.js` | Unpublish entries outside a given set | ❌ | ✅ |
 | `updateImgUrlAntik.js` | One-off image URL update for Antikensammlung | ❌ | ✅ |
 | `etl/backfill_smb_event_attribution.py` | SMB rows without coordinates: findspot/production place from the museum-digital record (fetch → report → apply); then the place pipeline in CLAUDE.md | ✅ (`apply` without `--apply`) | ✅ (only writes rows unchanged since fetch) |
+| `etl/scrape_smb_search.py` + `etl/import_smb_search.py` | SMB objects on search.smb.museum but not on museum-digital (Ethnologisches Museum): enumerate → fetch → map (origin rule in the script's docstring), then the insert-only import, the place pipeline in CLAUDE.md, `import_smb_search.py --finalize` and `refresh_geospatial_views()` | ✅ (`map --dry-run`; import without `--apply` rolls back) | ✅ (skips object_ids/source links already present) |
 
 ---
 

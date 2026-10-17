@@ -14,6 +14,8 @@ etl/
 ├── scrape_aic_api.py          # Art Institute of Chicago resolver
 ├── scrape_europeana.py        # Europeana resolver — institutions via Europeana, non-European origins only
 ├── check_europeana_images.py  # Finds Europeana image URLs that do not load (objects are left out)
+├── scrape_smb_search.py       # SMB objects on search.smb.museum that museum-digital lacks (enumerate → fetch → map)
+├── import_smb_search.py       # Inserts its output in one transaction (dry run unless --apply)
 ├── backfill_europeana_fields.py # After import: country/city, museum locality, licence, inventory number
 ├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
 ├── import_gazetteer.sh        # Loads a GeoNames extract into gazetteer_places
