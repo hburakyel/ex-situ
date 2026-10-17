@@ -113,6 +113,26 @@ RENAMES = {
     ("Astarabad", "Iran"): "Gorgan",
     ("Palmyra", "Syria"): "Tadmur",
     ("Apamea", "Syria"): "Qalaat al-Madiq",
+    # Former names elsewhere (desk review 2026-10-17).
+    ("Bangalore", "India"): "Bengaluru",
+    ("Belgaum", "India"): "Belagavi",
+    ("Calicut", "India"): "Kozhikode",
+    ("Gauhati", "India"): "Guwahati",
+    ("Gulbarga", "India"): "Kalaburagi",
+    ("Mangalore", "India"): "Mangaluru",
+    ("Masulipatam", "India"): "Machilipatnam",
+    ("Orissa", "India"): "Odisha",
+    ("Simla", "India"): "Shimla",
+    ("Tanjore", "India"): "Thanjavur",
+    ("Bijapur", "India"): "Vijayapura",
+    ("Chittagong", "Bangladesh"): "Chattogram",
+    ("Tiflis", "Georgia"): "Tbilisi",
+    ("Stettin", "Poland"): "Szczecin",
+    ("Peking", "China"): "Beijing",
+    ("Swatow", "China"): "Shantou",
+    ("Port Arthur", "China"): "Lüshunkou",
+    ("Saigon", "Vietnam"): "Ho Chi Minh City",
+    ("Moçâmedes", "Angola"): "Namibe",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -161,13 +181,20 @@ LABELS = {
     "Noordwest-Perzië": ("Northwestern Iran", None),
     "Noord-Perzie": ("Northern Iran", None),
     "Zuidwest-Perzië": ("Southwestern Iran", None),
+    "Sansibar": ("Zanzibar", None),
+    "Neue Hebriden": ("Vanuatu", None),
+    "Gilbertinseln": ("Gilbert Islands", None),
+    "Easter Island": ("Rapa Nui", None),
+    "Phnom-Penh": ("Phnom Penh", None),
+    "Malakka": ("Melaka", None),
+    "Bokhara": ("Bukhara", None),
     # "Nusayri" is a pejorative name for Alawites.
     "Nusayriyah Mountains": ("Syrian Coastal Mountains", None),
     "West Coast of Asia Minor": ("Western Anatolia", None),
 }
 
-# Korea before 1945 lies in both present-day Koreas.
-AREAS = {"Korea", "Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa"}
+# Korea before 1945 lies in both present-day Koreas; the Mughal Empire spanned several countries.
+AREAS = {"Korea", "Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa", "Mughal Empire", "Mughal empire"}
 
 # (label, country_en, rounded lat, lon) of a wrong point → new label. The Met's
 # "Khotan" sat at Aksu, 450 km from Hotan.
