@@ -131,3 +131,6 @@ CLAUDE.md
 
 # Local production test builds
 frontend/.next-local/
+
+# Local roadmap notes
+ROADMAP.local.md
