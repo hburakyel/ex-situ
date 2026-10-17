@@ -45,7 +45,9 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     // their museum-digital record (etl/backfill_smb_event_attribution.py).
     // 2659 since 2026-10-17: 14 "Theben" records placed at Devín, Slovakia (German
     // "Theben") lost the point and country; Greece or Egypt is not stated, so they wait for review.
-    expect(r.flows_objects).toBe(2659)
+    // 2650 since 2026-10-17 (Italy review): 9 records geocoded to a same-name Italian place
+    // (Weiden, Ligurio, Naxos, ...) whose real place the record doesn't settle wait for review.
+    expect(r.flows_objects).toBe(2650)
     expect(r.flows_objects).toBeLessThanOrEqual(r.coverage.located)
     expect(r.note).toMatch(/^\d+ of 5612 objects \(\d+%\) have a located origin/)
     expect(r.note).not.toMatch(/slightly higher/)
@@ -133,9 +135,13 @@ describe(`geospatial place grouping for Antikensammlung (${API_URL})`, () => {
     expect(olympia[0].place_variants).toEqual(expect.arrayContaining(["Olympia", "Olympia, Greece"]))
   })
 
-  it("keeps Tarquinia and the tomb inside it apart", () => {
+  it("puts the tomb under Tarquinia as a precise place, not a site of its own", async () => {
     const names = rows!.map((r) => r.place_name)
-    expect(names).toEqual(expect.arrayContaining(["Tarquinia", "Tomba del Guerriero (Tarquinia)"]))
+    expect(names).toContain("Tarquinia")
+    expect(names).not.toContain("Tomba del Guerriero (Tarquinia)")
+    const res = await fetch(`${API_URL}/museum-objects/precise-places?country=Italy&site=Tarquinia&institution=Antikensammlung`)
+    const precise = (await res.json()).data.map((p: { name: string }) => p.name)
+    expect(precise).toContain("Tomba del Guerriero")
   })
 
   it("has no two rows that differ only by case or a country suffix", () => {
