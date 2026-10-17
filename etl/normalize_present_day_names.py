@@ -99,6 +99,20 @@ RENAMES = {
     ("Mysore", "India"): "Mysuru",
     ("Deshima", "Japan"): "Dejima",
     ("Elephantine", "Egypt"): "Aswan",
+    # Iraq, Iran, Syria (desk review 2026-10-17): ancient sites under the present-day town or tell.
+    ("Ctesiphon", "Iraq"): "Salman Pak",
+    ("Uruk", "Iraq"): "Warka",
+    ("Shuruppak", "Iraq"): "Fara",
+    ("Lagash", "Iraq"): "Al-Hiba",
+    ("Borsippa", "Iraq"): "Birs Nimrud",
+    ("Nippur", "Iraq"): "Nuffar",
+    ("Persepolis", "Iran"): "Takht-e Jamshid",
+    ("Pasargadae", "Iran"): "Pasargad",
+    ("Sultanabad", "Iran"): "Arak",
+    ("Senneh", "Iran"): "Sanandaj",
+    ("Astarabad", "Iran"): "Gorgan",
+    ("Palmyra", "Syria"): "Tadmur",
+    ("Apamea", "Syria"): "Qalaat al-Madiq",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -143,6 +157,12 @@ LABELS = {
     "Guinea-Conakry": ("Guinea", None),
     "Zuid-China": ("South China", None),
     "Asia Minor": ("Anatolia", None),
+    "Midden-Perzië": ("Central Iran", None),
+    "Noordwest-Perzië": ("Northwestern Iran", None),
+    "Noord-Perzie": ("Northern Iran", None),
+    "Zuidwest-Perzië": ("Southwestern Iran", None),
+    # "Nusayri" is a pejorative name for Alawites.
+    "Nusayriyah Mountains": ("Syrian Coastal Mountains", None),
     "West Coast of Asia Minor": ("Western Anatolia", None),
 }
 
