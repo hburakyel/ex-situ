@@ -1,6 +1,6 @@
 # Ex Situ — Collection Roadmap
 
-Current (15 October 2026): **280,763 artifacts on the map · 61 collections · 203 territories · 6,179 origin sites**
+Current (17 October 2026, from the public API): **284,621 artifacts on the map · 61 collections · 200 territories**
 
 318,828 records are indexed. The others have no located origin in their institution's record yet, have a point but no territory that can be assigned without guessing (regions such as Polynesia, or a place name that does not match its point), or are parts of one object that share an inventory number and are counted once. 10 collections are indexed directly, 51 via Europeana.
 

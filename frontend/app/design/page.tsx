@@ -117,12 +117,12 @@ export default function DesignPage() {
   )
 }
 
-// \u2500\u2500\u2500 TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── TOKENS ──────────────────────────────────────────────────────────────────────────────
 
 function TokensTab() {
   return (
     <div>
-      <SectionLabel>Colors \u2014 Surface</SectionLabel>
+      <SectionLabel>Colors — Surface</SectionLabel>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-4">
         <Swatch bg="#ffffff" label="bg-white" sub="#fff" outline />
         <Swatch bg="#f9fafb" label="bg-gray-50" sub="#f9fafb" />
@@ -130,7 +130,7 @@ function TokensTab() {
         <Swatch bg="#111111" label="map bg" sub="#111" />
       </div>
 
-      <SectionLabel>Colors \u2014 Text</SectionLabel>
+      <SectionLabel>Colors — Text</SectionLabel>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-4">
         <Swatch bg="#000000" label="text-black" sub="#000" />
         <Swatch bg="rgba(0,0,0,0.6)" label="black/60" sub="60%" />
@@ -140,7 +140,7 @@ function TokensTab() {
         <Swatch bg="#6b7280" label="gray-500" sub="#6b7280" />
       </div>
 
-      <SectionLabel>Colors \u2014 Chips &amp; Nodes</SectionLabel>
+      <SectionLabel>Colors — Chips &amp; Nodes</SectionLabel>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-4">
         <Swatch bg="#dbeafe" label="blue-100" sub="country chip" />
         <Swatch bg="#eff6ff" label="blue-50" sub="active row" />
@@ -150,39 +150,39 @@ function TokensTab() {
         <Swatch bg="#f3f4f6" label="gray-100" sub="other node" />
       </div>
 
-      <SectionLabel>Colors \u2014 Arcs (deck.gl WebGL)</SectionLabel>
+      <SectionLabel>Colors — Arcs (deck.gl WebGL)</SectionLabel>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-4">
         <Swatch bg="rgb(239,95,0)" label="arc default" sub="rgb(239,95,0)" />
         <Swatch bg="rgb(59,130,246)" label="arc source" sub="highlighted" />
         <Swatch bg="rgb(147,51,234)" label="arc target" sub="highlighted" />
       </div>
       <p className="text-[10px] text-gray-400 mt-2">
-        Default: rgb(239,95,0) \u00b7 Highlighted source: rgb(59,130,246) \u00b7 Highlighted target: rgb(147,51,234) \u00b7 Width: 0.5\u20133px (country) / 2\u20136px (objects)
+        Default: rgb(239,95,0) · Highlighted source: rgb(59,130,246) · Highlighted target: rgb(147,51,234) · Width: 0.5–3px (country) / 2–6px (objects)
       </p>
 
-      <SectionLabel>Colors \u2014 Ring / Selection</SectionLabel>
+      <SectionLabel>Colors — Ring / Selection</SectionLabel>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-4">
         <Swatch bg="rgb(59,130,246)" label="ring-blue-500" sub="image hover" />
       </div>
       <p className="text-[10px] text-gray-400 mt-2">
-        ring-2 ring-blue-500 \u00b7 rounded-[4px] \u00b7 on image hover &amp; selected
+        ring-2 ring-blue-500 · rounded-[4px] · on image hover &amp; selected
       </p>
 
       <SectionLabel>Typography</SectionLabel>
       <div className="space-y-5">
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-gray-400">text-sm \u00b7 14px \u00b7 font-mono \u00b7 base size (all text)</span>
+          <span className="text-[10px] text-gray-400">text-sm · 14px · font-mono · base size (all text)</span>
           <span className="text-sm text-black">132 objects from Rwanda</span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-gray-400">
-            text-[10px] uppercase tracking-wider \u00b7 section labels (panel-text-muted)
+            text-[10px] uppercase tracking-wider · section labels (panel-text-muted)
           </span>
           <span className="text-[10px] uppercase tracking-wider panel-text-muted">Places</span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-gray-400">
-            breadcrumb \u00b7 text-sm \u00b7 black/60 \u2192 separator black/30 \u2192 last font-medium
+            breadcrumb · text-sm · black/60 → separator black/30 → last font-medium
           </span>
           <div className="flex items-center text-sm">
             <span className="text-black/60">All</span>
@@ -193,7 +193,7 @@ function TokensTab() {
           </div>
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-gray-400">text-[10px] \u00b7 chips \u00b7 path nodes \u00b7 ESC badge \u00b7 10px secondary labels</span>
+          <span className="text-[10px] text-gray-400">text-[10px] · chips · path nodes · ESC badge · 10px secondary labels</span>
         </div>
       </div>
 
@@ -245,14 +245,14 @@ function TokensTab() {
           <span className="text-sm text-black">Mobile bottom-sheet spring</span>
           <br />
           <span className="text-[10px] text-gray-400">
-            cubic-bezier(0.32, 0.72, 0, 1) \u00b7 350ms height
+            cubic-bezier(0.32, 0.72, 0, 1) · 350ms height
           </span>
         </div>
         <div>
           <span className="text-sm text-black">Desktop panel resize</span>
           <br />
           <span className="text-[10px] text-gray-400">
-            cubic-bezier(0.4, 0, 0.2, 1) \u00b7 260ms width &amp; height
+            cubic-bezier(0.4, 0, 0.2, 1) · 260ms width &amp; height
           </span>
         </div>
       </div>
@@ -260,7 +260,7 @@ function TokensTab() {
   )
 }
 
-// \u2500\u2500\u2500 COMPONENTS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── COMPONENTS ────────────────────────────────────────────────────────────────────────
 
 // Object card: matches object-grid.tsx exactly
 // Wrapper: group relative cursor-pointer bg-white p-1 h-44 flex items-center justify-center
@@ -306,7 +306,7 @@ function ComponentsTab() {
     <div>
       <SectionLabel>Object Card (image grid)</SectionLabel>
       <p className="text-[10px] text-gray-400 mb-3">
-        group \u00b7 p-1 \u00b7 bg-white \u00b7 h-44 \u00b7 ring-2 ring-blue-500 on hover / click \u00b7 rounded-[4px] \u00b7 inventory number as placeholder
+        group · p-1 · bg-white · h-44 · ring-2 ring-blue-500 on hover / click · rounded-[4px] · inventory number as placeholder
       </p>
       <div className="grid grid-cols-4 gap-3 max-w-xs">
         {["III C 15987", "III C 4832", "III E 1201", "III C 22011"].map((inv, i) => (
@@ -322,7 +322,7 @@ function ComponentsTab() {
 
       <SectionLabel>Icon Buttons</SectionLabel>
       <p className="text-[10px] text-gray-400 mb-3">
-        h-8 w-8 \u00b7 ghost \u00b7 icon only \u00b7 no label
+        h-8 w-8 · ghost · icon only · no label
       </p>
       <div className="flex flex-wrap gap-4">
         {(
@@ -368,7 +368,7 @@ function ComponentsTab() {
           <Search className="w-[18px] h-[18px] text-gray-400 flex-shrink-0" />
           <input
             type="text"
-            placeholder="Search places, sites, collections\u2026"
+            placeholder="Search places, sites, collections…"
             className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
             readOnly
           />
@@ -432,12 +432,12 @@ function ComponentsTab() {
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
           Rwanda
         </span>
-        <span className="text-violet-300 text-xs">\u2192</span>
+        <span className="text-violet-300 text-xs">→</span>
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           Kigali
         </span>
-        <span className="text-violet-300 text-xs">\u2192</span>
+        <span className="text-violet-300 text-xs">→</span>
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           British Museum
@@ -499,14 +499,14 @@ function FilterChipDemo() {
   )
 }
 
-// \u2500\u2500\u2500 PATTERNS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── PATTERNS ────────────────────────────────────────────────────────────────────────
 
 // Dummy data
 const MOCK_OBJECTS = [
   { id: "1", inv: "III C 15987", title: "Figur eines Ahnen" },
   { id: "2", inv: "III C 4832", title: "Maske" },
   { id: "3", inv: "III E 1201", title: "Objekt ohne Titel" },
-  { id: "4", inv: "III C 22011", title: "Keramikgef\u00e4\u00df" },
+  { id: "4", inv: "III C 22011", title: "Keramikgefäß" },
   { id: "5", inv: "III C 9123", title: "Holzfigur" },
   { id: "6", inv: "III C 7741", title: "Ritualobjekt" },
 ]
@@ -603,7 +603,7 @@ function PatternsTab({ onShowCode }: { onShowCode: (code: string) => void }) {
   )
 }
 
-// \u2500\u2500 Header Panel \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Header Panel ──────────────────────────────────────────────────────────────────────
 function HeaderPanelPattern() {
   const [showPlaces, setShowPlaces] = useState(false)
   const [showSites, setShowSites] = useState(false)
@@ -628,7 +628,7 @@ function HeaderPanelPattern() {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider panel-text-muted mb-3">
-        Header Panel \u00b7 desktop \u00b7 absolute top-10 left-10 sm:w-80 \u00b7 white panel \u00b7 rounded-2xl \u00b7 shadow-lg
+        Header Panel · desktop · absolute top-10 left-10 sm:w-80 · white panel · rounded-2xl · shadow-lg
       </p>
       <div
         className="relative overflow-hidden rounded-2xl"
@@ -776,7 +776,7 @@ function HeaderPanelPattern() {
   )
 }
 
-// \u2500\u2500 Object Panel Desktop \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Object Panel Desktop ───────────────────────────────────────────────────────────────────
 function ObjectPanelDesktopPattern() {
   const [expanded, setExpanded] = useState(false)
   const [chips, setChips] = useState([
@@ -794,7 +794,7 @@ function ObjectPanelDesktopPattern() {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider panel-text-muted mb-3">
-        Object Panel \u00b7 desktop \u00b7 right \u00b7 width 40% default / calc(100%\u22125rem) expanded \u00b7 sticky header \u00b7 260ms cubic-bezier(0.4,0,0.2,1)
+        Object Panel · desktop · right · width 40% default / calc(100%−5rem) expanded · sticky header · 260ms cubic-bezier(0.4,0,0.2,1)
       </p>
       <div
         className="relative overflow-hidden rounded-2xl"
@@ -913,13 +913,13 @@ function ObjectPanelDesktopPattern() {
         </div>
       </div>
       <p className="text-[10px] text-gray-400 mt-2">
-        Click expand icon to toggle panel width. Click cards to see ring-2 ring-blue-500. Click chip \u00d7 to remove.
+        Click expand icon to toggle panel width. Click cards to see ring-2 ring-blue-500. Click chip × to remove.
       </p>
     </div>
   )
 }
 
-// \u2500\u2500 Object Panel Mobile \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Object Panel Mobile ────────────────────────────────────────────────────────────────────
 type SheetSize = "minimized" | "default" | "expanded"
 
 function ObjectPanelMobilePattern() {
@@ -949,7 +949,7 @@ function ObjectPanelMobilePattern() {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider panel-text-muted mb-3">
-        Object Panel \u00b7 mobile \u00b7 bottom sheet \u00b7 minimized 88px / default 44dvh / expanded 100dvh \u00b7 spring cubic-bezier(0.32,0.72,0,1) 350ms
+        Object Panel · mobile · bottom sheet · minimized 88px / default 44dvh / expanded 100dvh · spring cubic-bezier(0.32,0.72,0,1) 350ms
       </p>
       <div
         className="relative overflow-hidden"
@@ -1026,13 +1026,13 @@ function ObjectPanelMobilePattern() {
         </div>
       </div>
       <p className="text-[10px] text-gray-400 mt-2">
-        Click drag handle to cycle: minimized \u2192 default \u2192 expanded. Click cards to see ring.
+        Click drag handle to cycle: minimized → default → expanded. Click cards to see ring.
       </p>
     </div>
   )
 }
 
-// \u2500\u2500 Command Palette \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Command Palette ─────────────────────────────────────────────────────────────────────
 function CommandPalettePattern() {
   const [query, setQuery] = useState("")
   const [activeFilter, setActiveFilter] = useState("All")
@@ -1045,15 +1045,15 @@ function CommandPalettePattern() {
 
   const FILTER_TABS = ["All", "Places", "Institutions", "Paths"]
   const RESULTS = [
-    { label: "Rwanda", sub: "Country \u00b7 Central Africa" },
-    { label: "Kigali, Rwanda", sub: "City \u00b7 RW" },
-    { label: "Rwanda \u2192 Ethnologisches Museum", sub: "132 objects \u00b7 arc" },
+    { label: "Rwanda", sub: "Country · Central Africa" },
+    { label: "Kigali, Rwanda", sub: "City · RW" },
+    { label: "Rwanda → Ethnologisches Museum", sub: "132 objects · arc" },
   ].filter((r) => !query || r.label.toLowerCase().includes(query.toLowerCase()))
 
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider panel-text-muted mb-3">
-        Command Palette \u00b7 \u2318K \u00b7 fixed center modal \u00b7 rounded-[20px] \u00b7 shadow-2xl \u00b7 backdrop-blur-[2px] bg-black/25
+        Command Palette · ⌘K · fixed center modal · rounded-[20px] · shadow-2xl · backdrop-blur-[2px] bg-black/25
       </p>
       <div
         className="relative overflow-hidden rounded-2xl"
@@ -1072,7 +1072,7 @@ function CommandPalettePattern() {
               <Search className="w-[18px] h-[18px] text-gray-400 flex-shrink-0" />
               <input
                 type="text"
-                placeholder="Search places, sites, collections\u2026"
+                placeholder="Search places, sites, collections…"
                 className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -1188,13 +1188,13 @@ function CommandPalettePattern() {
         </div>
       </div>
       <p className="text-[10px] text-gray-400 mt-2">
-        Type to filter results. Click filter tabs. Click \u00d7 to remove chips. Click accordion rows to expand.
+        Type to filter results. Click filter tabs. Click × to remove chips. Click accordion rows to expand.
       </p>
     </div>
   )
 }
 
-// \u2500\u2500\u2500 STACK \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── STACK ──────────────────────────────────────────────────────────────────────────────
 
 const STACK_ITEMS = [
   { name: "Next.js 15", role: "Framework (App Router)", license: "MIT" },

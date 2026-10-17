@@ -4,6 +4,7 @@ import ClientMapLibreCSS from "@/components/client-maplibre-css"
 import { Theme } from "@radix-ui/themes"
 import AnalyticsScript from "@/components/analytics-script"
 import { Noto_Sans_Mono } from "next/font/google"
+import { SITE_PREVIEW_IMAGE } from "@/lib/map-title"
 
 // The map labels are Noto Sans Mono Regular (lib/protomaps-dark-style.ts); the
 // interface uses the same open-licence (OFL) font, served from this site.
@@ -53,20 +54,20 @@ export default function RootLayout({
 export const metadata = {
   metadataBase: new URL('https://exsitu.app'),
   title: 'Ex Situ',
-  description: `A spatial index of displaced cultural artifacts — 
-mapped from origin site to holding institution.`,
+  description: 'An open-source spatial index of the migration of cultural artifacts, from their place of origin to the institution that holds them today.',
   openGraph: {
     title: 'Ex Situ',
     description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',
     url: 'https://exsitu.app',
     siteName: 'Ex Situ',
     type: 'website',
+    images: [SITE_PREVIEW_IMAGE],
   },
-  // Text-only link previews: no og:image by default. Pages with a real image
-  // (artifacts) declare their own large-image card.
+  // The map image by default; artifacts with a photo show their own.
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'Ex Situ',
     description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',
+    images: [SITE_PREVIEW_IMAGE.url],
   },
 };

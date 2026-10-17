@@ -65,9 +65,11 @@ function AboutText() {
   return (
     <>
       <p className="mb-2.5 text-[#555]">
-        Ex Situ is an open-source spatial index of the migration of cultural artifacts. Each artifact is an arc from its place of origin to the institution that holds it today. Ex Situ does not host images or copy records. Every arc links back to the institution&rsquo;s own page. The index shows what museum records state. Many objects have no located origin, and some locations are uncertain.
+        Ex Situ is an open-source spatial index of the migration of cultural artifacts: each arc runs from an artifact&rsquo;s place of origin to the institution that holds it today, and links back to that institution&rsquo;s own page. Places come from the museums&rsquo; own records and are shown under their present-day names; where a record is uncertain or names no place, Ex Situ shows that rather than guessing. Made by H&uuml;seyin Burak Yel, starting from an MA thesis in 2022.
       </p>
       <p>
+        <a href="https://github.com/hburakyel/ex-situ/blob/main/METHODOLOGY.md" target="_blank" rel="noopener noreferrer" className="text-link">Methodology ↗</a>
+        {" · "}
         <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="text-link">GitHub ↗</a>
         {" · "}
         <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" className="text-link">Report issue ↗</a>
@@ -303,6 +305,13 @@ export default function InfoPanel({
             </Button>
           )}
         </div>
+      )}
+
+      {/* First screen: one line on what this is, until the visitor picks something. */}
+      {breadcrumb.length === 1 && breadcrumb[0].level === "global" && !aboutOpen && (
+        <p className="pb-2 text-[13px] leading-snug text-black/60">
+          The migration of cultural artifacts, from their place of origin to the institution that holds them today.
+        </p>
       )}
 
       {mobileVariant === "drill" && aboutOpen && (

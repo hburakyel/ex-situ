@@ -22,7 +22,7 @@ import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/co
 import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
 import { track } from "@/lib/analytics"
-import { mapTitle } from "@/lib/map-title"
+import { MAP_DEFAULT_TITLE, mapTitle } from "@/lib/map-title"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 
@@ -262,6 +262,19 @@ function MapContent() {
   const activeSiteRef = useRef<string | null>(urlSite || null)
   useEffect(() => { activeSiteRef.current = activeSite }, [activeSite])
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
+  // Links from /research/collection/<slug> carry the lower-case slug ("rijksmuseum"); once
+  // the arcs are in, use the museum's own spelling (breadcrumb, title, URL, toggles).
+  useEffect(() => {
+    if (!activeInstitution || arcData.length === 0) return
+    const key = activeInstitution.toLowerCase()
+    const name = arcData.find((a) => a.institution_name?.toLowerCase() === key)?.institution_name
+    if (!name || name === activeInstitution) return
+    setActiveInstitution(name)
+    setFacetedFilters((prev) => ({
+      ...prev,
+      institutions: prev.institutions.map((i) => (i.toLowerCase() === key ? name : i)),
+    }))
+  }, [activeInstitution, arcData])
   // Precise place inside the active site (Istanbul → Dolmabahçe Palace). Kept with the
   // site it belongs to, so picking another site can't leave a stale filter behind.
   const [precisePick, setPrecisePick] = useState<{ site: string; name: string } | null>(null)
@@ -277,7 +290,7 @@ function MapContent() {
   // Tab title follows the drill (the server only sets it for the URL the page loaded with).
   useEffect(() => {
     const title = mapTitle({ place: activeCountry, site: activeSite, institution: activeInstitution })
-    document.title = title ? `${title} | Ex Situ` : "Ex Situ"
+    document.title = title ? `${title} | Ex Situ` : MAP_DEFAULT_TITLE
   }, [activeCountry, activeSite, activeInstitution])
 
   // Mobile: picking an arc, place, site or collection brings the object sheet up to

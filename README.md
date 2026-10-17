@@ -1,6 +1,6 @@
 # Ex Situ
 
-**A spatial index of displaced cultural artifacts — mapped from origin site to holding institution.**
+**An open-source spatial index of the migration of cultural artifacts, from their place of origin to the institution that holds them today.**
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)

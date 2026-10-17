@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import MapClient from "./map-client"
 import { fetchArcTotals, findGroup, groupByInstitution, groupByPlace } from "@/lib/arc-index"
-import { mapTitle } from "@/lib/map-title"
+import { SITE_PREVIEW_IMAGE, mapTitle } from "@/lib/map-title"
 
 // Place and museum views live on /map (?place=, ?institution=); give each its own title,
 // description and canonical so search engines can index them. Labels and counts only.
@@ -43,8 +43,8 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
     title: `${title} | Ex Situ`,
     description,
     alternates: { canonical },
-    openGraph: { title, description, url: canonical, siteName: "Ex Situ", type: "website" },
-    twitter: { card: "summary", title, description },
+    openGraph: { title, description, url: canonical, siteName: "Ex Situ", type: "website", images: [SITE_PREVIEW_IMAGE] },
+    twitter: { card: "summary_large_image", title, description, images: [SITE_PREVIEW_IMAGE.url] },
   }
 }
 

@@ -1,8 +1,9 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
+import { MAP_DEFAULT_TITLE } from "@/lib/map-title"
 
 export const metadata: Metadata = {
-  title: "Ex Situ",
+  title: MAP_DEFAULT_TITLE,
   description: "Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.",
 }
 
