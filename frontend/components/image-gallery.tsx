@@ -469,26 +469,12 @@ export default function ImageGallery({
         </div>
 
 
-        {/* Site mark — bottom left; image credit — bottom right */}
+        {/* Site mark — bottom left; image credit, then the correction link — bottom right */}
         <div style={{ padding: "4px 16px 6px", backgroundColor: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
           <span style={{ color: "#2a2a2a", fontSize: "9px", whiteSpace: "nowrap", flexShrink: 0 }}>
-            Indexed by Ex Situ
-            {!String(currentObject.id).startsWith("wiki-") && (
-              <>
-                {" · "}
-                <a
-                  href={artifactCorrectionUrl({ id: currentObject.id, ...currentObject.attributes })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-link"
-                  style={{ fontSize: "9px" }}
-                >
-                  Correction ↗
-                </a>
-              </>
-            )}
+            Ex Situ
           </span>
-          <span style={{ textAlign: "right", minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
+          <span style={{ display: "flex", justifyContent: "flex-end", alignItems: "baseline", minWidth: 0, flex: "1 1 auto", overflow: "hidden", whiteSpace: "nowrap" }}>
           {(() => {
             // Image credit as each museum states it for its images (audited 2026-10-07):
             // - SMB (museum-digital object_images[].rights): CC BY-NC-SA for every collection
@@ -535,13 +521,27 @@ export default function ImageGallery({
               return (
                 <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link" title={credit} style={{ fontSize: style.fontSize, display: "flex", justifyContent: "flex-end", minWidth: 0, whiteSpace: "nowrap" }} onClick={() => trackOutbound(sourceUrl, "credit")}>
                   <span style={{ ...linkText, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{creditName}</span>
-                  <span style={{ ...linkText, flexShrink: 0 }}>{licence ? ` · ${licence}` : ""} ↗</span>
+                  <span style={{ ...linkText, flexShrink: 0 }}>{licence ? ` · ${licence}` : ""} ↗</span>
                 </a>
               )
             }
             if (credit) return <span style={style}>{credit}</span>
             return null
           })()}
+          {!String(currentObject.id).startsWith("wiki-") && (
+            <span style={{ fontSize: "9px", color: "#2a2a2a", flexShrink: 0 }}>
+              {"\u00a0· "}
+              <a
+                href={artifactCorrectionUrl({ id: currentObject.id, ...currentObject.attributes })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-link"
+                style={{ fontSize: "9px" }}
+              >
+                Correction ↗
+              </a>
+            </span>
+          )}
           </span>
         </div>
       </div>
