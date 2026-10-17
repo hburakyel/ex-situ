@@ -43,7 +43,9 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     // country of the GeoNames town their place name and point both match.
     // 2673 since 2026-10-16: 201 records without coordinates got the findspot of
     // their museum-digital record (etl/backfill_smb_event_attribution.py).
-    expect(r.flows_objects).toBe(2673)
+    // 2659 since 2026-10-17: 14 "Theben" records placed at Devín, Slovakia (German
+    // "Theben") lost the point and country; Greece or Egypt is not stated, so they wait for review.
+    expect(r.flows_objects).toBe(2659)
     expect(r.flows_objects).toBeLessThanOrEqual(r.coverage.located)
     expect(r.note).toMatch(/^\d+ of 5612 objects \(\d+%\) have a located origin/)
     expect(r.note).not.toMatch(/slightly higher/)
