@@ -43,7 +43,11 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     // country of the GeoNames town their place name and point both match.
     // 2673 since 2026-10-16: 201 records without coordinates got the findspot of
     // their museum-digital record (etl/backfill_smb_event_attribution.py).
-    expect(r.flows_objects).toBe(2673)
+    // 2659 since 2026-10-17: 14 "Theben" records placed at Devín, Slovakia (German
+    // "Theben") lost the point and country; Greece or Egypt is not stated, so they wait for review.
+    // 2650 since 2026-10-17 (Italy review): 9 records geocoded to a same-name Italian place
+    // (Weiden, Ligurio, Naxos, ...) whose real place the record doesn't settle wait for review.
+    expect(r.flows_objects).toBe(2650)
     expect(r.flows_objects).toBeLessThanOrEqual(r.coverage.located)
     expect(r.note).toMatch(/^\d+ of 5612 objects \(\d+%\) have a located origin/)
     expect(r.note).not.toMatch(/slightly higher/)
@@ -53,7 +57,7 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     const r = await call("get_origins", { institution: "Antikensammlung", detail: "site", limit: 5 })
     const olympia = r.flows.filter((f: any) => f.origin === "Olympia")
     expect(olympia).toHaveLength(1)
-    expect(olympia[0].objects).toBe(372)
+    expect(olympia[0].objects).toBe(381) // 372 + 4 "Olympia?" (site key) + 5 Gymnasion, House of Nero, Pelopion (precise places, 2026-10-16)
     expect(olympia[0].variants).toEqual(expect.arrayContaining(["Olympia, Greece", "Olympia"]))
   })
 
@@ -127,13 +131,17 @@ describe(`geospatial place grouping for Antikensammlung (${API_URL})`, () => {
   it("returns Olympia as one row with its raw spellings", () => {
     const olympia = rows!.filter((r) => r.place_name.toLowerCase().startsWith("olympia") && !r.place_name.endsWith("?"))
     expect(olympia).toHaveLength(1)
-    expect(olympia[0].object_count).toBe(372)
+    expect(olympia[0].object_count).toBe(381) // 372 + 4 "Olympia?" (site key) + 5 Gymnasion, House of Nero, Pelopion (precise places, 2026-10-16)
     expect(olympia[0].place_variants).toEqual(expect.arrayContaining(["Olympia", "Olympia, Greece"]))
   })
 
-  it("keeps Tarquinia and the tomb inside it apart", () => {
+  it("puts the tomb under Tarquinia as a precise place, not a site of its own", async () => {
     const names = rows!.map((r) => r.place_name)
-    expect(names).toEqual(expect.arrayContaining(["Tarquinia", "Tomba del Guerriero (Tarquinia)"]))
+    expect(names).toContain("Tarquinia")
+    expect(names).not.toContain("Tomba del Guerriero (Tarquinia)")
+    const res = await fetch(`${API_URL}/museum-objects/precise-places?country=Italy&site=Tarquinia&institution=Antikensammlung`)
+    const precise = (await res.json()).data.map((p: { name: string }) => p.name)
+    expect(precise).toContain("Tomba del Guerriero")
   })
 
   it("has no two rows that differ only by case or a country suffix", () => {

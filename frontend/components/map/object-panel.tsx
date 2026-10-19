@@ -27,6 +27,8 @@ import InfoPanel from "./info-panel"
 import type { EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { track } from "@/lib/analytics"
+import type { PrecisePlace } from "@/lib/api"
+import PrecisePlaceRows from "@/components/map/precise-place-rows"
 
 const EXPORT_ROW_CAP = 5000
 const EXPORT_TOOLTIP = "Select a place or artifact to export."
@@ -102,6 +104,9 @@ interface ObjectPanelProps {
   groupedSites?: GroupedSite[]
   drillInstitutions?: InstitutionItem[]
   activeSite?: string | null
+  precisePlaces?: PrecisePlace[]
+  activePrecise?: string | null
+  onTogglePrecise?: (place: PrecisePlace) => void
   activeCountry?: string | null
   activeInstitution?: string | null
   onToggleSite?: (site: string, lat?: number, lng?: number) => void
@@ -150,6 +155,9 @@ export default function ObjectPanel({
   groupedSites = [],
   drillInstitutions = [],
   activeSite = null,
+  precisePlaces = [],
+  activePrecise = null,
+  onTogglePrecise,
   activeCountry = null,
   activeInstitution = null,
   onToggleSite,
@@ -1402,6 +1410,9 @@ export default function ObjectPanel({
         onOriginClick={onOriginClick}
         groupedSites={groupedSites}
         activeSite={activeSite}
+        precisePlaces={precisePlaces}
+        activePrecise={activePrecise}
+        onTogglePrecise={onTogglePrecise}
         onToggleSite={onToggleSite}
         isLoadingSubArcs={isLoadingSubArcs}
         drillInstitutions={drillInstitutions}
@@ -1480,6 +1491,9 @@ export default function ObjectPanel({
                 onOriginClick={onOriginClick}
                 groupedSites={groupedSites}
                 activeSite={activeSite}
+                precisePlaces={precisePlaces}
+                activePrecise={activePrecise}
+                onTogglePrecise={onTogglePrecise}
                 onToggleSite={onToggleSite}
                 isLoadingSubArcs={isLoadingSubArcs}
                 drillInstitutions={drillInstitutions}

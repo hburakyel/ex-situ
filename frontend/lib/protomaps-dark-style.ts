@@ -214,6 +214,10 @@ const exSituLabelLayers: LayerSpecification[] = [
     type: "symbol",
     source: ORIGIN_LABELS_SOURCE,
     minzoom: 4,
+    // From neighbourhood zoom on, the basemap's own names (streets, districts,
+    // buildings) describe the place; a site label such as "Istanbul" drawn over
+    // Dolmabahçe would read like a street name.
+    maxzoom: 12,
     layout: { ...townLabelLayout, "text-field": ["get", "name"] },
     paint: townLabelPaint,
   },

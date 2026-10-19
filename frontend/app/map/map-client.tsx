@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "rea
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import MapView, { type FacetedFilters } from "@/components/map/map-view"
 import ObjectPanel, { type ContainerSize } from "@/components/map/object-panel"
-import { fetchMuseumObjects, fetchObjectsByCountry, fetchDateBucketCounts, type DateBucketCounts } from "@/lib/api"
+import { fetchMuseumObjects, fetchObjectsByCountry, fetchDateBucketCounts, fetchPrecisePlaces, type DateBucketCounts, type PrecisePlace } from "@/lib/api"
 import { eraToDateFilters, type EraDateFilters } from "@/lib/era-buckets"
 import type { MuseumObject, MapBounds, SelectedArc } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -22,7 +22,7 @@ import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/co
 import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
 import { track } from "@/lib/analytics"
-import { mapTitle } from "@/lib/map-title"
+import { MAP_DEFAULT_TITLE, mapTitle } from "@/lib/map-title"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 
@@ -262,11 +262,35 @@ function MapContent() {
   const activeSiteRef = useRef<string | null>(urlSite || null)
   useEffect(() => { activeSiteRef.current = activeSite }, [activeSite])
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
+  // Links from /research/collection/<slug> carry the lower-case slug ("rijksmuseum"); once
+  // the arcs are in, use the museum's own spelling (breadcrumb, title, URL, toggles).
+  useEffect(() => {
+    if (!activeInstitution || arcData.length === 0) return
+    const key = activeInstitution.toLowerCase()
+    const name = arcData.find((a) => a.institution_name?.toLowerCase() === key)?.institution_name
+    if (!name || name === activeInstitution) return
+    setActiveInstitution(name)
+    setFacetedFilters((prev) => ({
+      ...prev,
+      institutions: prev.institutions.map((i) => (i.toLowerCase() === key ? name : i)),
+    }))
+  }, [activeInstitution, arcData])
+  // Precise place inside the active site (Istanbul → Dolmabahçe Palace). Kept with the
+  // site it belongs to, so picking another site can't leave a stale filter behind.
+  const [precisePick, setPrecisePick] = useState<{ site: string; name: string } | null>(null)
+  const activePrecise = precisePick && activeSite && precisePick.site === activeSite ? precisePick.name : null
+  const [precisePlaces, setPrecisePlaces] = useState<PrecisePlace[]>([])
+  useEffect(() => {
+    if (!activeSite) { setPrecisePlaces([]); return }
+    let cancelled = false
+    fetchPrecisePlaces(activeSite, activeCountry, activeInstitution).then((p) => { if (!cancelled) setPrecisePlaces(p) })
+    return () => { cancelled = true }
+  }, [activeSite, activeCountry, activeInstitution])
 
   // Tab title follows the drill (the server only sets it for the URL the page loaded with).
   useEffect(() => {
     const title = mapTitle({ place: activeCountry, site: activeSite, institution: activeInstitution })
-    document.title = title ? `${title} | Ex Situ` : "Ex Situ"
+    document.title = title ? `${title} | Ex Situ` : MAP_DEFAULT_TITLE
   }, [activeCountry, activeSite, activeInstitution])
 
   // Mobile: picking an arc, place, site or collection brings the object sheet up to
@@ -549,6 +573,12 @@ function MapContent() {
 
   // ── Institutions for the active country (filtered by site) ──
   const aggregateInstitutions = useMemo(() => {
+    // A precise place (Dolmabahçe Palace): its few objects are all loaded — count them.
+    if (activePrecise) {
+      const map = new Map<string, number>()
+      arcObjects.forEach((o) => { const n = o.attributes.institution_name; if (n) map.set(n, (map.get(n) || 0) + 1) })
+      return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
+    }
     if (activeSite && filteredSubArcs.length > 0) {
       const map = new Map<string, number>()
       const siteKey = normalizePlaceKey(activeSite)
@@ -571,7 +601,7 @@ function MapContent() {
     const map = new Map<string, number>()
     source.forEach((arc) => { map.set(arc.institution_name, (map.get(arc.institution_name) || 0) + arc.object_count) })
     return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
-  }, [countryArcs, filteredGlobalAggregateArcs, filteredSubArcs, activeSite, activeCountry, activeInstitution])
+  }, [activePrecise, arcObjects, countryArcs, filteredGlobalAggregateArcs, filteredSubArcs, activeSite, activeCountry, activeInstitution])
 
   const institutions = useMemo(() => {
     return [...aggregateInstitutions].sort((a, b) => b.count - a.count)
@@ -601,9 +631,10 @@ function MapContent() {
     if (activeSite && activeSite !== activeCountry) {
       segments.push({ label: placeDisplayLabel(activeSite, groupedSites.map((s) => s.name)), level: "objects" })
     }
+    if (activePrecise) segments.push({ label: activePrecise, level: "objects" })
     if (activeInstitution && !activeSite) segments.push({ label: activeInstitution, level: "objects" })
     return segments
-  }, [activeCountry, activeSite, activeInstitution, groupedSites])
+  }, [activeCountry, activeSite, activePrecise, activeInstitution, groupedSites])
 
   // ── Sync drill-down state → URL (shallow replace, no scroll) ──
   const isRestoringFromUrl = useRef(!!urlCountry)
@@ -733,6 +764,7 @@ function MapContent() {
         effectiveInstitution,
         false,
         eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
+        activePrecise || undefined,
       )
       // A newer request (from a filter change that happened while this one was
       // in flight) has already taken over — applying this stale result would
@@ -758,7 +790,7 @@ function MapContent() {
     } finally {
       if (requestId === drillFetchIdRef.current) setArcObjectsLoading(false)
     }
-  }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id])
+  }, [activeCountry, activeSite, activePrecise, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id])
 
   // Trigger object fetch when drill-down filters change (also a museum picked at global level)
   useEffect(() => {
@@ -767,7 +799,18 @@ function MapContent() {
       setArcObjectsPage(1)
       fetchDrillObjects(1)
     }
-  }, [activeCountry, activeSite, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id, fetchDrillObjects, drillLevel])
+  }, [activeCountry, activeSite, activePrecise, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id, fetchDrillObjects, drillLevel])
+
+  // Picking a precise place filters the objects to it and flies to building level.
+  const handleTogglePrecise = useCallback((place: PrecisePlace) => {
+    if (!activeSite) return
+    if (activePrecise === place.name) { setPrecisePick(null); return }
+    setPrecisePick({ site: activeSite, name: place.name })
+    if (mapRef.current && hasValidCoordinates(place.latitude, place.longitude)) {
+      mapRef.current.flyToLocation(place.longitude as number, place.latitude as number, 16, 1200)
+      setViewState((prev) => ({ ...prev, longitude: place.longitude as number, latitude: place.latitude as number, zoom: 16 }))
+    }
+  }, [activeSite, activePrecise])
 
   const handleDrillLoadMore = useCallback(() => {
     if (!arcObjectsHasMore || arcObjectsLoading) return
@@ -1161,6 +1204,9 @@ function MapContent() {
     }
   }, [])
 
+  // The objects shown in the panel, for the image-click zoom (filled below, where
+  // containerObjects is built).
+  const containerObjectsRef = useRef<MuseumObject[]>([])
   const handleObjectClick = useCallback((longitude: number, latitude: number, object?: MuseumObject) => {
     const drill = drillLevelRef.current
 
@@ -1251,9 +1297,23 @@ function MapContent() {
       if (site === "Unknown" || (country && normalizePlaceKey(site) === normalizePlaceKey(country))) return
     }
 
-    // ── Step 2: Country level → fly to object detail ──
-    mapRef.current.flyToLocation(longitude, latitude, 14, 1200)
-    setViewState(prev => ({ ...prev, longitude, latitude, zoom: 14 }))
+    // ── Step 2: fly to the object ──
+    // An object with its own precise point (Dolmabahçe Mosque, within Istanbul) gets
+    // building-level zoom; one that only sits on its site's centre (located to
+    // "Istanbul") stays at city level instead of landing on an arbitrary street.
+    let targetZoom = 14
+    if (object && hasValidCoordinates(latitude, longitude)) {
+      // A point shared by several of the place's objects is the place's own point
+      // (a city centre); a point of its own is a precise location.
+      const key = (lat: number, lng: number) => `${lat.toFixed(3)},${lng.toFixed(3)}`
+      const here = key(latitude, longitude)
+      const sharing = containerObjectsRef.current.filter((o) =>
+        hasValidCoordinates(o.attributes.latitude, o.attributes.longitude) &&
+        key(o.attributes.latitude, o.attributes.longitude) === here).length
+      targetZoom = sharing >= 3 ? 11 : 16
+    }
+    mapRef.current.flyToLocation(longitude, latitude, targetZoom, 1200)
+    setViewState(prev => ({ ...prev, longitude, latitude, zoom: targetZoom }))
     debouncedGeocode(longitude, latitude)
   }, [groupedOrigins, handleOriginClick, debouncedGeocode])
 
@@ -1352,11 +1412,12 @@ function MapContent() {
     })
     return combined
   }, [drillLevel, isGlobalInstitutionDrill, arcObjects, objects, filteredGlobalPreviewObjects, allObjects, isWikipediaActive, wikiObjects])
+  useEffect(() => { containerObjectsRef.current = containerObjects }, [containerObjects])
 
   // Effective location name: derived from drill state, with manual fallback
   // This ensures the object panel header ALWAYS reflects the current drill-down
   // without needing setLocationName() in every single handler.
-  const effectiveLocationName = activeSite || activeCountry || locationName || ''
+  const effectiveLocationName = activePrecise || activeSite || activeCountry || locationName || ''
 
   // Global-level stats: arc count and unique collection count
   const globalArcCount = filteredGlobalAggregateArcs.length
@@ -1443,7 +1504,7 @@ function MapContent() {
           onExpandView={() => setContainerSize(prev => prev === "default" ? "expanded" : "default")}
           viewMode={viewMode}
           containerSize={containerSize}
-          locationName={drillLevel === "country" ? (activeCountry || locationName) : locationName}
+          locationName={activePrecise || (drillLevel === "country" ? (activeCountry || locationName) : locationName)}
           onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
           isObjectContainerVisible={isObjectContainerVisible}
           setObjects={setObjects}
@@ -1468,6 +1529,9 @@ function MapContent() {
           drillInstitutions={institutions}
           activeCountry={activeCountry}
           activeSite={activeSite}
+          precisePlaces={precisePlaces}
+          activePrecise={activePrecise}
+          onTogglePrecise={handleTogglePrecise}
           activeInstitution={activeInstitution}
           onToggleSite={handleToggleSite}
           onToggleInstitution={handleToggleInstitution}
@@ -1584,6 +1648,9 @@ function MapContent() {
             groupedSites={groupedSites}
             drillInstitutions={institutions}
             activeSite={activeSite}
+            precisePlaces={precisePlaces}
+            activePrecise={activePrecise}
+            onTogglePrecise={handleTogglePrecise}
             activeCountry={activeCountry}
             activeInstitution={activeInstitution}
             onToggleSite={(...args: Parameters<typeof handleToggleSite>) => { if (isMobile) showMapCard(); handleToggleSite(...args) }}

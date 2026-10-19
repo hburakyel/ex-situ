@@ -38,6 +38,21 @@ Each origin is checked against its own source record and the GeoNames gazetteer 
 
 Places are labelled with their present-day names; the name in the source record is kept with the record. Historical, colonial and imperial names of places that exist today give way to the name in use now — Chennai for Madras, Jakarta for Batavia, Bergama for Pergamon, Haida Gwaii for the Queen Charlotte Islands — matched together with the country, so a Madras in Oregon is left alone. The present-day name is the one in official use, applied the same way everywhere, including where a renaming is itself debated (Prayagraj for Allahabad, 2018). Historical units that span several present-day countries, such as Rhodesia, are not given a point. The list is in `etl/normalize_present_day_names.py`.
 
+## Where places come from
+
+"Origin" is whatever the holding institution's own record gives as a place. Ex Situ reads one field per source and does not reinterpret it; where a record says the place is a findspot, a place of use or an uncertain attribution, that is kept as stated.
+
+| Source | Field read as origin |
+|---|---|
+| Staatliche Museen zu Berlin (museum-digital) | Place of the record's "Gefunden" (found) event; if there is none, of its "Hergestellt" (made) or "Gemalt" (painted) event. Collected, recorded, owned and similar events are never used. Whether the place is a findspot is stored with the record. |
+| The Metropolitan Museum of Art | The record's city, state, county, country, region and subregion fields. |
+| Art Institute of Chicago | `place_of_origin`. |
+| Victoria and Albert Museum | `_primaryPlace`. |
+| Rijksmuseum | `dcterms:spatial`, the place of production. Depicted places (`dc:subject`) are not used. |
+| Other institutions, through Europeana | The provider's own `dcterms:spatial` and `dc:coverage`. Only where a provider gives none is Europeana's enrichment (`edmPlace`) used, and those records are marked as such. |
+
+Swedish National Museums of World Culture records (Carlotta) name the role of each place — origin, made, findspot, used, acquired from. Europeana's `dcterms:spatial` merges these roles into one list.
+
 ## Country labels
 
 Country names on the map follow one rule for every country: the usage of the United Nations and the International Court of Justice. The basemap's own labels come from OpenStreetMap and treat neighbouring countries differently by zoom level, so Ex Situ draws country labels itself, from Natural Earth v5.1.2 (public domain), in the basemap's style.

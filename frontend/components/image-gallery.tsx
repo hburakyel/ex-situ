@@ -7,12 +7,14 @@ import { displayObjectDate } from "@/lib/object-date"
 import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
-import { Check, Link2 } from "lucide-react"
+import { Check, Link2, Quote } from "lucide-react"
 import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
 import { isWithdrawn, withdrawnSourceUrl } from "@/lib/withdrawn"
 import { isPublicDomain, rightsLabel } from "@/lib/image-rights"
 import { artifactCorrectionUrl } from "@/lib/correction-link"
+import { citationText } from "@/lib/cite"
+import { copyText } from "@/lib/clipboard"
 import { linkHost, track } from "@/lib/analytics"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
@@ -40,6 +42,7 @@ export default function ImageGallery({
   const [imageError, setImageError] = useState(!startsWithImage)
   const [isLoading, setIsLoading] = useState(startsWithImage)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [citeCopied, setCiteCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
@@ -310,6 +313,26 @@ export default function ImageGallery({
                 </Button>
               ) : null
             })()}
+            {Number(currentObject.id) > 0 && !String(currentObject.id).startsWith('wiki-') && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title={citeCopied ? "Citation copied!" : "Copy citation"}
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  track("share_click", { target: "citation", id: String(currentObject.id) })
+                  if (await copyText(citationText({ id: currentObject.id, ...currentObject.attributes }))) {
+                    setCiteCopied(true)
+                    setTimeout(() => setCiteCopied(false), 2000)
+                  }
+                }}
+              >
+                {citeCopied
+                  ? <Check className="h-5 w-5 text-green-500" />
+                  : <Quote className="h-5 w-5 text-gray-500" />}
+              </Button>
+            )}
             {getLinkUrl() && (
               <Button
                 variant="ghost"
@@ -469,26 +492,12 @@ export default function ImageGallery({
         </div>
 
 
-        {/* Site mark — bottom left; image credit — bottom right */}
+        {/* Site mark — bottom left; image credit, then the correction link — bottom right */}
         <div style={{ padding: "4px 16px 6px", backgroundColor: "white", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
           <span style={{ color: "#2a2a2a", fontSize: "9px", whiteSpace: "nowrap", flexShrink: 0 }}>
-            Indexed by Ex Situ
-            {!String(currentObject.id).startsWith("wiki-") && (
-              <>
-                {" · "}
-                <a
-                  href={artifactCorrectionUrl({ id: currentObject.id, ...currentObject.attributes })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-link"
-                  style={{ fontSize: "9px" }}
-                >
-                  Correction ↗
-                </a>
-              </>
-            )}
+            Ex Situ
           </span>
-          <span style={{ textAlign: "right", minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
+          <span style={{ display: "flex", justifyContent: "flex-end", alignItems: "baseline", minWidth: 0, flex: "1 1 auto", overflow: "hidden", whiteSpace: "nowrap" }}>
           {(() => {
             // Image credit as each museum states it for its images (audited 2026-10-07):
             // - SMB (museum-digital object_images[].rights): CC BY-NC-SA for every collection
@@ -535,13 +544,27 @@ export default function ImageGallery({
               return (
                 <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-link" title={credit} style={{ fontSize: style.fontSize, display: "flex", justifyContent: "flex-end", minWidth: 0, whiteSpace: "nowrap" }} onClick={() => trackOutbound(sourceUrl, "credit")}>
                   <span style={{ ...linkText, overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{creditName}</span>
-                  <span style={{ ...linkText, flexShrink: 0 }}>{licence ? ` · ${licence}` : ""} ↗</span>
+                  <span style={{ ...linkText, flexShrink: 0 }}>{licence ? ` · ${licence}` : ""} ↗</span>
                 </a>
               )
             }
             if (credit) return <span style={style}>{credit}</span>
             return null
           })()}
+          {!String(currentObject.id).startsWith("wiki-") && (
+            <span style={{ fontSize: "9px", color: "#2a2a2a", flexShrink: 0 }}>
+              {"\u00a0· "}
+              <a
+                href={artifactCorrectionUrl({ id: currentObject.id, ...currentObject.attributes })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-link"
+                style={{ fontSize: "9px" }}
+              >
+                Correction ↗
+              </a>
+            </span>
+          )}
           </span>
         </div>
       </div>

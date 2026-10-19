@@ -1,7 +1,9 @@
 import type { Metadata } from "next"
+import { notFound } from "next/navigation"
 
 import type { MuseumObject } from "@/types"
 import { LARGE_WIDTH, resolveImageSrc } from "@/lib/image-src"
+import { SITE_PREVIEW_IMAGE } from "@/lib/map-title"
 
 import ArtifactRedirect from "./artifact-redirect"
 
@@ -12,20 +14,30 @@ function fixLocalhost(url: string) {
 	return url.replace("localhost", "127.0.0.1")
 }
 
+// An id that isn't a number, or that the API says doesn't exist, is a 404. Any other
+// failure (API down, timeout) still redirects to the map, which retries on its own.
 async function fetchArtifact(id: string): Promise<MuseumObject | null> {
 	if (!/^\d+$/.test(id)) {
+		notFound()
+	}
+
+	let response: Response
+	try {
+		response = await fetch(fixLocalhost(`${API_BASE}/museum-objects/${id}?populate=*`), {
+			next: { revalidate: 600 },
+		})
+	} catch {
+		return null
+	}
+
+	if (response.status === 404) {
+		notFound()
+	}
+	if (!response.ok) {
 		return null
 	}
 
 	try {
-		const response = await fetch(fixLocalhost(`${API_BASE}/museum-objects/${id}?populate=*`), {
-			next: { revalidate: 600 },
-		})
-
-		if (!response.ok) {
-			return null
-		}
-
 		const json = await response.json()
 		return (json?.data as MuseumObject | undefined) ?? null
 	} catch {
@@ -33,18 +45,14 @@ async function fetchArtifact(id: string): Promise<MuseumObject | null> {
 	}
 }
 
+// Titles and link previews name the object by the museum's inventory number, not by
+// the (often descriptive, often German or Dutch) title in its record.
+function artifactLabel(artifact: MuseumObject | null, id: string) {
+	return artifact?.attributes.inventory_number?.trim() || `Artifact ${id}`
+}
+
 function buildArtifactTitle(artifact: MuseumObject | null, id: string) {
-	const rawTitle = artifact?.attributes.title?.trim()
-	if (rawTitle) {
-		return `${rawTitle} | Ex Situ`
-	}
-
-	const inventoryNumber = artifact?.attributes.inventory_number?.trim()
-	if (inventoryNumber) {
-		return `${inventoryNumber} | Ex Situ`
-	}
-
-	return `Artifact ${id} | Ex Situ`
+	return `${artifactLabel(artifact, id)} | Ex Situ`
 }
 
 function buildArtifactDescription(artifact: MuseumObject | null) {
@@ -108,8 +116,8 @@ export async function generateMetadata({
 	const description = buildArtifactDescription(artifact)
 	const canonicalUrl = `${SITE_URL}/artifact/${encodeURIComponent(id)}`
 	// The object's own photo, at a size link previews can fetch (Met web-large
-	// instead of multi-MB originals, AIC through our proxy). No photo → a
-	// text-only preview (no og:image).
+	// instead of multi-MB originals, AIC through our proxy). No photo → the
+	// site's map image.
 	const rawImage = artifact?.attributes.img_url?.trim()
 	const resolved = rawImage ? resolveImageSrc(rawImage, LARGE_WIDTH) : undefined
 	const imageUrl = resolved ? (resolved.startsWith("/") ? `${SITE_URL}${resolved}` : resolved) : undefined
@@ -124,14 +132,14 @@ export async function generateMetadata({
 			url: canonicalUrl,
 			type: "website",
 			images: imageUrl
-				? [{ url: imageUrl, alt: artifact?.attributes.title || artifact?.attributes.inventory_number || "Artifact image" }]
-				: undefined,
+				? [{ url: imageUrl, alt: artifactLabel(artifact, id) }]
+				: [SITE_PREVIEW_IMAGE],
 		},
 		twitter: {
-			card: imageUrl ? "summary_large_image" : "summary",
+			card: "summary_large_image",
 			title,
 			description,
-			images: imageUrl ? [imageUrl] : undefined,
+			images: [imageUrl ?? SITE_PREVIEW_IMAGE.url],
 		},
 	}
 }

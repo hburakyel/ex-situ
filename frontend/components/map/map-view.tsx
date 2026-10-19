@@ -32,6 +32,8 @@ import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey
 import { track } from "@/lib/analytics"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
+import type { PrecisePlace } from "@/lib/api"
+import PrecisePlaceRows from "@/components/map/precise-place-rows"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -181,6 +183,9 @@ interface MapViewProps {
   drillInstitutions?: InstitutionItem[]
   activeCountry?: string | null
   activeSite?: string | null
+  precisePlaces?: PrecisePlace[]
+  activePrecise?: string | null
+  onTogglePrecise?: (place: PrecisePlace) => void
   activeInstitution?: string | null
   // Transient hover-only place name (from an object card in the grid) — highlights
   // the matching arc without the navigation/fetch side effects of activeSite.
@@ -238,6 +243,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       drillInstitutions = [],
       activeCountry = null,
       activeSite = null,
+      precisePlaces = [],
+      activePrecise = null,
+      onTogglePrecise,
       activeInstitution = null,
       hoveredObjectPlace = null,
       onToggleSite,
@@ -1231,38 +1239,38 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             className="absolute bg-white p-3 rounded-xl text-sm z-50 pointer-events-none border shadow-lg"
             style={{ left: arcTooltipPosRef.current.x + 10, top: arcTooltipPosRef.current.y + 10, maxWidth: "300px" }}
           >
-            <div className="mb-1">
-              <span className="text-muted-foreground mr-2">from:</span>
-              <span className="text-foreground">{hoveredArc.fromName}</span>
-              {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
-              {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
-                <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
-              )}
-              {(hoveredArc.fromCity || hoveredArc.fromCountry) && (
-                (() => {
-                  const city = hoveredArc.fromCity && hoveredArc.fromCity.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCity : null
-                  const country = hoveredArc.fromCountry && hoveredArc.fromCountry.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCountry : null
-                  const sub = city && country ? `${city}, ${country}` : city || country
-                  return sub ? <div className="text-[10px] text-muted-foreground">{sub}</div> : null
-                })()
-              )}
-            </div>
             {/* Same terms as the artifact panel: "to" is a place, the museum is the collection. */}
             {(() => {
               const known = institutionPlace(hoveredArc.toName)
               const toPlace = hoveredArc.toCity || known?.city || ""
               const toCountry = hoveredArc.toCountry || known?.country || ""
+              const city = hoveredArc.fromCity && hoveredArc.fromCity.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCity : null
+              const country = hoveredArc.fromCountry && hoveredArc.fromCountry.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCountry : null
+              const fromSub = city && country ? `${city}, ${country}` : city || country
               return (
                 <>
-                  {toPlace && (
-                    <div className="mb-1">
-                      <span className="text-muted-foreground mr-2">to:</span>
-                      <span className="text-foreground">{toPlace}</span>
-                      {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
-                        <div className="text-[10px] text-muted-foreground">{toCountry}</div>
-                      )}
+                  <div className="grid grid-cols-2 gap-x-4 mb-2">
+                    <div>
+                      <div className="text-muted-foreground">from:</div>
+                      <div>
+                        <span className="text-foreground">{hoveredArc.fromName}</span>
+                        {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
+                        {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
+                          <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
+                        )}
+                      </div>
+                      {fromSub && <div className="text-[10px] text-muted-foreground">{fromSub}</div>}
                     </div>
-                  )}
+                    {toPlace && (
+                      <div>
+                        <div className="text-muted-foreground">to:</div>
+                        <div className="text-foreground">{toPlace}</div>
+                        {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
+                          <div className="text-[10px] text-muted-foreground">{toCountry}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="mb-1">
                     <span className="text-muted-foreground mr-2">collection:</span>
                     <span className="text-foreground">{hoveredArc.toName}</span>
@@ -1454,7 +1462,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   <div className="mt-1 pl-0">
                     <HeaderAccordionList>
                       {groupedSites.map((site, index) => (
-                        <div key={index}
+                        <Fragment key={index}>
+                        <div
                           className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           {...listHoverProps("site", site.name)}
@@ -1467,6 +1476,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                           </Tooltip>
                           <span className="ml-2 text-gray-500 text-sm">{site.totalCount}</span>
                         </div>
+                        {activeSite === site.name && (
+                          <PrecisePlaceRows places={precisePlaces} active={activePrecise} onToggle={onTogglePrecise} padX="px-1" />
+                        )}
+                        </Fragment>
                       ))}
                     </HeaderAccordionList>
                   </div>

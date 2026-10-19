@@ -674,6 +674,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               city_en,
               place_name_normalized,
               historical_name,
+              precise_place,
               country_en,
               institution_name,
               institution_latitude,
@@ -819,6 +820,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_is_findspot,
           origin_person_name,
           historical_name,
+          precise_place,
           ${manualSelect},
           (SELECT ol.link_text FROM museum_objects_components moc
            JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
@@ -892,6 +894,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_is_findspot: row.origin_is_findspot,
           origin_person_name: row.origin_person_name || null,
           historical_name: row.historical_name || null,
+          precise_place: row.precise_place || null,
           manual_latitude: row.manual_latitude ? parseFloat(row.manual_latitude) : null,
           manual_longitude: row.manual_longitude ? parseFloat(row.manual_longitude) : null,
           object_links: row.object_link_url ? [{ link_text: row.object_link_url, link_display: row.object_link_display }] : null,
@@ -928,9 +931,33 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
    * @param {object} options - { site, institution, page, pageSize }
    * @returns {Promise<object>} - { data: [...], meta: { pagination: {...} } }
    */
+  /**
+   * Precise places inside one site (country → city → precise location):
+   * [{ name, count, latitude, longitude }], largest first. Empty for most sites —
+   * most records name only their city.
+   */
+  async getPrecisePlaces({ country, site, institution }) {
+    const db = strapi.db.connection;
+    const bindings = { site };
+    let where = `published_at IS NOT NULL AND NULLIF(BTRIM(precise_place), '') IS NOT NULL
+      AND ${PLACE_GROUP_KEY} = ${SITE_KEY(':site')}`;
+    if (country) { where += ` AND country_en = :country`; bindings.country = country; }
+    if (institution) { where += ` AND institution_name ILIKE :institution`; bindings.institution = `%${institution}%`; }
+    const result = await db.raw(`
+      SELECT mode() WITHIN GROUP (ORDER BY BTRIM(precise_place)) AS name, COUNT(*)::integer AS count,
+             AVG(COALESCE(manual_latitude, latitude)) AS latitude, AVG(COALESCE(manual_longitude, longitude)) AS longitude
+      FROM museum_objects WHERE ${where}
+      GROUP BY LOWER(BTRIM(precise_place)) ORDER BY count DESC, name LIMIT 200`, bindings);
+    return (result.rows || []).map((r) => ({
+      name: r.name, count: r.count,
+      latitude: r.latitude == null ? null : parseFloat(r.latitude),
+      longitude: r.longitude == null ? null : parseFloat(r.longitude),
+    }));
+  },
+
   async getObjectsByCountry(country, options = {}) {
     const db = strapi.db.connection;
-    const { site, institution, page = 1, pageSize = 60, onlyWithImages = false, located = false, countOnly = false } = options;
+    const { site, precise, institution, page = 1, pageSize = 60, onlyWithImages = false, located = false, countOnly = false } = options;
     const offset = (page - 1) * pageSize;
 
     try {
@@ -953,6 +980,12 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         // case-insensitive match, so "Kano" doesn't also pull in "Kano (City)".
         whereClause += ` AND ${PLACE_GROUP_KEY} = ${SITE_KEY(':site')}`;
         bindings.site = site;
+      }
+
+      // A precise place inside the site ("Dolmabahçe Palace" in Istanbul).
+      if (precise) {
+        whereClause += ` AND LOWER(BTRIM(precise_place)) = LOWER(BTRIM(:precise))`;
+        bindings.precise = precise;
       }
 
       if (institution) {
@@ -1036,6 +1069,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             origin_is_findspot,
             origin_person_name,
             historical_name,
+            precise_place,
             (SELECT ti.time_name FROM museum_objects_components moc
              JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
              WHERE moc.entity_id = m.id AND moc.field = 'time'
@@ -1102,6 +1136,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             origin_is_findspot: row.origin_is_findspot,
             origin_person_name: row.origin_person_name || null,
             historical_name: row.historical_name || null,
+            precise_place: row.precise_place || null,
             institution_name: row.institution_name,
             institution_place: row.institution_place,
             institution_city_en: row.institution_city_en || null,
@@ -1185,6 +1220,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_is_findspot,
           origin_person_name,
           historical_name,
+          precise_place,
           ${latExpr} as latitude,
           ${lonExpr} as longitude,
           institution_latitude,
@@ -1259,6 +1295,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_is_findspot: row.origin_is_findspot,
           origin_person_name: row.origin_person_name || null,
           historical_name: row.historical_name || null,
+          precise_place: row.precise_place || null,
           latitude: row.latitude ? parseFloat(row.latitude) : null,
           longitude: row.longitude ? parseFloat(row.longitude) : null,
           institution_latitude: row.institution_latitude ? parseFloat(row.institution_latitude) : null,

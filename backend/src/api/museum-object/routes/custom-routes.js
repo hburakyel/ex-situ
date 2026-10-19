@@ -38,6 +38,16 @@ module.exports = {
     },
     {
       method: 'GET',
+      path: '/museum-objects/precise-places',
+      handler: 'museum-object.precisePlaces',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
       path: '/museum-objects/by-country',
       handler: 'museum-object.byCountry',
       config: {

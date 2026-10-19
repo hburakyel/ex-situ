@@ -38,11 +38,12 @@ const PLACE_GROUP_EXPR = `COALESCE(
 
 // One place written several ways is one site: case, accents ("Çorum" / "Corum"),
 // a trailing "?" (the source's uncertainty, kept in the record) and a type suffix
+// ("İzmir" lowercases to i + combining dot U+0307, which is dropped)
 // ("Tokyo (city)", "Corum (Province)") don't make a new site. Mirrored by
 // siteKey() in frontend/lib/site-key.ts. No literal question mark in this SQL: knex.raw
 // reads every ? as a binding placeholder (CHR(63) builds it instead).
 const SITE_KEY = (expr) => `BTRIM(REGEXP_REPLACE(REGEXP_REPLACE(
-  TRANSLATE(LOWER(BTRIM(${expr})), 'çğıöşüâêîôûáàäãåéèëíìïóòõúùñýÿčšžřďťňěůłńśźżćęāēīōūșțőűøđ', 'cgiosuaeiouaaaaaeeeiiiooouunyycszrdtneulnszzceaeioustouod'),
+  TRANSLATE(REPLACE(LOWER(BTRIM(${expr})), CHR(775), ''), 'çğıöşüâêîôûáàäãåéèëíìïóòõúùñýÿčšžřďťňěůłńśźżćęāēīōūșțőűøđ', 'cgiosuaeiouaaaaaeeeiiiooouunyycszrdtneulnszzceaeioustouod'),
   '\\s*\\((city|province|provinz|stad|state|district|region|prov\\.)\\)\\s*$', '', 'i'),
   '\\s*[' || CHR(63) || ']+\\s*$', ''))`;
 

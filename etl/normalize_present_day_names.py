@@ -99,6 +99,40 @@ RENAMES = {
     ("Mysore", "India"): "Mysuru",
     ("Deshima", "Japan"): "Dejima",
     ("Elephantine", "Egypt"): "Aswan",
+    # Iraq, Iran, Syria (desk review 2026-10-17): ancient sites under the present-day town or tell.
+    ("Ctesiphon", "Iraq"): "Salman Pak",
+    ("Uruk", "Iraq"): "Warka",
+    ("Shuruppak", "Iraq"): "Fara",
+    ("Lagash", "Iraq"): "Al-Hiba",
+    ("Borsippa", "Iraq"): "Birs Nimrud",
+    ("Nippur", "Iraq"): "Nuffar",
+    ("Persepolis", "Iran"): "Takht-e Jamshid",
+    ("Pasargadae", "Iran"): "Pasargad",
+    ("Sultanabad", "Iran"): "Arak",
+    ("Senneh", "Iran"): "Sanandaj",
+    ("Astarabad", "Iran"): "Gorgan",
+    ("Palmyra", "Syria"): "Tadmur",
+    ("Apamea", "Syria"): "Qalaat al-Madiq",
+    # Former names elsewhere (desk review 2026-10-17).
+    ("Bangalore", "India"): "Bengaluru",
+    ("Belgaum", "India"): "Belagavi",
+    ("Calicut", "India"): "Kozhikode",
+    ("Gauhati", "India"): "Guwahati",
+    ("Gulbarga", "India"): "Kalaburagi",
+    ("Mangalore", "India"): "Mangaluru",
+    ("Masulipatam", "India"): "Machilipatnam",
+    ("Orissa", "India"): "Odisha",
+    ("Simla", "India"): "Shimla",
+    ("Tanjore", "India"): "Thanjavur",
+    ("Bijapur", "India"): "Vijayapura",
+    ("Chittagong", "Bangladesh"): "Chattogram",
+    ("Tiflis", "Georgia"): "Tbilisi",
+    ("Stettin", "Poland"): "Szczecin",
+    ("Peking", "China"): "Beijing",
+    ("Swatow", "China"): "Shantou",
+    ("Port Arthur", "China"): "Lüshunkou",
+    ("Saigon", "Vietnam"): "Ho Chi Minh City",
+    ("Moçâmedes", "Angola"): "Namibe",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -143,11 +177,40 @@ LABELS = {
     "Guinea-Conakry": ("Guinea", None),
     "Zuid-China": ("South China", None),
     "Asia Minor": ("Anatolia", None),
+    "Midden-Perzië": ("Central Iran", None),
+    "Noordwest-Perzië": ("Northwestern Iran", None),
+    "Noord-Perzie": ("Northern Iran", None),
+    "Zuidwest-Perzië": ("Southwestern Iran", None),
+    "Coromandelkust": ("Coromandel Coast", None),
+    "Kasjmir": ("Kashmir", None),
+    "Kurramvallei": ("Kurram Valley", None),
+    "Zoeloeland": ("Zululand", None),
+    "West-Kaap": ("Western Cape", None),
+    "Batoemi": ("Batumi", None),
+    "Khartoem": ("Khartoum", None),
+    "Molukken": ("Maluku", None),
+    "Ceribon": ("Cirebon", None),
+    "Kansu": ("Gansu", None),
+    "Golkonda": ("Golconda", None),
+    "Noordwest-India": ("Northwestern India", None),
+    "Centraal-Tibet": ("Central Tibet", None),
+    "Congo (rivier)": ("Congo River", None),
+    "Tobameer": ("Lake Toba", None),
+    "Bakoe": ("Baku", None),
+    "Sansibar": ("Zanzibar", None),
+    "Neue Hebriden": ("Vanuatu", None),
+    "Gilbertinseln": ("Gilbert Islands", None),
+    "Easter Island": ("Rapa Nui", None),
+    "Phnom-Penh": ("Phnom Penh", None),
+    "Malakka": ("Melaka", None),
+    "Bokhara": ("Bukhara", None),
+    # "Nusayri" is a pejorative name for Alawites.
+    "Nusayriyah Mountains": ("Syrian Coastal Mountains", None),
     "West Coast of Asia Minor": ("Western Anatolia", None),
 }
 
-# Korea before 1945 lies in both present-day Koreas.
-AREAS = {"Korea", "Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa"}
+# Korea before 1945 lies in both present-day Koreas; the Mughal Empire spanned several countries.
+AREAS = {"Korea", "Rhodesia", "South Africa or Kingdom of Swaziland, Southern Africa", "Mughal Empire", "Mughal empire"}
 
 # (label, country_en, rounded lat, lon) of a wrong point → new label. The Met's
 # "Khotan" sat at Aksu, 450 km from Hotan.

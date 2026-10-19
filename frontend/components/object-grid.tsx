@@ -452,29 +452,6 @@ return (
         "group-hover:ring-2 group-hover:ring-blue-500",
       ].join(" ")}
     >
-      {(object.attributes.geocoding_status && object.attributes.geocoding_status !== "ok") && (
-        <span
-          className={`absolute top-2 left-2 z-10 capitalize inline-flex items-center px-2 py-0.5 rounded-md text-xs ${
-            object.attributes.geocoding_status === "disputed"
-              ? "bg-orange-50 text-orange-700"
-              : "border border-gray-200 text-gray-500"
-          }`}
-          title={object.attributes.geocoding_notes || undefined}
-        >
-          {object.attributes.geocoding_status}
-        </span>
-      )}
-      {(object.attributes.review_status && object.attributes.review_status !== "verified") && (
-        <span
-          className={`absolute top-2 right-2 z-10 capitalize inline-flex items-center px-2 py-0.5 rounded-md text-xs ${
-            object.attributes.review_status === "rejected"
-              ? "bg-orange-50 text-orange-700"
-              : "border border-gray-200 text-gray-500"
-          }`}
-        >
-          {object.attributes.review_status}
-        </span>
-      )}
       {typeof object.attributes.geocoding_confidence === 'number' &&
         object.attributes.geocoding_confidence < 0.5 && (
         <span

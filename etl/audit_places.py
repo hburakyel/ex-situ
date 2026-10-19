@@ -13,6 +13,9 @@ Names (fixable):
       label is not the same place.
   Fix: the label becomes the cleaned raw name (same rules as
   fill_place_name_normalized.py). place_name is never changed.
+  Also reported: the source hedges the place ("possibly", "probably", "(?)",
+  "vermutlich", "wohl") but the label dropped it. Fix: the label keeps the
+  source's doubt as a trailing "?" (METHODOLOGY), e.g. "Akhmim" -> "Akhmim?".
 
 Coordinates (flag only — never invented or moved):
   outside_country  outside the country's extent (GeoNames towns + MARGIN_DEG)
@@ -35,6 +38,7 @@ import argparse
 import csv
 import math
 import os
+import re
 import unicodedata
 from collections import defaultdict
 
@@ -66,6 +70,8 @@ EXTRA_CODES = {
     "NL": ["AW", "CW", "SX", "BQ"], "DK": ["GL", "FO"], "US": ["PR", "GU", "VI", "AS", "MP"],
     "GB": ["GI", "FK", "BM", "KY", "VG", "TC", "MS", "SH", "PN", "IO"],
 }
+# The source's own doubt about a place; a label must keep it (as a trailing "?").
+SOURCE_HEDGE = re.compile(r"possibl|probabl|\?|said to be|attributed to|vermutlich|\bwohl\b|fraglich", re.IGNORECASE)
 GENERIC_WORDS = {"region", "state", "province", "district", "city", "area", "island", "islands", "river"}
 CLEAN_COUNTRIES = None
 
@@ -202,6 +208,34 @@ def audit_names(cur, gaz):
     return sorted(out, key=lambda r: -r["objects"])
 
 
+def audit_hedges(cur):
+    """Labels that dropped the doubt the source states ("Court of Benin (?)" -> "Benin City")."""
+    cur.execute(
+        """
+        SELECT place_name, place_name_normalized, country_en, COUNT(*),
+               AVG(COALESCE(manual_latitude, latitude)), AVG(COALESCE(manual_longitude, longitude))
+        FROM museum_objects
+        WHERE published_at IS NOT NULL
+          AND NULLIF(BTRIM(place_name_normalized), '') IS NOT NULL AND NULLIF(BTRIM(place_name), '') IS NOT NULL
+        GROUP BY 1, 2, 3
+        """
+    )
+    out = []
+    for raw, label, country, n, lat, lon in cur.fetchall():
+        if not SOURCE_HEDGE.search(raw) or SOURCE_HEDGE.search(label):
+            continue
+        base = label.strip()
+        # A trailing ", <country>" only repeats country_en (same rule as the "(<country>)" tag).
+        if country and key(base).endswith(", " + key(country)):
+            base = base[: -len(country) - 2].rstrip(" ,")
+        out.append({
+            "place_name": raw, "current_label": label, "proposed_label": f"{base}?", "country_en": country or "",
+            "objects": n, "lat": round(lat, 4) if lat is not None else "", "lon": round(lon, 4) if lon is not None else "",
+            "reason": "source states the place with doubt; label kept it without",
+        })
+    return sorted(out, key=lambda r: -r["objects"])
+
+
 def audit_coords(cur, gaz):
     country_code, _, _, extent, _ = gaz
     _, _, towns, _, _ = gaz
@@ -273,6 +307,10 @@ def run(args):
     try:
         with conn.cursor() as cur:
             names = audit_names(cur, gaz)
+            hedges = audit_hedges(cur)
+            print(f"Labels without the source's doubt: {len(hedges)} ({sum(r['objects'] for r in hedges)} objects) "
+                  f"→ {write_csv('place_audit_hedges.csv', hedges)}")
+            names += hedges
             coords, unmapped = audit_coords(cur, gaz)
             print(f"Wrong labels: {len(names)} ({sum(r['objects'] for r in names)} objects) → {write_csv('place_audit_names.csv', names)}")
             by_issue = defaultdict(lambda: [0, 0])

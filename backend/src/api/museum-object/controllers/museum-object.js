@@ -202,12 +202,29 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
   },
 
   /**
+   * GET /api/museum-objects/precise-places?site=Istanbul&country=Turkey&institution=...
+   * Precise places inside a site, for the drill-down below a city.
+   */
+  async precisePlaces(ctx) {
+    try {
+      const { site, country, institution } = ctx.query;
+      if (!site || String(site).length > 200) return ctx.badRequest('site parameter is required');
+      const data = await strapi.service('api::museum-object.museum-object')
+        .getPrecisePlaces({ site: String(site), country: country ? String(country) : null, institution: institution ? String(institution) : null });
+      ctx.send({ data });
+    } catch (error) {
+      strapi.log.error('precisePlaces endpoint error:', error.message);
+      ctx.internalServerError('Query failed');
+    }
+  },
+
+  /**
    * Fast PostGIS endpoint for fetching objects by country
    * GET /api/museum-objects/by-country?country=Turkey&site=Pergamon&institution=...&page=1&pageSize=60
    */
   async byCountry(ctx) {
     try {
-      const { country, site, institution, page, pageSize, onlyWithImages, located, countOnly } = ctx.query;
+      const { country, site, precise, institution, page, pageSize, onlyWithImages, located, countOnly } = ctx.query;
 
       if (!country && !institution) {
         return ctx.badRequest('country or institution parameter is required');
@@ -223,6 +240,7 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
         .service('api::museum-object.museum-object')
         .getObjectsByCountry(country || null, {
           site: site || null,
+          precise: precise || null,
           institution: institution || null,
           page: pageNum,
           pageSize: size,

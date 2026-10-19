@@ -4,6 +4,8 @@ export const metadata: Metadata = {
   title: "Design System — Ex Situ",
   description:
     "Ex Situ design system reference: tokens, components, and patterns used across the application.",
+  // A working reference for the site's own pages, not part of the index.
+  robots: { index: false, follow: false },
 }
 
 export default function DesignLayout({
