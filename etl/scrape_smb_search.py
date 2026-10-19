@@ -47,6 +47,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 import unicodedata
@@ -340,10 +341,9 @@ class Places:
             with zipfile.ZipFile(os.path.join(folder, fn)) as z, z.open(f"{cc}.txt") as fh:
                 for raw in fh:
                     f = raw.decode("utf-8").rstrip("\n").split("\t")
-                    names = {f[1], f[2], *[a for a in f[3].split(",") if a]}
-                    for n in names:
-                        if n.lower() in wanted:
-                            self.country_gaz.setdefault((cc, n.lower()), set()).add(
+                    for n in {f[1].lower(), f[2].lower(), *[a.lower() for a in f[3].split(",") if a]}:
+                        if n in wanted:
+                            self.country_gaz.setdefault((cc, n), set()).add(
                                 (f[0], float(f[4]), float(f[5]), f[6], f[7]))
 
     def country(self, label: str):

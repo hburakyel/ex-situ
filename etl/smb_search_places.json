@@ -1,5 +1,5 @@
 {
-  "_comment": "Desk review 2026-10-19 (not verified): SMB place labels that the exact-match passes could not place, matched by hand to one GeoNames entry (id in 'source'). Key: 'label|country label as SMB gives it' ('label|' when the record names no country). Ambiguous labels (Kumuli: two islands; Kara Khoja, Ruinen von Kuwiki, Navajo Ruins: no GeoNames entry) are left out on purpose.",
+  "_comment": "Desk review 2026-10-19 (not verified): SMB place labels that the exact-match passes could not place, matched by hand to one GeoNames entry (id in 'source'). Key: 'label|country label as SMB gives it' ('label|' when the record names no country). Ambiguous labels (Kumuli: two islands; Kara Khoja, Ruinen von Kuwiki, Navajo Ruins: no GeoNames entry) are left out on purpose. Manus and Samarai: the exact-name pass matched another island that lists them as an alternate name (Manu Island, Nesamari Island), corrected here.",
   "Wuvulu|Papua-Neuguinea": {"lat": -1.733, "lon": 142.851, "country_en": "Papua New Guinea", "source": "GeoNames 2083258 Wuvulu Island"},
   "Rambutyo|Papua-Neuguinea": {"lat": -2.303, "lon": 147.82, "country_en": "Papua New Guinea", "source": "GeoNames 2087807 Rambutyo Island"},
   "Aua|Papua-Neuguinea": {"lat": -1.464, "lon": 143.059, "country_en": "Papua New Guinea", "source": "GeoNames 2100376 Aua Island"},
@@ -26,5 +26,9 @@
   "Ancon|Peru": {"lat": -11.771, "lon": -77.169, "country_en": "Peru", "source": "GeoNames 3947775 Ancón (north of Lima)"},
   "Cuzco|Peru": {"lat": -13.532, "lon": -71.967, "country_en": "Peru", "source": "GeoNames 3941584 Cusco"},
   "Tehuacan|Mexiko": {"lat": 18.464, "lon": -97.397, "country_en": "Mexico", "source": "GeoNames 3516109 Tehuacán"},
-  "Sescheke|Sambia (Zambia)": {"lat": -17.476, "lon": 24.297, "country_en": "Zambia", "source": "GeoNames 898905 Sesheke"}
+  "Sescheke|Sambia (Zambia)": {"lat": -17.476, "lon": 24.297, "country_en": "Zambia", "source": "GeoNames 898905 Sesheke"},
+  "Manus|Papua-Neuguinea": {"lat": -2.076, "lon": 146.967, "country_en": "Papua New Guinea", "source": "GeoNames 2091496 Manus Island"},
+  "Manus (?)|Papua-Neuguinea": {"lat": -2.076, "lon": 146.967, "country_en": "Papua New Guinea", "source": "GeoNames 2091496 Manus Island"},
+  "Samarai|Papua-Neuguinea": {"lat": -10.612, "lon": 150.664, "country_en": "Papua New Guinea", "source": "GeoNames 2132604 Samarai Island"},
+  "Samarai|": {"lat": -10.612, "lon": 150.664, "country_en": "Papua New Guinea", "source": "GeoNames 2132604 Samarai Island"}
 }
