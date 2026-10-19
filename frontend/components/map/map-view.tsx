@@ -8,7 +8,7 @@ import { Protocol } from "pmtiles"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
-import { ChevronDown, ChevronUp, Info } from "lucide-react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
 import { iconSvgStrings } from "@/components/icons"
 import SearchBar from "./search-bar"
@@ -34,8 +34,6 @@ import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 import type { PrecisePlace } from "@/lib/api"
 import PrecisePlaceRows from "@/components/map/precise-place-rows"
-import { AboutText } from "@/components/map/info-panel"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
 let pmtilesRegistered = false
@@ -619,8 +617,80 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         onZoomChangeRef.current?.(newZoom)
       })
 
-      // No map controls: scroll or pinch zooms, the breadcrumb root goes back to the globe,
-      // and About sits on the breadcrumb row of the header card (and next to search on phones).
+      // Nav controls – read media query synchronously so the value is correct
+      // even if the React `isMobile` hook hasn't hydrated yet.
+      const mobileNow = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
+      const controlPosition = "bottom-left"
+      const ctrlPrefix = "maplibregl"
+      // Info control
+      class InfoControl {
+        _container: HTMLDivElement | null = null; _popup: HTMLDivElement | null = null; _closeFn: ((ev: MouseEvent) => void) | null = null
+        onAdd() {
+          this._container = document.createElement("div")
+          this._container.className = `${ctrlPrefix}-ctrl ${ctrlPrefix}-ctrl-group`
+          const btn = document.createElement("button")
+          btn.className = `${ctrlPrefix}-ctrl-icon`
+          btn.setAttribute("aria-label", "About")
+          btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 1C3.91 1 1 3.91 1 7.5S3.91 14 7.5 14 14 11.09 14 7.5 11.09 1 7.5 1Zm0 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm-.5 3h1v1h-1V5Zm0 2h1v4h-1V7Z" fill="currentColor"/></svg>'
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation()
+            if (this._popup) { this._popup.remove(); this._popup = null; return }
+            const rect = btn.getBoundingClientRect()
+            this._popup = document.createElement("div")
+            this._popup.style.cssText = `position:fixed;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);padding:14px 16px;width:320px;font-family:system-ui,sans-serif;z-index:9999;font-size:13px;line-height:1.5;color:#333`
+            this._popup.style.bottom = `${window.innerHeight - rect.bottom}px`
+            this._popup.style.left = `${rect.right + 8}px`
+            this._popup.innerHTML = `
+              <div style="margin-bottom:10px;color:#555">Ex Situ is an open-source spatial index of the migration of cultural artifacts. Each artifact is an arc from its place of origin to the institution that holds it today. Ex Situ does not host images or copy records. Every arc links back to the institution’s own page. The index shows what museum records state. Many artifacts have no located origin, and some locations are uncertain.</div>
+              <div style="white-space:nowrap">
+                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:none">GitHub ↗</a>
+                ·
+                <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:none">Report issue ↗</a>
+              </div>
+            `
+            const close = (ev: MouseEvent) => {
+              if (this._popup && !this._popup.contains(ev.target as Node) && ev.target !== btn) {
+                this._popup.remove(); this._popup = null; document.removeEventListener("click", close); this._closeFn = null
+              }
+            }
+            this._closeFn = close
+            setTimeout(() => document.addEventListener("click", close), 0)
+            document.body.appendChild(this._popup)
+          })
+          this._container.appendChild(btn)
+          return this._container
+        }
+        onRemove() { if (this._popup) { this._popup.remove(); this._popup = null }; if (this._closeFn) { document.removeEventListener("click", this._closeFn); this._closeFn = null }; if (this._container?.parentNode) this._container.parentNode.removeChild(this._container) }
+      }
+
+      // Globe view control
+      class GlobeViewControl {
+        _map: any = null; _container: HTMLDivElement | null = null
+        onAdd(map: any) {
+          this._map = map
+          this._container = document.createElement("div")
+          this._container.className = `${ctrlPrefix}-ctrl ${ctrlPrefix}-ctrl-group`
+          const btn = document.createElement("button")
+          btn.className = `${ctrlPrefix}-ctrl-icon`
+          btn.setAttribute("aria-label", "Global View")
+          btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.49996 1.80002C4.35194 1.80002 1.79996 4.352 1.79996 7.50002C1.79996 10.648 4.35194 13.2 7.49996 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.352 10.648 1.80002 7.49996 1.80002ZM0.899963 7.50002C0.899963 3.85494 3.85488 0.900024 7.49996 0.900024C11.145 0.900024 14.1 3.85494 14.1 7.50002C14.1 11.1451 11.145 14.1 7.49996 14.1C3.85488 14.1 0.899963 11.1451 0.899963 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M13.4999 7.89998H1.49994V7.09998H13.4999V7.89998Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M7.09991 13.5V1.5H7.89991V13.5H7.09991zM10.375 7.49998C10.375 5.32724 9.59364 3.17778 8.06183 1.75656L8.53793 1.24341C10.2396 2.82218 11.075 5.17273 11.075 7.49998 11.075 9.82724 10.2396 12.1778 8.53793 13.7566L8.06183 13.2434C9.59364 11.8222 10.375 9.67273 10.375 7.49998zM3.99969 7.5C3.99969 5.17611 4.80786 2.82678 6.45768 1.24719L6.94177 1.75281C5.4582 3.17323 4.69969 5.32389 4.69969 7.5 4.6997 9.67611 5.45822 11.8268 6.94179 13.2472L6.45769 13.7528C4.80788 12.1732 3.9997 9.8239 3.99969 7.5z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>'
+          btn.addEventListener("click", () => {
+            // Trigger parent's breadcrumb "global" handler to clear drill state
+            onBreadcrumbClickRef.current?.("global" as any)
+          })
+          this._container.appendChild(btn)
+          return this._container
+        }
+        onRemove() { if (this._container?.parentNode) this._container.parentNode.removeChild(this._container); this._map = null }
+      }
+
+      // Phones get no map controls: pinch zooms, the breadcrumb root goes back to the
+      // globe, and About sits next to search in the info card (info-panel.tsx).
+      if (showControls && !mobileNow) {
+        mapInstance.addControl(new GlobeViewControl(), controlPosition)
+        mapInstance.addControl(new InfoControl(), controlPosition)
+        mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), controlPosition)
+      }
 
       window.addEventListener("resize", handleResize)
       // The mobile map card changes size (card, full screen, put away) without a window
@@ -1284,7 +1354,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
         {!isMobile && (
         <div className="absolute top-10 left-10 sm:w-80 z-20">
-        <div className="bg-white rounded-2xl shadow-lg flex flex-col relative">
+        <div className="bg-white rounded-2xl shadow-lg flex flex-col relative max-h-[calc(100dvh-5rem)] overflow-y-auto">
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. */}
@@ -1310,16 +1380,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 )
               })}
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" title="About" aria-label="About">
-                  <Info className="w-5 h-5 text-gray-500" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 rounded-xl text-[13px] leading-normal text-[#333]">
-                <AboutText />
-              </PopoverContent>
-            </Popover>
           </div>
           <div className="px-4 pb-2">
             <SearchBar onOpen={() => onCommandPaletteOpen?.()} />
