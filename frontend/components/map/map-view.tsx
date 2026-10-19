@@ -1179,22 +1179,20 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               const fromSub = city && country ? `${city}, ${country}` : city || country
               return (
                 <>
-                  <div className="mb-2" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", columnGap: "1rem" }}>
-                    <div>
-                      <div className="text-muted-foreground">from:</div>
-                      <div>
-                        <span className="text-foreground">{hoveredArc.fromName}</span>
-                        {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
-                        {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
-                          <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
-                        )}
-                      </div>
+                  <div className="mb-1" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", columnGap: "1rem" }}>
+                    <div className="min-w-0">
+                      <span className="text-muted-foreground mr-2">From:</span>
+                      <span className="text-foreground">{hoveredArc.fromName}</span>
+                      {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
+                      {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
+                        <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
+                      )}
                       {fromSub && <div className="text-[10px] text-muted-foreground">{fromSub}</div>}
                     </div>
                     {toPlace && (
-                      <div>
-                        <div className="text-muted-foreground">to:</div>
-                        <div className="text-foreground">{toPlace}</div>
+                      <div className="min-w-0">
+                        <span className="text-muted-foreground mr-2">To:</span>
+                        <span className="text-foreground">{toPlace}</span>
                         {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
                           <div className="text-[10px] text-muted-foreground">{toCountry}</div>
                         )}
@@ -1202,14 +1200,14 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                     )}
                   </div>
                   <div className="mb-1">
-                    <span className="text-muted-foreground mr-2">collection:</span>
+                    <span className="text-muted-foreground mr-2">Collection:</span>
                     <span className="text-foreground">{hoveredArc.toName}</span>
                   </div>
                 </>
               )
             })()}
             <div>
-              <span className="text-muted-foreground mr-2">{hoveredArc.count === 1 ? "artifact:" : "artifacts:"}</span>
+              <span className="text-muted-foreground mr-2">{hoveredArc.count === 1 ? "Artifact:" : "Artifacts:"}</span>
               <span className="text-foreground">
                 {hoveredArc.count}
               </span>
@@ -1282,8 +1280,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
         {!isMobile && (
-        <div className="absolute top-10 left-10 bottom-10 sm:w-80 z-20">
-        <div className="bg-white rounded-2xl shadow-lg flex flex-col relative h-full">
+        <div className="absolute top-10 left-10 bottom-10 sm:w-80 z-20 pointer-events-none">
+        <div className={`bg-white rounded-2xl shadow-lg flex flex-col relative pointer-events-auto max-h-full ${showArcs || showTime || showCollections ? "h-full" : ""}`}>
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. */}
