@@ -5,6 +5,7 @@
  */
 
 const { createCoreController } = require('@strapi/strapi').factories;
+const { buildPublicDateFields } = require('../services/date-display');
 
 /**
  * Parse the Time (dateStart/dateEnd/undated) and Migration
@@ -50,6 +51,23 @@ function parseDateQueryFilters(query) {
 }
 
 module.exports = createCoreController('api::museum-object.museum-object', ({ strapi }) => ({
+  /**
+   * GET /api/museum-objects/:id — Strapi's own, plus the public date the lists show
+   * (buildPublicDateFields). Without it an artifact opened by link showed no Time
+   * when only the migrated date columns are set (Nofretete, ÄM 21300: object_date
+   * empty, 1351–1334 BCE in object_date_earliest/latest/display).
+   */
+  async findOne(ctx) {
+    const response = await super.findOne(ctx);
+    const attrs = response && response.data && response.data.attributes;
+    if (attrs) {
+      const { object_date, acquisition_year } = buildPublicDateFields(attrs);
+      attrs.object_date = object_date;
+      attrs.acquisition_year = acquisition_year;
+    }
+    return response;
+  },
+
   /**
    * Custom geospatial endpoint
    * GET /api/museum-objects/geospatial?zoom=5&minLon=-180&minLat=-90&maxLon=180&maxLat=90&institution=...
