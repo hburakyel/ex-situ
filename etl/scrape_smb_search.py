@@ -49,6 +49,8 @@ import json
 import os
 import sys
 import time
+import unicodedata
+import zipfile
 import urllib.parse
 import urllib.request
 
@@ -218,6 +220,22 @@ COUNTRY_ROLES = {"Land", "Land/Region", "Republik", None}
 HOLD_ROLES = {"Deutsches Kriegsgefangenenlager"}
 MATERIAL_DEPARTMENTS = {"I", "II", "III", "IV", "V", "VI"}
 UNLABELLED_EVENT = "Attributed place"
+ISLAND_CODES = {"ISL", "ISLET", "ATOL", "ISLT"}
+SITE_CODES = {"RUIN", "ANS", "HSTS", "MSSN"}
+# Where a record names no present-day country: candidate GeoNames countries from its
+# country-like region or island group (used only to search, never as an origin themselves).
+REGION_ISO = {
+    "Nordwestküste von Kanada (Canada)": ("CA",), "Kanada (Canada)": ("CA",), "Ost-Kolumbien": ("CO",),
+    "Zentral-Brasilien": ("BR",), "Sinkiang (Xinjiang)": ("CN",), "Alaska": ("US",), "Hawaii": ("US",),
+    "Karolinen": ("FM", "PW"), "Marshall-Inseln": ("MH",), "Marianen": ("MP", "GU"), "Gilbert-Inseln": ("KI",),
+    "Marquesas": ("PF",), "Gesellschafts-Inseln": ("PF",), "Französisch-Polynesien": ("PF",), "Austral-Inseln": ("PF",),
+    "Neukaledonien": ("NC",), "Wallis und Futuna": ("WF",), "Tokelau": ("TK",), "Cookinseln": ("CK",),
+    "Tonga": ("TO",), "Samoa": ("WS", "AS"), "Bismarck-Archipel": ("PG",), "Admiralitäts-Inseln": ("PG",),
+    "Schouten-Inseln": ("PG",), "D'Entrecasteaux-Archipel": ("PG",), "Maprik": ("PG",), "Arawe": ("PG",),
+    "Mikronesien": ("FM", "MH", "PW", "MP", "GU", "KI", "NR"), "Para-Mikronesien": ("PG",),
+    "Melanesien": ("PG", "SB", "VU", "FJ", "NC"),
+    "Polynesien": ("TV", "WS", "TO", "PF", "CK", "US", "NZ", "AS", "TK", "WF", "NU"),
+}
 NOTE_TAG = "[smb-search]"
 INSTITUTION = {"institution_name": "Ethnologisches Museum", "institution_place": "Berlin",
                "institution_latitude": 52.5174, "institution_longitude": 13.4007}
@@ -239,13 +257,16 @@ def split_line(name_line: str) -> tuple[str, str]:
 
 
 def name_variants(label: str) -> list[str]:
-    """'Sulawesi (Celebes)' -> ['Sulawesi (Celebes)', 'Sulawesi', 'Celebes']; drops a trailing '(?)'."""
+    """Spellings SMB gives for one place: 'Sulawesi (Celebes)' -> Sulawesi (Celebes), Sulawesi, Celebes;
+    'Nendö (Ndende, Nendo)' -> … Ndende, Nendo; 'A / B' -> A, B; plus accent-free forms. Drops '(?)'."""
     label = label.replace("(?)", "").strip()
     out = [label]
     if "(" in label and label.endswith(")"):
         outer, inner = label[:-1].split("(", 1)
-        out += [outer.strip(), inner.strip()]
-    return [v for v in dict.fromkeys(out) if v]
+        out += [outer.strip(), inner.strip(), *[x.strip() for x in inner.split(",")]]
+    out += [x.strip() for v in list(out) for x in v.split(" / ") if " / " in v]
+    out += [unicodedata.normalize("NFKD", v).encode("ascii", "ignore").decode() for v in out]
+    return [v for v in dict.fromkeys(out) if v and "(" not in v[:1]]
 
 
 class Places:
@@ -254,7 +275,7 @@ class Places:
     match in the record's country, or the reviewed lookup file. No fuzzy matching."""
 
     def __init__(self, exsitu_rows: list[dict], gazetteer_dir: str, lookup_path: str | None):
-        self.lookup = json.load(open(lookup_path)) if lookup_path and os.path.exists(lookup_path) else {}
+        self.lookup = {k: v for k, v in (json.load(open(lookup_path)) if lookup_path and os.path.exists(lookup_path) else {}).items() if isinstance(v, dict)}
         self.points: dict[str, set] = {}
         country_votes: dict[str, dict] = {}
         for r in exsitu_rows:
@@ -302,13 +323,37 @@ class Places:
             for n in {name, ascii_, *[a for a in alts.split(",") if a]}:
                 self.gaz.setdefault((cc, n.lower()), set()).add((gid, float(lat), float(lon)))
 
+        self.iso_name = {cc: name for name, cc in self.iso.items()}
+        self.iso_name.update({"US": "United States", "FM": "Federated States of Micronesia", "CI": "Côte d'Ivoire",
+                              "CD": "Democratic Republic of the Congo", "CG": "Republic of the Congo",
+                              "KR": "South Korea", "KP": "North Korea", "PS": "Palestine", "TL": "Timor-Leste"})
+        self.country_gaz: dict[tuple, set] = {}
+
+    def add_country_files(self, folder: str, wanted: set[str]) -> None:
+        """GeoNames country dumps (<CC>.zip): index only the names the records ask for."""
+        if not os.path.isdir(folder):
+            return
+        for fn in sorted(os.listdir(folder)):
+            if not fn.endswith(".zip"):
+                continue
+            cc = fn[:-4]
+            with zipfile.ZipFile(os.path.join(folder, fn)) as z, z.open(f"{cc}.txt") as fh:
+                for raw in fh:
+                    f = raw.decode("utf-8").rstrip("\n").split("\t")
+                    names = {f[1], f[2], *[a for a in f[3].split(",") if a]}
+                    for n in names:
+                        if n.lower() in wanted:
+                            self.country_gaz.setdefault((cc, n.lower()), set()).add(
+                                (f[0], float(f[4]), float(f[5]), f[6], f[7]))
+
     def country(self, label: str):
         for v in name_variants(label):
             if v in self.countries:
                 return self.countries[v]
         return None
 
-    def resolve(self, label: str, country_label: str | None, country_en: str | None):
+    def resolve(self, label: str, country_label: str | None, country_en: str | None,
+                isos: tuple = (), role: str = ""):
         """-> (lat, lon, country_en, source) or None."""
         for key in (f"{label}|{country_label or ''}", f"{label}|"):
             v = self.lookup.get(key)
@@ -329,6 +374,21 @@ class Places:
             if len(hits) == 1:
                 gid, lat, lon = next(iter(hits))
                 return round(lat, 5), round(lon, 5), country_en, f"GeoNames {gid} (single exact match in {cc})"
+        # GeoNames country dumps: islands and villages cities500 lacks. Feature must fit the role;
+        # exactly one match among the record's candidate countries.
+        hits = {}
+        for c in (([cc] if cc else []) or list(isos)):
+            for v in name_variants(label):
+                for gid, lat, lon, fclass, fcode in self.country_gaz.get((c, v.lower()), set()):
+                    if role == "island" and not (fclass == "T" and fcode in ISLAND_CODES):
+                        continue
+                    if role != "island" and not (fclass == "P" or (fclass == "S" and fcode in SITE_CODES)):
+                        continue
+                    hits[gid] = (lat, lon, c, fcode)
+        if len(hits) == 1:
+            gid, (lat, lon, c, fcode) = next(iter(hits.items()))
+            return (round(lat, 5), round(lon, 5), country_en or self.iso_name.get(c),
+                    f"GeoNames {gid} {fcode} (single exact match in {c if cc else '/'.join(isos)})")
         return None
 
 
@@ -367,7 +427,8 @@ def choose_origin(d: dict) -> dict:
     settlements = list(dict.fromkeys(v for v, r in unl if r in SETTLEMENT_ROLES))
     islands = list(dict.fromkeys(v for v, r in unl if r in ISLAND_ROLES))
     if len(settlements) == 1:
-        return {**out, "kind": "unlabelled", "place": settlements[0], "role": "settlement"}
+        return {**out, "kind": "unlabelled", "place": settlements[0], "role": "settlement",
+                "island": islands[0] if len(islands) == 1 else None}
     if not settlements and len(islands) == 1:
         return {**out, "kind": "unlabelled", "place": islands[0], "role": "island"}
     why = "several settlements" if len(settlements) > 1 else ("several islands" if len(islands) > 1 else "")
@@ -393,6 +454,14 @@ def cmd_map(args) -> None:
     exsitu = json.load(open(args.exsitu))
     known_inv = {" ".join((r.get("inventory_number") or "").split()) for r in exsitu}
     places = Places(exsitu, args.gazetteer, args.lookup)
+    wanted = set()
+    for line in open(args.cache):
+        dd = json.loads(line)["detail"]
+        if not dd.get("error"):
+            oo = choose_origin(dd)
+            if oo.get("place"):
+                wanted |= {v.lower() for v in name_variants(oo["place"])}
+    places.add_country_files(os.path.join(args.gazetteer, "countries"), wanted)
     years = {}
     if args.ids:
         d = json.load(open(args.ids))
@@ -441,12 +510,21 @@ def cmd_map(args) -> None:
             if as_country:  # "Herkunft (Allgemein): Kamerun"
                 country_label, country = o["place"], as_country
             else:
-                loc = places.resolve(o["place"], country_label, country[0] if country else None)
+                isos = tuple(dict.fromkeys(c for g in d.get("geography") or []
+                                           for v in name_variants(split_line(g.get("nameLine"))[1])
+                                           for c in REGION_ISO.get(v, ())))
+                loc = places.resolve(o["place"], country_label, country[0] if country else None,
+                                     isos, o.get("role") or "")
                 if loc:
                     place_name = o["place"]
                 else:
                     unresolved[(o["place"], o.get("role"), country_label or "")] += 1
                     notes.append(f"specific place not resolved: {o['place']}")
+                    if o.get("island"):  # the record's own island, e.g. Pohnpei for Nan Matol
+                        loc = places.resolve(o["island"], country_label, country[0] if country else None,
+                                             isos, "island")
+                        if loc:
+                            place_name = o["island"]
         # The unlabelled country is a fallback only in departments I-VI; elsewhere it may be
         # where a recording or photograph was made (see ORIGIN RULE).
         if not loc and country and (o["kind"] != "none") and \

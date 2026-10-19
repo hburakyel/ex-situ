@@ -16,7 +16,7 @@
   "Burundi": ["Burundi"],
   "Cambodia": ["Kambodscha"],
   "Cameroon": ["Kamerun"],
-  "Canada": ["Kanada"],
+  "Canada": ["Kanada", "Kanada (Canada)"],
   "Central African Republic": ["Zentralafrikanische Republik"],
   "Chad": ["Tschad"],
   "Chile": ["Chile"],
@@ -90,7 +90,7 @@
   "Senegal": ["Senegal"],
   "Sierra Leone": ["Sierra Leone"],
   "Singapore": ["Singapur (Singapore)", "Singapur"],
-  "Solomon Islands": ["Salomonen"],
+  "Solomon Islands": ["Salomonen", "Salomonen (Solomon Islands)"],
   "Somalia": ["Somalia"],
   "South Africa": ["Südafrika"],
   "South Korea": ["Südkorea"],
@@ -114,7 +114,7 @@
   "Venezuela": ["Venezuela"],
   "Vietnam": ["Vietnam"],
   "Yemen": ["Jemen"],
-  "Zambia": ["Sambia"],
+  "Zambia": ["Sambia", "Sambia (Zambia)"],
   "Zimbabwe": ["Simbabwe"],
   "Germany": ["Deutschland"]
 }
