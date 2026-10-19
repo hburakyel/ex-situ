@@ -595,6 +595,67 @@ def cmd_apply(args):
     print(f"Old values are in geocoding_notes ('{NOTE_TAG} {date.today().isoformat()} …') for undo.")
 
 
+def types_rows(records):
+    """Cache rows whose place museum-digital still gives as stored: only the event type is new."""
+    return [r for r in records
+            if r["status"] == "ok" and r.get("event_type_id") is not None
+            and r.get("new_place_name") and r["new_place_name"] == r.get("old_place_name")
+            and (r.get("old_review_status") or "") != "verified"]
+
+
+def cmd_apply_types(args):
+    """Store found / made / painted (and the person) for rows whose place did not change.
+
+    Writes only origin_event_type_*, origin_is_findspot and origin_person_name, only where all
+    three are still empty and place_name is still the cached value. Coordinates, labels and
+    countries are not touched.
+    """
+    records = load_cache_records(args.cache)
+    rows = types_rows(records)
+    print(f"{len(records)} cache rows; {len(rows)} keep their place and have an event type.")
+    for t, n in Counter(r["event_type_en"] for r in rows).most_common():
+        print(f"  {t}: {n}")
+    conn = get_conn()
+    cur = conn.cursor()
+    updated = stale = 0
+    try:
+        for d in rows:
+            cur.execute(
+                """
+                UPDATE museum_objects SET
+                    origin_event_type_id = %(event_type_id)s,
+                    origin_event_type_en = %(event_type_en)s,
+                    origin_is_findspot = %(is_findspot)s,
+                    origin_person_name = %(person_name)s,
+                    geocoding_notes = CONCAT_WS(E'\\n', NULLIF(geocoding_notes, ''), %(note)s)
+                WHERE id = %(id)s
+                  AND place_name IS NOT DISTINCT FROM %(new_place_name)s
+                  AND origin_event_type_id IS NULL AND origin_event_type_en IS NULL
+                  AND origin_is_findspot IS NULL
+                  AND COALESCE(review_status, '') <> 'verified'
+                """,
+                {**d, "note": f"{NOTE_TAG} {date.today().isoformat()} event type only ({d['event_type_en']}); place unchanged"},
+            )
+            if cur.rowcount:
+                updated += 1
+            else:
+                stale += 1
+        if args.apply:
+            conn.commit()
+        else:
+            conn.rollback()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+    print(f"{'Updated' if args.apply else 'Would update'} {updated} rows; {stale} skipped "
+          "(already have an event type, place changed, or verified).")
+    if not args.apply:
+        print("Dry run (rolled back) — re-run with --apply to write.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -617,8 +678,12 @@ def main():
     p_apply.add_argument("--cache", type=str, required=True)
     p_apply.add_argument("--apply", action="store_true", help="Actually write")
 
+    p_types = sub.add_parser("apply-types", help="Store found/made for rows whose place did not change (dry run by default)")
+    p_types.add_argument("--cache", type=str, required=True)
+    p_types.add_argument("--apply", action="store_true", help="Actually write")
+
     args = parser.parse_args()
-    {"fetch": cmd_fetch, "report": cmd_report, "apply": cmd_apply}[args.command](args)
+    {"fetch": cmd_fetch, "report": cmd_report, "apply": cmd_apply, "apply-types": cmd_apply_types}[args.command](args)
 
 
 if __name__ == "__main__":
