@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { placeBaseName, placeDisplayLabel, placeDisplayLabels } from "./place-label"
+import { originFromLabel, placeBaseName, placeDisplayLabel, placeDisplayLabels } from "./place-label"
 
 describe("placeBaseName", () => {
   it("drops generic tags written by the ETL", () => {
@@ -41,5 +41,28 @@ describe("placeDisplayLabel", () => {
   it("uses the siblings to decide", () => {
     expect(placeDisplayLabel("Kano (State)", ["Owo"])).toBe("Kano")
     expect(placeDisplayLabel("Kano (State)", ["Kano (City)"])).toBe("Kano (State)")
+  })
+})
+
+describe("originFromLabel", () => {
+  it("puts the precise place before the site and drops the repeated former name", () => {
+    expect(originFromLabel({
+      place_name_normalized: "Bergama", historical_name: "Pergamon", precise_place: "Sanctuary of Athena (Pergamon)",
+    })).toBe("Sanctuary of Athena, Bergama (Pergamon)")
+    expect(originFromLabel({ place_name_normalized: "Bergama", historical_name: "Pergamon", precise_place: "Trajaneum" }))
+      .toBe("Trajaneum, Bergama (Pergamon)")
+    expect(originFromLabel({ place_name_normalized: "Istanbul", precise_place: "Dolmabahçe Palace" }))
+      .toBe("Dolmabahçe Palace, Istanbul")
+  })
+  it("keeps other tags on the precise place", () => {
+    expect(originFromLabel({ place_name_normalized: "Bergama", precise_place: "Asklepieion (?)" }))
+      .toBe("Asklepieion (?), Bergama")
+  })
+  it("shows the site alone without a precise place, or when it only repeats the site", () => {
+    expect(originFromLabel({ place_name_normalized: "Bergama", historical_name: "Pergamon" })).toBe("Bergama (Pergamon)")
+    expect(originFromLabel({ place_name_normalized: "Bergama", historical_name: "Pergamon", precise_place: "Pergamon" }))
+      .toBe("Bergama (Pergamon)")
+    expect(originFromLabel({ place_name: "Pergamon", historical_name: "Pergamon", precise_place: " " })).toBe("Pergamon")
+    expect(originFromLabel({})).toBeNull()
   })
 })

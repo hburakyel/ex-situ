@@ -80,8 +80,10 @@ function hasValidCoordinates(lat?: number | null, lng?: number | null) {
 function buildArtifactRedirectUrl(id: string, artifact: MuseumObject | null) {
 	const params = new URLSearchParams({ artifactId: id })
 
-	const originLat = artifact?.attributes.latitude
-	const originLng = artifact?.attributes.longitude
+	// The map draws COALESCE(manual_latitude, latitude): open it on that point
+	const manual = hasValidCoordinates(artifact?.attributes.manual_latitude, artifact?.attributes.manual_longitude)
+	const originLat = manual ? artifact?.attributes.manual_latitude : artifact?.attributes.latitude
+	const originLng = manual ? artifact?.attributes.manual_longitude : artifact?.attributes.longitude
 	const fallbackLat = artifact?.attributes.institution_latitude
 	const fallbackLng = artifact?.attributes.institution_longitude
 

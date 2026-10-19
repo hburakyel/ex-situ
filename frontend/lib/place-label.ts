@@ -45,3 +45,29 @@ export function placeDisplayLabels(names: Iterable<string>): Map<string, string>
 export function placeDisplayLabel(name: string, siblings: Iterable<string> = []): string {
   return placeDisplayLabels([...siblings, name]).get(name) ?? name
 }
+
+interface OriginFields {
+  place_name?: string | null
+  place_name_normalized?: string | null
+  historical_name?: string | null
+  precise_place?: string | null
+}
+
+/**
+ * The object panel's "From" value: precise place, then the site with its former
+ * name — "Sanctuary of Athena, Bergama (Pergamon)". A trailing "(Pergamon)" on
+ * the precise place repeats the site, so it is dropped there.
+ */
+export function originFromLabel(o: OriginFields): string | null {
+  const clean = (v?: string | null) => (v && v.trim() !== "" ? v.trim() : null)
+  const from = clean(o.place_name_normalized) || clean(o.place_name)
+  if (!from) return null
+  const historical = clean(o.historical_name)
+  const former = historical && historical.toLowerCase() !== from.toLowerCase() ? historical : null
+  const site = former ? `${from} (${former})` : from
+  let precise = clean(o.precise_place)
+  const tag = precise ? TRAILING_TAG.exec(precise) : null
+  if (tag && [from, former].some((n) => n && n.toLowerCase() === tag[2].trim().toLowerCase())) precise = tag[1]
+  if (!precise || [from, former, site].some((n) => n && n.toLowerCase() === precise!.toLowerCase())) return site
+  return `${precise}, ${site}`
+}

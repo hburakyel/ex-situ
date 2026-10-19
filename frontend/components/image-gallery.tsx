@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons"
 import { IconSource, IconClose } from "@/components/icons"
 import { displayObjectDate } from "@/lib/object-date"
+import { originFromLabel } from "@/lib/place-label"
 import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
@@ -368,13 +369,13 @@ export default function ImageGallery({
           <span className="text-black" style={{ fontSize: "0.875rem" }}>
             {(() => {
               const at = currentObject.attributes
-              const from = at.place_name_normalized || at.place_name
+              // Precise place, then the present-day site and its former name:
+              // "Sanctuary of Athena, Bergama (Pergamon)", "Al-Shirqat (Assur)"
+              const from = originFromLabel(at)
               const to = at.institution_city_en || INSTITUTION_CITIES[at.institution_name || ""] || at.institution_place
               const time = displayObjectDate(at.object_date)
               const items: [string, string][] = []
-              // Former name after the present-day one: "Al-Shirqat (Assur)"
-              const former = at.historical_name && at.historical_name.toLowerCase() !== (from || "").toLowerCase() ? at.historical_name : null
-              if (from) items.push(["From", former ? `${from} (${former})` : from])
+              if (from) items.push(["From", from])
               if (to) items.push(["To", to])
               if (time) items.push(["Time", time])
               if (at.institution_name) items.push(["Collection", at.institution_name])

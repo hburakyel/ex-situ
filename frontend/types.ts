@@ -40,6 +40,8 @@ export interface MuseumObject {
     place_name_normalized?: string
     /** Former name of a renamed place ("Assur" for Al-Shirqat); shown after it */
     historical_name?: string | null
+    /** Place inside the site ("Sanctuary of Athena (Pergamon)" in Bergama) */
+    precise_place?: string | null
     origin_event_type_en?: string
     origin_is_findspot?: boolean | null
     origin_person_name?: string
@@ -180,6 +182,7 @@ export interface GeospatialObject {
   place_name?: string
   place_name_normalized?: string
   historical_name?: string | null
+  precise_place?: string | null
   origin_event_type_en?: string
   origin_is_findspot?: boolean | null
   origin_person_name?: string
