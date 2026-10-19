@@ -128,7 +128,9 @@ function hasValidCoordinatePair(position?: [number, number] | number[]): boolean
 function HeaderAccordionList({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative">
-      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-1">
+      {/* A third of what the card (as tall as the object panel) has left after its header, search
+          and three section titles, so with Sites, Time and Collections open the card is filled. */}
+      <div className="space-y-0.5 overflow-y-auto pr-1 pb-1" style={{ maxHeight: "max(10rem, calc((100dvh - 21rem) / 3))" }}>
         {children}
       </div>
       <div
