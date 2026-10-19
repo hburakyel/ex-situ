@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore, Suspense } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import MapView, { type FacetedFilters } from "@/components/map/map-view"
 import ObjectPanel, { type ContainerSize } from "@/components/map/object-panel"
@@ -97,6 +97,8 @@ export default function MapPage() {
 // ── Drill-down level type ──
 type DrillLevel = "global" | "country" | "objects"
 
+const noopSubscribe = () => () => {}
+
 function MapContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -140,6 +142,9 @@ function MapContent() {
   const [isRateLimited, setIsRateLimited] = useState(false)
   const mapRef = useRef<any>(null)
   const isMobile = useMediaQuery("(max-width: 768px)")
+  // The server renders the desktop layout (it can't know the screen). Until the
+  // client takes over, phones get a white page instead of that layout flashing by.
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [containerSize, setContainerSize] = useState<ContainerSize>("default")
   // Mobile: the object panel fills the screen and the map is a card above its
@@ -1474,6 +1479,7 @@ function MapContent() {
 
   return (
     <div className="flex h-full flex-col">
+      {!hydrated && <div aria-hidden="true" className="fixed inset-0 z-[100] bg-white min-[769px]:hidden" />}
       <div className="h-full w-full relative">
         {/* Safari tints its toolbar from a fixed element at the bottom edge, which was
             the dark map card. A white strip below the card keeps it white unless the

@@ -33,7 +33,17 @@ const SLOW_SKIP_MS = 1200
 // host's images into inventory numbers for the rest of the visit.
 const SLOW_HOST_STRIKES = 3
 const SLOW_HOST_PAUSE_MS = 60_000
+// The first screen opens at once: the grid waits (spinner) until this many tiles
+// are ready, or every loaded object is checked, instead of filling in one tile at a
+// time (two across, then three). Later rows still appear as they load.
+const FIRST_SCREEN_TILES = 12
+const FIRST_SCREEN_TILES_FULLSCREEN = 24
+// "No artifacts found" only after a load has finished (or this long after mount, if
+// none starts): the server-rendered page has no objects yet and must not claim none.
+const EMPTY_STATE_FALLBACK_MS = 4000
 const slowHostStrikes = new Map<string, { count: number; last: number }>()
+
+const NO_OBJECTS: MuseumObject[] = []
 
 const imageHost = (url: string): string => {
   try {
@@ -130,9 +140,11 @@ export default function ObjectGrid({
   // A new place/collection replaces the list: start it from the top (otherwise the
   // old scroll position carries over and the info block opens half scrolled away).
   const firstObjectId = objects[0]?.id
+  const [firstScreenOpen, setFirstScreenOpen] = useState(false)
   useEffect(() => {
     if (containerRef.current) containerRef.current.scrollTop = 0
     setIsScrolled(false)
+    setFirstScreenOpen(false)
     // Retry images that failed earlier (e.g. while a server was briefly down).
     setImageStatus((prev) => {
       const kept = Object.fromEntries(Object.entries(prev).filter(([, status]) => status !== "failed"))
@@ -245,9 +257,29 @@ export default function ObjectGrid({
     }
   }, [])
 
+  const firstScreenReady =
+    revealed.length >= (isFullscreen ? FIRST_SCREEN_TILES_FULLSCREEN : FIRST_SCREEN_TILES) ||
+    (imageObjects.length > 0 && frontier === imageObjects.length)
+  useEffect(() => {
+    if (firstScreenReady && !firstScreenOpen) setFirstScreenOpen(true)
+  }, [firstScreenReady, firstScreenOpen])
+  const shown = firstScreenOpen || firstScreenReady ? revealed : NO_OBJECTS
+
+  // Has a load finished since mount? Until then an empty list means "not loaded yet".
+  const sawLoadingRef = useRef(false)
+  const [loadSettled, setLoadSettled] = useState(false)
+  useEffect(() => {
+    if (isLoading) sawLoadingRef.current = true
+    else if (sawLoadingRef.current) setLoadSettled(true)
+  }, [isLoading])
+  useEffect(() => {
+    const id = window.setTimeout(() => setLoadSettled(true), EMPTY_STATE_FALLBACK_MS)
+    return () => window.clearTimeout(id)
+  }, [])
+
   const visibleObjects = useMemo(() => {
-    return revealed.slice(visibleRange.start, visibleRange.end)
-  }, [revealed, visibleRange])
+    return shown.slice(visibleRange.start, visibleRange.end)
+  }, [shown, visibleRange])
 
   // Every loaded object has been checked but too few had images to fill the
   // view — fetch the next page instead of waiting for a scroll that can't happen.
@@ -363,11 +395,11 @@ export default function ObjectGrid({
   // Loading / empty states render inside the same scroll container as the tiles,
   // so the header (mobile info block) stays mounted and keeps its accordion state.
   const emptyState =
-    revealed.length === 0 && (isCheckingImages || (isLoading && objects.length === 0)) ? (
+    shown.length === 0 && (isCheckingImages || (objects.length === 0 && (isLoading || !loadSettled))) ? (
       <div className={`flex flex-col justify-center items-center text-center ${header ? "py-16" : "h-full"}`}>
         <Spinner size="2" />
       </div>
-    ) : revealed.length === 0 ? (
+    ) : shown.length === 0 ? (
       <div className={`flex flex-col justify-center items-center text-center ${header ? "py-16" : "h-full"}`}>
         {objects.length > 0 ? (
           // There are artifacts here, but none has an image that loads (no image,

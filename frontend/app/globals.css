@@ -321,8 +321,10 @@ img {
   box-shadow: 0 0 0 2px rgb(59, 130, 246);
 }
 
-/* Masonry-like grid layout */
-.grid {
+/* Masonry-like grid layout — only for grids that set no columns of their own: it
+   came after Tailwind's grid-cols-* and overrode them, so the object grid followed
+   the panel's width (two columns while the panel opened, then three). */
+.grid:not([class*="grid-cols-"]) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   grid-auto-rows: minmax(0, auto);
