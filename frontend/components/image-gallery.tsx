@@ -7,12 +7,14 @@ import { displayObjectDate } from "@/lib/object-date"
 import { Button } from "@/components/ui/button"
 import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
-import { Check, Link2 } from "lucide-react"
+import { Check, Link2, Quote } from "lucide-react"
 import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
 import { isWithdrawn, withdrawnSourceUrl } from "@/lib/withdrawn"
 import { isPublicDomain, rightsLabel } from "@/lib/image-rights"
 import { artifactCorrectionUrl } from "@/lib/correction-link"
+import { citationText } from "@/lib/cite"
+import { copyText } from "@/lib/clipboard"
 import { linkHost, track } from "@/lib/analytics"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
@@ -40,6 +42,7 @@ export default function ImageGallery({
   const [imageError, setImageError] = useState(!startsWithImage)
   const [isLoading, setIsLoading] = useState(startsWithImage)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [citeCopied, setCiteCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
@@ -310,6 +313,26 @@ export default function ImageGallery({
                 </Button>
               ) : null
             })()}
+            {Number(currentObject.id) > 0 && !String(currentObject.id).startsWith('wiki-') && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title={citeCopied ? "Citation copied!" : "Copy citation"}
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  track("share_click", { target: "citation", id: String(currentObject.id) })
+                  if (await copyText(citationText({ id: currentObject.id, ...currentObject.attributes }))) {
+                    setCiteCopied(true)
+                    setTimeout(() => setCiteCopied(false), 2000)
+                  }
+                }}
+              >
+                {citeCopied
+                  ? <Check className="h-5 w-5 text-green-500" />
+                  : <Quote className="h-5 w-5 text-gray-500" />}
+              </Button>
+            )}
             {getLinkUrl() && (
               <Button
                 variant="ghost"
