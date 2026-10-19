@@ -22,7 +22,7 @@ import CommandPalette, { type CommandPaletteHandlers } from "@/components/map/co
 import { placeDisplayLabel } from "@/lib/place-label"
 import { siteLabel } from "@/lib/site-label"
 import { track } from "@/lib/analytics"
-import { MAP_DEFAULT_TITLE, mapTitle } from "@/lib/map-title"
+import { MAP_DEFAULT_TITLE, mapTitle, withSiteName } from "@/lib/map-title"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 
@@ -299,7 +299,7 @@ function MapContent() {
   // Tab title follows the drill (the server only sets it for the URL the page loaded with).
   useEffect(() => {
     const title = mapTitle({ place: activeCountry, site: activeSite, precise: activePrecise, institution: activeInstitution })
-    document.title = title ? `${title} | Ex Situ` : MAP_DEFAULT_TITLE
+    document.title = title ? withSiteName(title) : MAP_DEFAULT_TITLE
   }, [activeCountry, activeSite, activePrecise, activeInstitution])
 
   // Mobile: picking an arc, place, site or collection brings the object sheet up to

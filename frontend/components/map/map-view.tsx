@@ -1237,7 +1237,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           <div
             ref={arcTooltipRef}
             className="absolute bg-white p-3 rounded-xl text-sm z-50 pointer-events-none border shadow-lg"
-            style={{ left: arcTooltipPosRef.current.x + 10, top: arcTooltipPosRef.current.y + 10, maxWidth: "260px" }}
+            style={{ left: arcTooltipPosRef.current.x + 10, top: arcTooltipPosRef.current.y + 10, maxWidth: "360px" }}
           >
             {/* Same terms as the artifact panel: "to" is a place, the museum is the collection. */}
             {(() => {
@@ -1249,26 +1249,21 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               const fromSub = city && country ? `${city}, ${country}` : city || country
               const fromFull = hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase()
                 ? `${hoveredArc.fromName} (${hoveredArc.fromHistorical})` : hoveredArc.fromName
+              // Place and country on one line, same type: "Konya, Turkey" → "Berlin, Germany"
+              const fromLine = fromSub ? `${fromFull}, ${fromSub}` : fromFull
+              const toLine = toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() ? `${toPlace}, ${toCountry}` : toPlace
               return (
                 <>
-                  <div className="mb-1" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", columnGap: "1rem" }}>
-                    <div className="min-w-0">
-                      <div className="flex min-w-0">
-                        <span className="text-muted-foreground mr-2 flex-shrink-0">From:</span>
-                        {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
-                        <span className="text-foreground truncate" title={fromFull}>{fromFull}</span>
-                      </div>
-                      {fromSub && <div className="text-[10px] text-muted-foreground truncate">{fromSub}</div>}
+                  <div className="mb-1 flex min-w-0 gap-3">
+                    <div className="flex min-w-0">
+                      <span className="text-muted-foreground mr-1.5 flex-shrink-0">From:</span>
+                      {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
+                      <span className="text-foreground truncate" title={fromLine}>{fromLine}</span>
                     </div>
-                    {toPlace && (
-                      <div className="min-w-0">
-                        <div className="flex min-w-0">
-                          <span className="text-muted-foreground mr-2 flex-shrink-0">To:</span>
-                          <span className="text-foreground truncate" title={toPlace}>{toPlace}</span>
-                        </div>
-                        {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
-                          <div className="text-[10px] text-muted-foreground truncate">{toCountry}</div>
-                        )}
+                    {toLine && (
+                      <div className="flex min-w-0 flex-shrink-0 max-w-[50%]">
+                        <span className="text-muted-foreground mr-1.5 flex-shrink-0">To:</span>
+                        <span className="text-foreground truncate" title={toLine}>{toLine}</span>
                       </div>
                     )}
                   </div>

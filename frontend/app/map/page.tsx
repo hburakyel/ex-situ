@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import MapClient from "./map-client"
 import { fetchArcTotals, findGroup, groupByInstitution, groupByPlace } from "@/lib/arc-index"
-import { SITE_PREVIEW_IMAGE, mapTitle } from "@/lib/map-title"
+import { SITE_PREVIEW_IMAGE, mapTitle, withSiteName } from "@/lib/map-title"
 
 // Place and museum views live on /map (?place=, ?institution=); give each its own title,
 // description and canonical so search engines can index them. Labels and counts only.
@@ -26,8 +26,13 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   if (narrowed || (place && institution)) {
     // Not indexed separately, but the tab still names the view: Next re-applies this
     // title on client navigations, so an empty one would reset it to "Ex Situ".
-    const title = mapTitle({ place, site: first(params.site), precise: first(params.precise), institution })
-    return { title: `${title} | Ex Situ` }
+    // A shared link previews with the same name ("Sanctuary of Athena (Pergamon) — Ex Situ").
+    const title = withSiteName(mapTitle({ place, site: first(params.site), precise: first(params.precise), institution })!)
+    return {
+      title,
+      openGraph: { title, siteName: "Ex Situ", type: "website", images: [SITE_PREVIEW_IMAGE] },
+      twitter: { card: "summary_large_image", title, images: [SITE_PREVIEW_IMAGE.url] },
+    }
   }
 
   const arcs = await fetchArcTotals()
@@ -40,11 +45,11 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const description = `${group.count.toLocaleString("en-US")} artifacts · ${names(group.related)}`
 
   return {
-    title: `${title} | Ex Situ`,
+    title: withSiteName(title),
     description,
     alternates: { canonical },
-    openGraph: { title, description, url: canonical, siteName: "Ex Situ", type: "website", images: [SITE_PREVIEW_IMAGE] },
-    twitter: { card: "summary_large_image", title, description, images: [SITE_PREVIEW_IMAGE.url] },
+    openGraph: { title: withSiteName(title), description, url: canonical, siteName: "Ex Situ", type: "website", images: [SITE_PREVIEW_IMAGE] },
+    twitter: { card: "summary_large_image", title: withSiteName(title), description, images: [SITE_PREVIEW_IMAGE.url] },
   }
 }
 

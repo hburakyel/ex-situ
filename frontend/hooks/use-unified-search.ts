@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { sharedRequest } from "@/lib/api"
 
 // Arc data from geospatial API
@@ -26,6 +26,15 @@ export interface CollectionResult {
   objectCount: number
   countries: string[]
   sampleImageUrl: string | null
+}
+
+/** A site matched by name in the database, with its country (suggest endpoint). */
+export interface SiteSuggestion {
+  name: string
+  country: string
+  latitude: number
+  longitude: number
+  objectCount: number
 }
 
 export interface PlaceResult {
@@ -139,6 +148,10 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
   const [searchResults, setSearchResults] = useState<PlaceResult[]>([])
   const [matchingArcs, setMatchingArcs] = useState<ArcData[]>([])
   const [matchingCollections, setMatchingCollections] = useState<CollectionResult[]>([])
+  // Sites found in the database by name (suggest). The Sites list otherwise comes from
+  // the zoom-4 arcs, which stop at 1000 rows and leave out smaller sites such as Konya.
+  const [matchingSites, setMatchingSites] = useState<SiteSuggestion[]>([])
+  const latestQueryRef = useRef("")
   const [searchError, setSearchError] = useState<string | null>(null)
   // DB-backed synonym map; falls back to COUNTRY_ALIASES_FALLBACK until loaded
   const [synonymMap, setSynonymMap] = useState<Record<string, string>>(COUNTRY_ALIASES_FALLBACK)
@@ -339,6 +352,8 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       setSearchResults([])
       setMatchingArcs([])
       setMatchingCollections([])
+      setMatchingSites([])
+      latestQueryRef.current = ""
       setSearchError(null)
       return
     }
@@ -352,10 +367,18 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     setMatchingCollections(cols)
 
     // Fire suggest and geocode in parallel
+    latestQueryRef.current = query
     const suggestPromise = fetch(`/api/proxy/museum-objects/suggest?q=${encodeURIComponent(query)}&limit=8`)
       .then(res => res.ok ? res.json() : { data: [] })
       .then(data => (Array.isArray(data?.data) ? data.data : []) as Array<{ place_name: string; country_en: string | null; city_en: string | null; latitude: number; longitude: number; object_count: number }>)
       .catch(() => [] as Array<{ place_name: string; country_en: string | null; city_en: string | null; latitude: number; longitude: number; object_count: number }>)
+    suggestPromise.then((rows) => {
+      if (latestQueryRef.current !== query) return
+      setMatchingSites(rows
+        .filter((r) => r.place_name && r.country_en && r.place_name.toLowerCase() !== r.country_en.toLowerCase()
+          && Number.isFinite(r.latitude) && Number.isFinite(r.longitude) && !(r.latitude === 0 && r.longitude === 0))
+        .map((r) => ({ name: r.place_name, country: r.country_en!, latitude: r.latitude, longitude: r.longitude, objectCount: r.object_count || 0 })))
+    })
 
     try {
       const params = new URLSearchParams({
@@ -462,6 +485,8 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       setSearchResults([])
       setMatchingArcs([])
       setMatchingCollections([])
+      setMatchingSites([])
+      latestQueryRef.current = ""
     }
   }, [minChars, performSearch])
 
@@ -487,6 +512,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     places: searchResults,
     arcs: matchingArcs,
     collections: matchingCollections,
+    sites: matchingSites,
     allCollections: collections,
     arcData,
     cityArcData,

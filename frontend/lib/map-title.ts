@@ -1,5 +1,8 @@
 // The map with nothing picked: the title search results, tabs and link previews show.
-export const MAP_DEFAULT_TITLE = "Ex Situ"
+export const MAP_DEFAULT_TITLE = "Ex Situ — spatial index of cultural artifacts"
+
+// A picked view's title in tabs, search results and link previews: "Palestine — Ex Situ".
+export const withSiteName = (title: string) => `${title} — Ex Situ`
 
 // Link-preview image for pages without one of their own: the world map with its arcs
 // (public/og-image.jpg, a screenshot of /map with the panels hidden). Resolved against
@@ -22,8 +25,6 @@ export function mapTitle({ place, site, precise, institution }: {
   // Several picked sites are joined with "|"; the country names them better.
   const oneSite = site && !site.includes("|") ? site : null
   const from = (oneSite && precise) || oneSite || place
-  if (from && institution) return `Artifacts from ${from} in ${institution}`
-  if (from) return `Artifacts from ${from}`
-  if (institution) return `Artifacts in ${institution}`
-  return null
+  if (from && institution) return `${from} · ${institution}`
+  return from || institution || null
 }

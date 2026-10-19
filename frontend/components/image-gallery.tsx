@@ -261,9 +261,10 @@ export default function ImageGallery({
 
         <div className="flex items-center justify-between px-4 pt-3 pb-2 bg-white">
           <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm" style={{fontSize:14}}>
-            <span className="text-black">{currentIndex + 1} / {galleryObjects.length}</span>
+            <span className="text-black whitespace-nowrap flex-shrink-0">{currentIndex + 1} / {galleryObjects.length}</span>
+            {/* One line; a long inventory number ends in "…" (full number on hover) */}
             {currentObject.attributes.inventory_number && (
-              <span className="text-[#666] ml-2">
+              <span className="text-[#666] ml-2 min-w-0 truncate whitespace-nowrap" title={currentObject.attributes.inventory_number}>
                 ID: <span className="text-black">{currentObject.attributes.inventory_number}</span>
               </span>
             )}

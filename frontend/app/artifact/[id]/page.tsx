@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 
 import type { MuseumObject } from "@/types"
 import { LARGE_WIDTH, resolveImageSrc } from "@/lib/image-src"
-import { SITE_PREVIEW_IMAGE } from "@/lib/map-title"
+import { SITE_PREVIEW_IMAGE, withSiteName } from "@/lib/map-title"
 
 import ArtifactRedirect from "./artifact-redirect"
 
@@ -52,7 +52,7 @@ function artifactLabel(artifact: MuseumObject | null, id: string) {
 }
 
 function buildArtifactTitle(artifact: MuseumObject | null, id: string) {
-	return `${artifactLabel(artifact, id)} | Ex Situ`
+	return withSiteName(artifactLabel(artifact, id))
 }
 
 function buildArtifactDescription(artifact: MuseumObject | null) {

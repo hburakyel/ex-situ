@@ -375,11 +375,21 @@ export default function V3CommandPalette({
   const siteRows = useMemo(() => {
     const placeNames = new Set(placeRows.map((p) => p.name.toLowerCase()))
     const query = search.hasQuery ? search.searchQuery.toLowerCase() : ""
-    return allSiteRows.filter((s) => {
+    const rows = allSiteRows.filter((s) => {
       const name = s.name.toLowerCase()
       return !placeNames.has(name) && (!query || name.includes(query))
     })
-  }, [search.hasQuery, search.searchQuery, allSiteRows, placeRows])
+    if (!search.hasQuery) return rows
+    // The arc list stops at 1000 rows; sites the database finds by name (Konya) join it.
+    const listed = new Set(rows.map((s) => s.name.toLowerCase()))
+    for (const s of search.sites) {
+      const key = s.name.toLowerCase()
+      if (listed.has(key) || placeNames.has(key)) continue
+      listed.add(key)
+      rows.push({ name: s.name, type: "city", objectCount: s.objectCount, lat: s.latitude, lng: s.longitude, country: s.country })
+    }
+    return rows.sort((a, b) => b.objectCount - a.objectCount)
+  }, [search.hasQuery, search.searchQuery, search.sites, allSiteRows, placeRows])
   const collectionRows = search.hasQuery ? searchCollectionRows : allCollectionRows
   // Fly-to rows: geocoded results that don't match places or sites — only shown when typing
   const flyToRows = useMemo(() => {

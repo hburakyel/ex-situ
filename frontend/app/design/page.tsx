@@ -172,7 +172,7 @@ function TokensTab() {
       <div className="space-y-5">
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-gray-400">text-sm · 14px · font-mono · base size (all text)</span>
-          <span className="text-sm text-black">132 objects from Rwanda</span>
+          <span className="text-sm text-black">132 artifacts from Rwanda</span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-gray-400">
@@ -304,7 +304,7 @@ function ComponentsTab() {
 
   return (
     <div>
-      <SectionLabel>Object Card (image grid)</SectionLabel>
+      <SectionLabel>Artifact Card (image grid)</SectionLabel>
       <p className="text-[10px] text-gray-400 mb-3">
         group · p-1 · bg-white · h-44 · ring-2 ring-blue-500 on hover / click · rounded-[4px] · inventory number as placeholder
       </p>
@@ -904,7 +904,7 @@ function ObjectPanelDesktopPattern() {
           </div>
           {/* Footer */}
           <div className="shrink-0 flex items-center justify-between px-4 py-2 border-t border-gray-100">
-            <span className="text-[10px] text-gray-400">132 objects</span>
+            <span className="text-[10px] text-gray-400">132 artifacts</span>
             <button className="flex items-center gap-1 text-gray-400 hover:text-black">
               <IconDownloadCsv className="h-4 w-4" />
               <span className="text-[10px]">Export CSV</span>
@@ -1047,7 +1047,7 @@ function CommandPalettePattern() {
   const RESULTS = [
     { label: "Rwanda", sub: "Country · Central Africa" },
     { label: "Kigali, Rwanda", sub: "City · RW" },
-    { label: "Rwanda → Ethnologisches Museum", sub: "132 objects · arc" },
+    { label: "Rwanda → Ethnologisches Museum", sub: "132 artifacts · arc" },
   ].filter((r) => !query || r.label.toLowerCase().includes(query.toLowerCase()))
 
   return (
