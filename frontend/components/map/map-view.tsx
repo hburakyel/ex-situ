@@ -128,9 +128,7 @@ function hasValidCoordinatePair(position?: [number, number] | number[]): boolean
 function HeaderAccordionList({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative">
-      {/* A third of what the card (as tall as the object panel) has left after its header, search
-          and three section titles, so with Sites, Time and Collections open the card is filled. */}
-      <div className="space-y-0.5 overflow-y-auto pr-1 pb-1" style={{ maxHeight: "max(10rem, calc((100dvh - 21rem) / 3))" }}>
+      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-1">
         {children}
       </div>
       <div
@@ -1169,7 +1167,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           <div
             ref={arcTooltipRef}
             className="absolute bg-white p-3 rounded-xl text-sm z-50 pointer-events-none border shadow-lg"
-            style={{ left: arcTooltipPosRef.current.x + 10, top: arcTooltipPosRef.current.y + 10, maxWidth: "300px" }}
+            style={{ left: arcTooltipPosRef.current.x + 10, top: arcTooltipPosRef.current.y + 10, maxWidth: "260px" }}
           >
             {/* Same terms as the artifact panel: "to" is a place, the museum is the collection. */}
             {(() => {
@@ -1179,24 +1177,27 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               const city = hoveredArc.fromCity && hoveredArc.fromCity.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCity : null
               const country = hoveredArc.fromCountry && hoveredArc.fromCountry.toLowerCase() !== hoveredArc.fromName.toLowerCase() ? hoveredArc.fromCountry : null
               const fromSub = city && country ? `${city}, ${country}` : city || country
+              const fromFull = hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase()
+                ? `${hoveredArc.fromName} (${hoveredArc.fromHistorical})` : hoveredArc.fromName
               return (
                 <>
                   <div className="mb-1" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", columnGap: "1rem" }}>
                     <div className="min-w-0">
-                      <span className="text-muted-foreground mr-2">From:</span>
-                      <span className="text-foreground">{hoveredArc.fromName}</span>
-                      {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
-                      {hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase() && (
-                        <span className="text-muted-foreground"> ({hoveredArc.fromHistorical})</span>
-                      )}
-                      {fromSub && <div className="text-[10px] text-muted-foreground">{fromSub}</div>}
+                      <div className="flex min-w-0">
+                        <span className="text-muted-foreground mr-2 flex-shrink-0">From:</span>
+                        {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
+                        <span className="text-foreground truncate" title={fromFull}>{fromFull}</span>
+                      </div>
+                      {fromSub && <div className="text-[10px] text-muted-foreground truncate">{fromSub}</div>}
                     </div>
                     {toPlace && (
                       <div className="min-w-0">
-                        <span className="text-muted-foreground mr-2">To:</span>
-                        <span className="text-foreground">{toPlace}</span>
+                        <div className="flex min-w-0">
+                          <span className="text-muted-foreground mr-2 flex-shrink-0">To:</span>
+                          <span className="text-foreground truncate" title={toPlace}>{toPlace}</span>
+                        </div>
                         {toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() && (
-                          <div className="text-[10px] text-muted-foreground">{toCountry}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">{toCountry}</div>
                         )}
                       </div>
                     )}
@@ -1282,8 +1283,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
         {!isMobile && (
-        <div className="absolute top-10 left-10 bottom-10 sm:w-80 z-20 pointer-events-none">
-        <div className={`bg-white rounded-2xl shadow-lg flex flex-col relative pointer-events-auto max-h-full ${showArcs || showTime || showCollections ? "h-full" : ""}`}>
+        <div className="absolute top-10 left-10 sm:w-80 z-20">
+        <div className="bg-white rounded-2xl shadow-lg flex flex-col relative">
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. */}
@@ -1339,7 +1340,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           )}
 
           <TooltipProvider delayDuration={150}>
-          <div className="px-4 pb-3 text-sm flex-1 min-h-0 overflow-y-auto">
+          <div className="px-4 pb-3 text-sm">
             {/* ── Places Section (drill-down) — header renders unconditionally
                 (like Time/Collections) so it appears during the loading window
                 instead of popping in only once groupedOrigins is non-empty. ── */}
