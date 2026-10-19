@@ -61,7 +61,7 @@ function SectionHeader({ columns, open, onToggle, children }: { columns?: boolea
 }
 
 // About Ex Situ: the mobile header's info section and the desktop popover.
-function AboutText() {
+export function AboutText() {
   return (
     <>
       <p className="mb-2.5 text-[#555]">
