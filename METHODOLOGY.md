@@ -26,6 +26,8 @@ Limited to institutions with open, programmatic access to their collections — 
 
 Object dates come from source institutions, shown at whatever precision they provide — exact year, range, century, or unknown. Undated objects remain visible; date filters never hide them silently.
 
+"Migration" is the year an object entered the holding institution, as a year only; how it got there (purchase, gift, collecting) is on the institution's own page. Sources: the V&A, the Met (`accessionYear`) and the Art Institute of Chicago (`fiscal_year`, used only where the accession number gives the same calendar year) state it in their records; for the Rijksmuseum and the Etnografiska museet / Världskulturmuseet it is the year in the object number ("NG-1994-65": acquired 1994; "1907.57.0012": collection registered in 1907, for the oldest collections by a predecessor institution). Other collections have no such year in their open data yet.
+
 ## Geocoding
 
 Place names are resolved to coordinates through a lookup table of known variants and a gazetteer. Fuzzy string matching is off by default and only used when explicitly enabled, because it produced false matches (Lagos → Laos, Delphi → Delhi); ambiguous places are flagged rather than guessed. Historical or ambiguous place names sometimes resolve imprecisely — corrections happen as they're found, not systematically.
