@@ -1,5 +1,5 @@
 // The map with nothing picked: the title search results, tabs and link previews show.
-export const MAP_DEFAULT_TITLE = "Ex Situ — map of the migration of cultural artifacts"
+export const MAP_DEFAULT_TITLE = "Ex Situ"
 
 // Link-preview image for pages without one of their own: the world map with its arcs
 // (public/og-image.jpg, a screenshot of /map with the panels hidden). Resolved against
