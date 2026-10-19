@@ -47,7 +47,10 @@ export async function GET(
         "Content-Type": "application/json",
         "User-Agent": "ExSitu/1.0",
       },
-      cache: "force-cache",
+      // Same 10 minutes as the in-memory cache and the artifact page. "force-cache"
+      // kept an object's first answer until the next frontend build, so a corrected
+      // record (Nofretete's place, 2026-10-19) still opened with its old data.
+      next: { revalidate: 600 },
     })
 
     if (response.status === 404) {
