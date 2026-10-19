@@ -452,7 +452,7 @@ return (
         "group-hover:ring-2 group-hover:ring-blue-500",
       ].join(" ")}
     >
-      {(object.attributes.geocoding_status && object.attributes.geocoding_status !== "ok") && (
+      {object.attributes.geocoding_status === "disputed" && (
         <span
           className={`absolute top-2 left-2 z-10 capitalize inline-flex items-center px-2 py-0.5 rounded-md text-xs ${
             object.attributes.geocoding_status === "disputed"
@@ -464,7 +464,7 @@ return (
           {object.attributes.geocoding_status}
         </span>
       )}
-      {(object.attributes.review_status && object.attributes.review_status !== "verified") && (
+      {object.attributes.review_status === "rejected" && (
         <span
           className={`absolute top-2 right-2 z-10 capitalize inline-flex items-center px-2 py-0.5 rounded-md text-xs ${
             object.attributes.review_status === "rejected"
