@@ -26,7 +26,7 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   if (narrowed || (place && institution)) {
     // Not indexed separately, but the tab still names the view: Next re-applies this
     // title on client navigations, so an empty one would reset it to "Ex Situ".
-    const title = mapTitle({ place, site: first(params.site), institution })
+    const title = mapTitle({ place, site: first(params.site), precise: first(params.precise), institution })
     return { title: `${title} | Ex Situ` }
   }
 

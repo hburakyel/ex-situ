@@ -105,6 +105,7 @@ function MapContent() {
   // ── Read initial state from URL params ──
   const urlCountry = searchParams.get("place")
   const urlSite = searchParams.get("site")
+  const urlPrecise = searchParams.get("precise")
   const urlInstitution = searchParams.get("institution")
   const urlLat = searchParams.get("lat")
   const urlLng = searchParams.get("lng")
@@ -277,8 +278,11 @@ function MapContent() {
   }, [activeInstitution, arcData])
   // Precise place inside the active site (Istanbul → Dolmabahçe Palace). Kept with the
   // site it belongs to, so picking another site can't leave a stale filter behind.
-  const [precisePick, setPrecisePick] = useState<{ site: string; name: string } | null>(null)
-  const activePrecise = precisePick && activeSite && precisePick.site === activeSite ? precisePick.name : null
+  const [precisePick, setPrecisePick] = useState<{ site: string; name: string } | null>(
+    urlSite && urlPrecise ? { site: urlSite, name: urlPrecise } : null,
+  )
+  const activePrecise = precisePick && activeSite && normalizePlaceKey(precisePick.site) === normalizePlaceKey(activeSite)
+    ? precisePick.name : null
   const [precisePlaces, setPrecisePlaces] = useState<PrecisePlace[]>([])
   useEffect(() => {
     if (!activeSite) { setPrecisePlaces([]); return }
@@ -289,9 +293,9 @@ function MapContent() {
 
   // Tab title follows the drill (the server only sets it for the URL the page loaded with).
   useEffect(() => {
-    const title = mapTitle({ place: activeCountry, site: activeSite, institution: activeInstitution })
+    const title = mapTitle({ place: activeCountry, site: activeSite, precise: activePrecise, institution: activeInstitution })
     document.title = title ? `${title} | Ex Situ` : MAP_DEFAULT_TITLE
-  }, [activeCountry, activeSite, activeInstitution])
+  }, [activeCountry, activeSite, activePrecise, activeInstitution])
 
   // Mobile: picking an arc, place, site or collection brings the object sheet up to
   // half height when it is minimized or hidden (a full-screen sheet is left as is).
@@ -641,10 +645,11 @@ function MapContent() {
   const urlUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Build URL from current state
-  const buildUrl = useCallback((country: string | null, site: string | null, institution: string | null, lat: number, lng: number, zoom: number) => {
+  const buildUrl = useCallback((country: string | null, site: string | null, precise: string | null, institution: string | null, lat: number, lng: number, zoom: number) => {
     const params = new URLSearchParams()
     if (country) params.set("place", country)
     if (site) params.set("site", site)
+    if (site && precise) params.set("precise", precise)
     if (institution) params.set("institution", institution)
     if (hasValidCoordinates(lat, lng) && (lat !== 20 || lng !== 0 || zoom !== 2)) {
       params.set("lat", lat.toFixed(4))
@@ -661,17 +666,17 @@ function MapContent() {
       isRestoringFromUrl.current = false
       return
     }
-    const newUrl = buildUrl(activeCountry, activeSite, activeInstitution, viewState.latitude, viewState.longitude, viewState.zoom)
+    const newUrl = buildUrl(activeCountry, activeSite, activePrecise, activeInstitution, viewState.latitude, viewState.longitude, viewState.zoom)
     router.replace(newUrl, { scroll: false })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCountry, activeSite, activeInstitution])
+  }, [activeCountry, activeSite, activePrecise, activeInstitution])
 
   // Debounced URL update for map position changes
   useEffect(() => {
     if (isRestoringFromUrl.current) return
     if (urlUpdateTimer.current) clearTimeout(urlUpdateTimer.current)
     urlUpdateTimer.current = setTimeout(() => {
-      const newUrl = buildUrl(activeCountry, activeSite, activeInstitution, viewState.latitude, viewState.longitude, viewState.zoom)
+      const newUrl = buildUrl(activeCountry, activeSite, activePrecise, activeInstitution, viewState.latitude, viewState.longitude, viewState.zoom)
       router.replace(newUrl, { scroll: false })
     }, 800)
     return () => { if (urlUpdateTimer.current) clearTimeout(urlUpdateTimer.current) }
