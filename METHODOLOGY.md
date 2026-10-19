@@ -45,6 +45,7 @@ Places are labelled with their present-day names; the name in the source record 
 | Source | Field read as origin |
 |---|---|
 | Staatliche Museen zu Berlin (museum-digital) | Place of the record's "Gefunden" (found) event; if there is none, of its "Hergestellt" (made) or "Gemalt" (painted) event. Collected, recorded, owned and similar events are never used. Whether the place is a findspot is stored with the record. |
+| Ethnologisches Museum objects not on museum-digital (search.smb.museum) | A place the record marks as findspot ("Fundort"), place of manufacture ("Herstellungsort") or origin ("Herkunft (Allgemein)"). The portal does not say what happened at an unmarked place, so an unmarked settlement or island (else the country) is used only for the material-culture collections (departments I–VI), shown as an attributed place; for sound recordings and photographs, where an unmarked place is often where the recording or photograph was made, only marked places are used. Objects with no such place are not indexed. |
 | The Metropolitan Museum of Art | The record's city, state, county, country, region and subregion fields. |
 | Art Institute of Chicago | `place_of_origin`. |
 | Victoria and Albert Museum | `_primaryPlace`. |
