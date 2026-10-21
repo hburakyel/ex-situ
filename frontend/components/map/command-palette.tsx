@@ -614,7 +614,7 @@ export default function V3CommandPalette({
   const renderObjects = () =>
     visObjectRows.length > 0 && (
       <>
-        <GroupLabel label="Objects" />
+        <GroupLabel label="Artifacts" />
         {visObjectRows.map((row, i) => {
           const fi = flatIndexOf("objects", i)
           const detail = [row.institution, row.placeName, row.objectDate].filter(Boolean).join(" · ")
