@@ -80,11 +80,11 @@ function matchesAnyFilter(value: string | null | undefined, filters: Set<string>
   return filters.has(normalizePlaceKey(value))
 }
 
-// Opening view, and where "Ex Situ" / the globe control return to. Mobile frames the
-// Arabian Peninsula / Red Sea, where arcs from Africa, Asia and Europe cross — the
-// whole world is unreadable at phone size.
-const MOBILE_HOME_VIEW = { lng: 47.2257, lat: 19.7517, zoom: 3.1 }
-const DESKTOP_HOME_VIEW = { lng: 0, lat: 20, zoom: 2 }
+// Opening view, and where "Ex Situ" / the globe control return to. Both frame the
+// Eastern Mediterranean / Near East, where arcs from Africa, Asia and Europe cross — the
+// whole world is unreadable at either size. Mobile sits a little further south and wider.
+const MOBILE_HOME_VIEW = { lng: 33.5, lat: 29.3, zoom: 3.5 }
+const DESKTOP_HOME_VIEW = { lng: 35.2, lat: 31.8, zoom: 4.25 }
 
 export default function MapPage() {
   return (
