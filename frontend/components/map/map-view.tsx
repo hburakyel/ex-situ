@@ -26,6 +26,7 @@ import { ARC_ANCHOR_LAYER, protomapsDarkStyle } from "@/lib/protomaps-dark-style
 import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
+import { arcHeightForZoom } from "@/lib/arc-height"
 import { placeDisplayLabels } from "@/lib/place-label"
 import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
@@ -270,6 +271,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const [isLowZoomArcView, setIsLowZoomArcView] = useState((initialZoom || 2) < 4)
     const [isStreetZoom, setIsStreetZoom] = useState((initialZoom || 2) >= 7)
     const currentZoomRef = useRef(initialZoom || 2)
+    // Pushes the layers to deck.gl with the arc height for the current zoom (set below).
+    const pushLayersRef = useRef<() => void>(() => {})
+    const appliedArcHeight = useRef<number | null>(null)
     const [isMapReady, setIsMapReady] = useState(false)
     const initialBoundsSet = useRef(false)
     const prevViewStateRef = useRef(initialViewState)
@@ -614,6 +618,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         setIsLowZoomArcView(newZoom < 4)
         setIsStreetZoom(newZoom >= 7)
         currentZoomRef.current = newZoom
+        if (appliedArcHeight.current !== arcHeightForZoom(newZoom)) pushLayersRef.current()
         onZoomChangeRef.current?.(newZoom)
       })
 
@@ -803,7 +808,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Arc layer construction
 
-    // Zoom 4 splits the global view from the regional one (arc height, viewport filter).
+    // Zoom 4 splits the global view from the regional one (viewport filter).
     // Bucketed to a boolean (isLowZoomArcView, set in the zoom handler) so the layers only
     // recompute when crossing the threshold, not on every zoom-gesture frame.
 
@@ -1001,11 +1006,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           if (isPanelHoveredArc(d)) return [59, 130, 246, 255]
           return [...targetColor, restingAlpha(d)] as [number, number, number, number]
         },
-        // Arcs rise toward the camera; zoomed in, a tall arc near the screen edge
-        // projects as a wide band. Lower arcs stay readable at regional zoom. At street
-        // zoom an arc thousands of km long is already far above the map next to its
-        // origin, and perspective pushes it out of view, so it lies flat there instead.
-        getHeight: isLowZoomArcView ? 1 : isStreetZoom ? 0 : 0.35,
         getWidth: (d) => {
           const selectedOrActive = isSelectedOrActiveArc(d)
           const isHovered = hoveredArcKey === `${d.fromName}-${d.toName}`
@@ -1061,7 +1061,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         },
       })
       return withEmphasis(mainLayer, arcLayerData.filter((d) => isSelectedOrActiveArc(d) || isPanelHoveredArc(d)))
-    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, isStreetZoom, visibleArcData, listHoverKey, matchesListHover, activeCountry, activeInstitution])
+    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, visibleArcData, listHoverKey, matchesListHover, activeCountry, activeInstitution])
 
     // ── Drill arc layer: persistent city-cluster arcs ──
     // Shown at city zoom (< 7) always. At zoom 7+, shown only when arcLayer has
@@ -1099,7 +1099,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           (isActiveSiteDrillArc(d) || isPanelHoveredDrillArc(d)) ? [59, 130, 246, 255] : [239, 95, 0, drillAlpha(d)],
         getTargetColor: (d: any): [number, number, number, number] =>
           isActiveSiteDrillArc(d) ? [147, 51, 234, 255] : (isPanelHoveredDrillArc(d) ? [59, 130, 246, 255] : [239, 95, 0, drillAlpha(d)]),
-        getHeight: isLowZoomArcView ? 1 : isStreetZoom ? 0 : 0.35,
         getWidth: (d: any) =>
           isActiveSiteDrillArc(d) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
         widthMinPixels: isMobile ? 2.5 : 1.5,
@@ -1160,11 +1159,18 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       return result.map((layer) => layer instanceof ArcLayer ? layer.clone({ beforeId: ARC_ANCHOR_LAYER }) : layer)
     }, [isMapReady, arcLayer, drillArcLayer, wikiLayer])
 
-    // Push layers to MapboxOverlay
-    useEffect(() => {
+    // Push layers to MapboxOverlay. Arc height follows the exact zoom
+    // (lib/arc-height.ts), so the zoom handler pushes again on every frame;
+    // a constant getHeight is a constant attribute, cheap to change, and the
+    // layers are not rebuilt.
+    pushLayersRef.current = () => {
       if (!deckOverlay.current || !isMapReady) return
-      try { deckOverlay.current.setProps({ layers, pickingRadius: isMobile ? 10 : 3 }) } catch (e) {}
-    }, [layers, isMapReady, isMobile])
+      const height = arcHeightForZoom(currentZoomRef.current)
+      appliedArcHeight.current = height
+      const withHeight = layers.map((layer) => layer instanceof ArcLayer ? layer.clone({ getHeight: height }) : layer)
+      try { deckOverlay.current.setProps({ layers: withHeight, pickingRadius: isMobile ? 10 : 3 }) } catch (e) {}
+    }
+    useEffect(() => { pushLayersRef.current() }, [layers, isMapReady, isMobile])
 
     // Notify parent when arcCards change
     useEffect(() => { onArcCardsChange?.(arcCards) }, [arcCards, onArcCardsChange])
