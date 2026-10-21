@@ -1150,11 +1150,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       if (drillArcLayer) result.push(...drillArcLayer)
       if (arcLayer) result.push(...arcLayer)
       if (wikiLayer) result.push(wikiLayer)
-      // Arcs go beneath every label, so all names stay legible. On a phone at street
-      // zoom a raised arc only shows its lift-off (a widening wedge), so it lies flat there.
-      const getHeight = isMobile && isStreetZoom ? 0 : 1
+      // Arcs go beneath every label, so all names stay legible. At street zoom a raised
+      // arc only shows its lift-off (a widening wedge), so it lies flat there.
+      const getHeight = isStreetZoom ? 0 : 1
       return result.map((layer) => layer instanceof ArcLayer ? layer.clone({ beforeId: ARC_ANCHOR_LAYER, getHeight }) : layer)
-    }, [isMapReady, arcLayer, drillArcLayer, wikiLayer, isMobile, isStreetZoom])
+    }, [isMapReady, arcLayer, drillArcLayer, wikiLayer, isStreetZoom])
 
     // Push layers to MapboxOverlay
     useEffect(() => {
