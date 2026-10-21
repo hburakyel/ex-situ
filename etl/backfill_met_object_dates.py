@@ -100,6 +100,9 @@ def dates(args):
         cur.execute("""SELECT count(*) FILTER (WHERE NULLIF(BTRIM(object_date_display), '') IS NOT NULL), count(*)
             FROM museum_objects WHERE institution_name = %s AND published_at IS NOT NULL""", (MET,))
         before, total = cur.fetchone()
+    # End the read transaction before the API fetch: an idle open transaction holds a lock
+    # on museum_objects for the whole fetch and blocks pre-strapi's DROP TRIGGER on a deploy.
+    conn.rollback()
     print(f"{MET}: {total} rows, {before} with the museum's own date line")
     found = fetch_dates(ids)
     print(f"API gives a date for {len(found)} of {len(ids)} objects")
@@ -110,7 +113,8 @@ def dates(args):
         cur.execute("""UPDATE museum_objects mo SET object_date_display = d.display,
                 object_date_earliest = d.earliest, object_date_latest = d.latest,
                 object_date_precision = d.precision
-            FROM _met_dates d WHERE mo.institution_name = %s AND mo.object_id = d.object_id""", (MET,))
+            FROM _met_dates d WHERE mo.institution_name = %s AND mo.object_id = d.object_id
+              AND mo.review_status IS DISTINCT FROM 'verified'""", (MET,))
         print(f"{cur.rowcount} rows updated")
         cur.execute("""SELECT object_date_precision, count(*) FROM museum_objects
             WHERE institution_name = %s AND published_at IS NOT NULL GROUP BY 1 ORDER BY 2 DESC""", (MET,))
