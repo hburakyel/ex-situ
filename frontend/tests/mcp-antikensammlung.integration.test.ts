@@ -47,7 +47,12 @@ describe(`MCP get_origins / count_objects for Antikensammlung (${MCP_URL})`, () 
     // "Theben") lost the point and country; Greece or Egypt is not stated, so they wait for review.
     // 2650 since 2026-10-17 (Italy review): 9 records geocoded to a same-name Italian place
     // (Weiden, Ligurio, Naxos, ...) whose real place the record doesn't settle wait for review.
-    expect(r.flows_objects).toBe(2650)
+    // 2654 since 2026-10-19: 4 "Altarterrasse" records (Pergamon) had no point and no
+    // labels; they now take the altar terrace's place and country (etl/fix_pergamon_sites.py).
+    // 2644 since 2026-10-21 (point review): the 10 "Agios Sostis" records lose their point
+    // and wait for review; the geocoder had placed them on an islet and a village elsewhere
+    // in Greece, and the record names Agios Sostis in Arkadien.
+    expect(r.flows_objects).toBe(2644)
     expect(r.flows_objects).toBeLessThanOrEqual(r.coverage.located)
     expect(r.note).toMatch(/^\d+ of 5612 objects \(\d+%\) have a located origin/)
     expect(r.note).not.toMatch(/slightly higher/)
