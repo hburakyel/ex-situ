@@ -9,6 +9,8 @@ import { ERA_BUCKETS, eraToDateFilters, collapseContiguousBuckets, type EraBucke
 import { fetchDecadeBucketCounts, type DateBucket, type DateBucketCounts } from "@/lib/api"
 import { placeDisplayLabels } from "@/lib/place-label"
 import { track } from "@/lib/analytics"
+import { resolveImageSrc } from "@/lib/image-src"
+import type { ObjectResult } from "@/hooks/use-unified-search"
 
 // ── Types ──
 
@@ -32,6 +34,8 @@ export interface CommandPaletteHandlers {
   onPathResult?: (path: PathStep[]) => void
   /** Called when "Explore" random jump is triggered */
   onExplore?: () => void
+  /** Open one object in the gallery (search by inventory number) */
+  onOpenArtifact?: (id: number) => void
 }
 
 /** A single step in a shortest-path result */
@@ -59,7 +63,7 @@ interface V3CommandPaletteProps {
   dateBuckets: DateBucketCounts | null
 }
 
-type SectionKey = "places" | "sites" | "collections" | "flyto" | "time" | "migration"
+type SectionKey = "places" | "sites" | "collections" | "objects" | "flyto" | "time" | "migration"
 type TabKey = "all" | "places" | "sites" | "time" | "migration" | "collections"
 
 const TABS: { key: TabKey; label: string }[] = [
@@ -414,6 +418,11 @@ export default function V3CommandPalette({
   const visSiteRows = tab === "all" || tab === "sites" ? preview(siteRows) : []
   const visCollectionRows = tab === "all" || tab === "collections" ? preview(collectionRows) : []
   const visFlyToRows = tab === "all" ? flyToRows : []
+  // Objects (inventory number or place text) only while searching, on "All". They lead
+  // when the query is an inventory number, else they follow the collections.
+  const objectRows: ObjectResult[] = search.hasQuery ? search.objects : []
+  const visObjectRows = tab === "all" ? objectRows : []
+  const objectsFirst = visObjectRows[0]?.match === "inventory_number"
   // Time/Migration aren't text-searchable: on "All" they only show while browsing.
   const showTime = tab === "time" || browsingAll
   const showMigration = tab === "migration" || browsingAll
@@ -425,12 +434,15 @@ export default function V3CommandPalette({
   // ── Flat selectable list for keyboard navigation ──
   const flatItems = useMemo(() => {
     const list: { section: SectionKey; index: number }[] = []
+    const pushObjects = () => visObjectRows.forEach((_, i) => list.push({ section: "objects", index: i }))
+    if (objectsFirst) pushObjects()
     visPlaceRows.forEach((_, i) => list.push({ section: "places", index: i }))
     visSiteRows.forEach((_, i) => list.push({ section: "sites", index: i }))
     visCollectionRows.forEach((_, i) => list.push({ section: "collections", index: i }))
+    if (!objectsFirst) pushObjects()
     visFlyToRows.forEach((_, i) => list.push({ section: "flyto", index: i }))
     return list
-  }, [visPlaceRows, visSiteRows, visCollectionRows, visFlyToRows])
+  }, [visPlaceRows, visSiteRows, visCollectionRows, visObjectRows, objectsFirst, visFlyToRows])
 
   // ── Filter toggle helpers (adds/removes chip, does NOT close palette) ──
   const toggleFilter = useCallback(
@@ -497,6 +509,15 @@ export default function V3CommandPalette({
     [toggleFilter, onOpenChange, trackPick],
   )
 
+  const handleSelectObject = useCallback(
+    (row: ObjectResult) => {
+      trackPick("object", row.inventoryNumber)
+      handlers.onOpenArtifact?.(row.id)
+      onOpenChange(false)
+    },
+    [handlers, onOpenChange, trackPick],
+  )
+
   // ── Fly-to handler (just navigate, no filter toggle) ──
   const handleSelectFlyTo = useCallback(
     (row: SiteRow) => {
@@ -514,9 +535,10 @@ export default function V3CommandPalette({
       if (entry.section === "places") handleSelectPlace(placeRows[entry.index])
       else if (entry.section === "sites") handleSelectSite(siteRows[entry.index])
       else if (entry.section === "flyto") handleSelectFlyTo(flyToRows[entry.index])
+      else if (entry.section === "objects") handleSelectObject(objectRows[entry.index])
       else handleSelectCollection(collectionRows[entry.index])
     },
-    [flatItems, placeRows, siteRows, collectionRows, flyToRows, handleSelectPlace, handleSelectSite, handleSelectFlyTo, handleSelectCollection],
+    [flatItems, placeRows, siteRows, collectionRows, objectRows, flyToRows, handleSelectPlace, handleSelectSite, handleSelectFlyTo, handleSelectObject, handleSelectCollection],
   )
 
   // Flat-index lookup for a section row
@@ -588,7 +610,48 @@ export default function V3CommandPalette({
 
   if (!open) return null
 
-  const matchCount = placeRows.length + siteRows.length + collectionRows.length + flyToRows.length
+  // ── Objects section (inventory number / place text) ──
+  const renderObjects = () =>
+    visObjectRows.length > 0 && (
+      <>
+        <GroupLabel label="Objects" />
+        {visObjectRows.map((row, i) => {
+          const fi = flatIndexOf("objects", i)
+          const detail = [row.institution, row.placeName, row.objectDate].filter(Boolean).join(" · ")
+          return (
+            <button
+              key={`o-${row.id}`}
+              data-flat={fi}
+              id={`palette-row-${fi}`}
+              aria-current={fi === selectedIdx ? "true" : undefined}
+              className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
+                fi === selectedIdx ? "bg-gray-50 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+              }`}
+              onClick={() => handleSelectObject(row)}
+              onMouseEnter={() => setSelectedIdx(fi)}
+            >
+              {row.imgUrl ? (
+                <img
+                  src={resolveImageSrc(row.imgUrl)}
+                  alt=""
+                  className="h-8 w-8 rounded-[4px] object-cover flex-shrink-0 bg-gray-100"
+                  onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden" }}
+                />
+              ) : (
+                <span className="h-8 w-8 rounded-[4px] bg-gray-100 flex-shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <span className="text-sm truncate block tabular-nums">{row.inventoryNumber || `Artifact ${row.id}`}</span>
+                {detail && <span className="text-sm text-gray-500 truncate block" title={detail}>{detail}</span>}
+              </div>
+              {!row.located && <span className="text-sm text-gray-500 flex-shrink-0">Not on map</span>}
+            </button>
+          )
+        })}
+      </>
+    )
+
+  const matchCount = placeRows.length + siteRows.length + collectionRows.length + objectRows.length + flyToRows.length
   const hasQuery = search.hasQuery
 
   return (
@@ -619,9 +682,10 @@ export default function V3CommandPalette({
               value={search.searchQuery}
               onChange={(e) => search.setSearchQuery(e.target.value)}
               placeholder="Search"
-              aria-label="Search places, sites, collections"
+              aria-label="Search places, sites, collections, inventory numbers"
               aria-describedby={selectedIdx >= 0 ? `palette-row-${selectedIdx}` : undefined}
-              className="flex-1 text-sm bg-transparent placeholder:text-gray-500"
+              // No focus ring: the palette is the focused surface and the caret shows where typing goes.
+              className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-gray-500 focus-visible:outline-none"
             />
             {search.isSearching && <Spinner size="1" />}
             {search.searchQuery && (
@@ -787,6 +851,8 @@ export default function V3CommandPalette({
             {/* Sections for the active tab — visible once data is loaded */}
             {(!search.searchQuery || matchCount > 0 || search.searchQuery.length < 2) && (allPlaceRows.length > 0 || allCollectionRows.length > 0) && (
               <div className="py-1">
+                {objectsFirst && renderObjects()}
+
                 {/* ── Places ── */}
                 {tab === "all" && visPlaceRows.length > 0 && (
                   <GroupLabel label="Places" total={placeRows.length} truncated={visPlaceRows.length < placeRows.length} onShowAll={() => setTab("places")} />
@@ -1066,6 +1132,8 @@ export default function V3CommandPalette({
                       </button>
                     )
                   })}
+
+                {!objectsFirst && renderObjects()}
 
                 {/* ── Fly-to rows: map locations outside the data (only when searching) ── */}
                 {hasQuery && visFlyToRows.length > 0 && (

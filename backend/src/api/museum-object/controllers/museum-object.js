@@ -69,6 +69,23 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
   },
 
   /**
+   * GET /api/museum-objects — Strapi's own list (and its _q search), with the same
+   * public date as findOne. Without it a Met record listed with no date although its
+   * object_date_earliest/latest were set (1974.294.2: 1500–1560).
+   */
+  async find(ctx) {
+    const response = await super.find(ctx);
+    for (const item of (response && response.data) || []) {
+      const attrs = item && item.attributes;
+      if (!attrs) continue;
+      const { object_date, acquisition_year } = buildPublicDateFields(attrs);
+      attrs.object_date = object_date;
+      attrs.acquisition_year = acquisition_year;
+    }
+    return response;
+  },
+
+  /**
    * Custom geospatial endpoint
    * GET /api/museum-objects/geospatial?zoom=5&minLon=-180&minLat=-90&maxLon=180&maxLat=90&institution=...
    */
@@ -419,6 +436,26 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
     } catch (error) {
       strapi.log.error('applyCorrection endpoint error:', error.message);
       ctx.internalServerError('Correction failed');
+    }
+  },
+
+  /**
+   * Object search by inventory number or place (search palette, MCP search_objects)
+   * GET /api/museum-objects/search?q=1974.294.2&limit=8
+   */
+  async search(ctx) {
+    try {
+      const { q, limit } = ctx.query;
+      if (!q || String(q).trim().length < 2) {
+        return ctx.send({ data: [] });
+      }
+      const results = await strapi
+        .service('api::museum-object.museum-object')
+        .searchObjects(q, limit);
+      ctx.send({ data: results });
+    } catch (error) {
+      strapi.log.error('search endpoint error:', error.message);
+      ctx.internalServerError('Search query failed');
     }
   },
 

@@ -17,6 +17,22 @@ const { buildEraBuckets } = require('./era-buckets');
 const ERA_BUCKETS = buildEraBuckets(new Date().getFullYear());
 
 /**
+ * Inventory number as stored in inventory_number_normalized (migration 011):
+ * lowercased, trailing letter parts dropped ("1991.17.58a, b" → "1991.17.58").
+ */
+function normalizeInventoryNumber(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[,\s]*[a-zA-Z]\s*(,\s*[a-zA-Z]\s*)*$/g, '')
+    .trim();
+}
+
+// The text searchObjects matches words against. Migration 017 indexes this exact
+// expression (pg_trgm); change both together or the index stops being used.
+const OBJECT_SEARCH_TEXT = `lower(coalesce(inventory_number, '') || ' ' || coalesce(place_name, '') || ' ' || coalesce(place_name_normalized, '') || ' ' || coalesce(city_en, '') || ' ' || coalesce(country_en, '') || ' ' || coalesce(historical_name, '') || ' ' || coalesce(precise_place, '') || ' ' || coalesce(institution_name, ''))`;
+
+/**
  * Decade sub-buckets within a single century bucket, for the Time section's
  * expand-to-drill-down UI (matches frontend/lib/era-buckets.ts's
  * buildDecadeBuckets — same ids/boundaries). Decades are derived from the
@@ -1244,11 +1260,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       // Normalized fallback: if no exact match, try matching against
       // inventory_number_normalized using the same normalization as migration 011.
       if (rows.length === 0) {
-        const normalizedInput = inventoryNumber
-          .trim()
-          .toLowerCase()
-          .replace(/[,\s]*[a-zA-Z]\s*(,\s*[a-zA-Z]\s*)*$/g, '')
-          .trim();
+        const normalizedInput = normalizeInventoryNumber(inventoryNumber);
 
         const fallbackQuery = dataQuery.replace(
           'WHERE published_at IS NOT NULL AND inventory_number = :inventoryNumber',
@@ -1845,6 +1857,82 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       strapi.log.error('Error in applyCorrection:', error);
       throw error;
     }
+  },
+
+  /**
+   * Object search for the search palette and the MCP search_objects tool.
+   * Matches the inventory number (exact, normalized as in migration 011, or as a
+   * prefix) and the record's place fields; every word of the query must appear.
+   * Titles are not searched: they are not part of the public API
+   * (strip-object-titles.js), and a hit on a hidden field would read as a false match.
+   *
+   * Unlocated objects are found too: search is how a reader reaches a record
+   * that has no point on the map.
+   * @param {string} query - min 2 chars
+   * @param {number} limit - default 8, max 20
+   */
+  async searchObjects(query, limit = 8) {
+    const db = strapi.db.connection;
+    const safeLimit = Math.min(Math.max(1, parseInt(limit) || 8), 20);
+    const q = String(query || '').trim().slice(0, 100);
+    if (q.length < 2) return [];
+
+    const escapeLike = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const invExact = normalizeInventoryNumber(q);
+    const invPrefix = `${escapeLike(q.toLowerCase())}%`;
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
+
+    const bindings = { invExact, invPrefix, limit: safeLimit };
+    const wordClauses = words.map((w, i) => {
+      bindings[`w${i}`] = `%${escapeLike(w)}%`;
+      return `${OBJECT_SEARCH_TEXT} LIKE :w${i}`;
+    });
+
+    const result = await db.raw(`
+      SELECT id, inventory_number, institution_name, institution_place, institution_city_en,
+             place_name, ${PLACE_DISPLAY_EXPR} AS place_display, city_en, country_en,
+             img_url, source_link, latitude, longitude, manual_latitude, manual_longitude,
+             object_date, acquisition_year, object_date_display, object_date_earliest,
+             object_date_latest, object_date_precision, acquisition_date_confidence,
+             acquisition_year_earliest,
+             CASE
+               WHEN inventory_number_normalized = :invExact THEN 0
+               WHEN lower(inventory_number) LIKE :invPrefix THEN 1
+               ELSE 2
+             END AS match_rank
+      FROM museum_objects
+      WHERE published_at IS NOT NULL
+        AND (
+          inventory_number_normalized = :invExact
+          OR lower(inventory_number) LIKE :invPrefix
+          OR (${wordClauses.join(' AND ')})
+        )
+      ORDER BY match_rank, (img_url IS NULL OR img_url = ''), id
+      LIMIT :limit
+    `, bindings);
+
+    return this.getRows(result).map((r) => {
+      const lat = r.manual_latitude ?? r.latitude;
+      const lng = r.manual_longitude ?? r.longitude;
+      const { object_date, acquisition_year } = buildPublicDateFields(r);
+      return {
+        id: r.id,
+        inventory_number: r.inventory_number,
+        institution_name: r.institution_name,
+        institution_place: r.institution_city_en || r.institution_place || null,
+        // 'Unknown' is the map's group label for a record with no city or country;
+        // the record's own place text ("Spain or North Africa") says more.
+        place_name: (r.place_display && r.place_display !== 'Unknown' ? r.place_display : r.place_name) || null,
+        city_en: r.city_en || null,
+        country_en: r.country_en || null,
+        img_url: r.img_url || null,
+        source_link: r.source_link || null,
+        object_date: object_date || null,
+        acquisition_year,
+        located: lat !== null && lat !== undefined && lng !== null && lng !== undefined,
+        match: r.match_rank < 2 ? 'inventory_number' : 'text',
+      };
+    });
   },
 
   /**

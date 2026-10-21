@@ -357,9 +357,10 @@ function buildServer(): McpServer {
     {
       title: "Search objects",
       description:
-        "Find individual objects. Either a free-text query (title, material, place…) or a country/museum filter. Returns up to 20 objects with links.",
+        "Find individual objects. Either a query (an inventory number such as '1974.294.2', or words from the origin place or museum, e.g. 'Herat') or a country/museum filter. " +
+        "Query results include objects with no point on the map (on_map: false). Titles are not searchable. Returns up to 20 objects with links.",
       inputSchema: {
-        query: z.string().trim().min(2).max(100).optional().describe("Free-text search, e.g. 'scarab', 'Iznik tile'"),
+        query: z.string().trim().min(2).max(100).optional().describe("Inventory number or place words, e.g. '57.51.37.3', 'Bukhara Herat'"),
         country,
         institution,
         limit: z.number().int().min(1).max(20).default(10),
@@ -374,7 +375,12 @@ function buildServer(): McpServer {
       if (country || institution) {
         data = await strapiGet("/museum-objects/by-country", { country, institution, page: 1, pageSize: limit, onlyWithImages: "true" })
       } else if (query) {
-        data = await strapiGet("/museum-objects", { _q: query, "pagination[page]": 1, "pagination[pageSize]": limit })
+        // Inventory number first (exact, then prefix), then every word in the place fields.
+        const rows: any[] = (await strapiGet("/museum-objects/search", { q: query, limit }))?.data || []
+        return result({
+          filters: { query },
+          objects: rows.map((r) => ({ ...compactObject(r.id, r), on_map: !!r.located, matched_on: r.match })),
+        })
       } else {
         return errorResult("Provide query, country, or institution.")
       }

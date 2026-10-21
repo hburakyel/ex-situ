@@ -58,6 +58,13 @@ Data-quality summary.
 ### `GET /museum-objects/suggest`
 Place autocomplete. Params: `q`, `limit`. Returns `data: [{place_name, country_en, city_en, latitude, longitude, object_count}]`.
 
+### `GET /museum-objects/search`
+Objects by inventory number (exact, normalized like `by-inventory`, or as a prefix) or by words in the
+place/museum fields; every word must match. Unlocated objects are included. Titles are not searched.
+Params: `q` (min 2 chars), `limit` (max 20). Returns `data: [{id, inventory_number, institution_name,
+institution_place, place_name, city_en, country_en, img_url, source_link, object_date, acquisition_year,
+located, match}]` (`match`: `inventory_number` or `text`). Indexed by migration 017.
+
 ### `GET /museum-objects/lookup`
 Objects at a named place. Params: `place_name` (required), `institution`.
 Returns `{total, sample: [{id, title, place_name, institution_name, city_en, country_en, latitude, longitude, geocoding_notes}]}`.
@@ -66,7 +73,7 @@ Returns `{total, sample: [{id, title, place_name, institution_name, city_en, cou
 Place-name alias → canonical mappings.
 
 ### `GET /museum-objects`
-Strapi default list with full-text search. Params: `_q`, `pagination[page]`, `pagination[pageSize]`,
+Strapi default list with full-text search (`object_date` is the public date, as in `/:id`). Params: `_q`, `pagination[page]`, `pagination[pageSize]`,
 `filters[latitude][$gte]` etc. Returns `{data, meta.pagination}`.
 
 ### `GET /stats`

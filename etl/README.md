@@ -10,6 +10,7 @@ Python pipelines for ingesting, geocoding, and normalising collection data from 
 etl/
 ├── scrape_smb_am_api.py       # Staatliche Museen zu Berlin — Antikensammlung resolver
 ├── scrape_met_api.py          # Metropolitan Museum of Art resolver
+├── backfill_met_object_dates.py # Met's own date line ("ca. 1525–35"); lists Met objects not indexed
 ├── scrape_vam.py              # Victoria and Albert Museum resolver
 ├── scrape_aic_api.py          # Art Institute of Chicago resolver
 ├── scrape_europeana.py        # Europeana resolver — institutions via Europeana, non-European origins only
