@@ -42,6 +42,7 @@ psql "$DATABASE_URL" -f database/migrations/009_fix_benin_coordinates.sql
 psql "$DATABASE_URL" -f database/migrations/010_expand_place_normalization.sql
 psql "$DATABASE_URL" -f database/migrations/011_add_inventory_number_normalized.sql
 psql "$DATABASE_URL" -f database/migrations/012_add_search_fulltext.sql
+psql "$DATABASE_URL" -f database/migrations/017_add_object_search_index.sql
 ```
 
 All migrations use `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` and are safe to re-run.

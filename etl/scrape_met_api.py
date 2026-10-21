@@ -370,10 +370,13 @@ async def main(args=None):
                         'geocoding_status': geocode_details.get('geocoding_status'),
                         'geocoding_notes': geocode_details.get('geocoding_notes'),
                         'review_status': geocode_details.get('review_status'),
+                        # time_name is the date line shown on the site: the Met's own
+                        # objectDate ("ca. 1525–35"), not `period` (a dynasty name).
+                        # Begin/end 0 is a year, so only None/"" count as missing.
                         'time': {
-                            'time_name': result.get('period') or None,
-                            'time_start': result.get('objectBeginDate') or None,
-                            'time_end': result.get('objectEndDate') or None
+                            'time_name': result.get('objectDate') or None,
+                            'time_start': None if result.get('objectBeginDate') in (None, '') else result.get('objectBeginDate'),
+                            'time_end': None if result.get('objectEndDate') in (None, '') else result.get('objectEndDate')
                         },
                         'inventory_number': result.get('accessionNumber', 'N/A'),
                         'object_links': [

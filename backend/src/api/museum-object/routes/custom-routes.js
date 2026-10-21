@@ -98,6 +98,16 @@ module.exports = {
     },
     {
       method: 'GET',
+      path: '/museum-objects/search',
+      handler: 'museum-object.search',
+      config: {
+        auth: false,
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'GET',
       path: '/museum-objects/suggest',
       handler: 'museum-object.suggest',
       config: {

@@ -208,17 +208,13 @@ function MapContent() {
     return () => window.removeEventListener("keydown", handler)
   }, [])
 
-  // ── Deep-link: fetch single artifact from URL param to auto-open gallery ──
-  // Use ref value so the URL being rewritten (stripping artifactId) doesn't cancel the fetch
-  useEffect(() => {
-    const artifactId = artifactIdRef.current
-    if (!artifactId) return
-    let cancelled = false
-
-    fetch(`/api/proxy/object/${encodeURIComponent(artifactId)}`)
+  // ── Open one artifact in the gallery: deep link (?artifactId=) and the search palette ──
+  // Works for unlocated objects too (the map goes to the holding museum instead).
+  const openArtifactById = useCallback((artifactId: string | number, isCancelled: () => boolean = () => false) => {
+    fetch(`/api/proxy/object/${encodeURIComponent(String(artifactId))}`)
       .then(r => r.ok ? r.json() : null)
       .then((data) => {
-        if (cancelled || !data?.data) return
+        if (isCancelled() || !data?.data) return
 
         const artifact = data.data as MuseumObject
         const objectCountry = artifact.attributes.country_en || artifact.attributes.country || artifact.attributes.place_name || null
@@ -248,13 +244,22 @@ function MapContent() {
 
         if (targetLat !== null && targetLng !== null) {
           setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 14 }))
+          mapRef.current?.flyToLocation(targetLng, targetLat, 14, 1400)
         }
       })
       .catch(() => {})
+  }, [])
+
+  // Use ref value so the URL being rewritten (stripping artifactId) doesn't cancel the fetch
+  useEffect(() => {
+    const artifactId = artifactIdRef.current
+    if (!artifactId) return
+    let cancelled = false
+    openArtifactById(artifactId, () => cancelled)
     return () => {
       cancelled = true
     }
-  }, []) // run once on mount — artifactIdRef is stable
+  }, [openArtifactById]) // runs once on mount — artifactIdRef is stable
 
   // ── Drill-down state (research page pattern) ──
   const [drillLevel, setDrillLevel] = useState<DrillLevel>(urlCountry ? (urlSite || urlInstitution ? "objects" : "country") : "global")
@@ -1099,7 +1104,8 @@ function MapContent() {
     onOriginClick: handleOriginClick,
     onToggleSite: handleToggleSite,
     onToggleInstitution: handleToggleInstitution,
-  }), [handleOriginClick, handleToggleSite, handleToggleInstitution, cityArcData, debouncedGeocode])
+    onOpenArtifact: (id: number) => openArtifactById(id),
+  }), [handleOriginClick, handleToggleSite, handleToggleInstitution, cityArcData, debouncedGeocode, openArtifactById])
 
   // Bbox fetch for zoomed-in objects
   const fetchObjects = useCallback(async (bounds: MapBounds, page: number, reset = false) => {

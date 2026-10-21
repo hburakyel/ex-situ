@@ -771,3 +771,13 @@ button.maplibregl-ctrl-icon svg {
   outline: 2px solid #1d4ed8;
   outline-offset: -2px;
 }
+
+/* iOS Safari zooms the page into any focused field under 16px (the search palette
+   opened zoomed in on phones). Touch screens get 16px fields; desktop keeps its sizes. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

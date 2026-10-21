@@ -37,6 +37,19 @@ export interface SiteSuggestion {
   objectCount: number
 }
 
+/** An object found by inventory number or place text (search endpoint). */
+export interface ObjectResult {
+  id: number
+  inventoryNumber: string
+  institution: string
+  placeName: string | null
+  imgUrl: string | null
+  objectDate: string | null
+  /** false: the record has no point on the map; search is the way to reach it. */
+  located: boolean
+  match: "inventory_number" | "text"
+}
+
 export interface PlaceResult {
   name: string
   longitude: number
@@ -151,6 +164,8 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
   // Sites found in the database by name (suggest). The Sites list otherwise comes from
   // the zoom-4 arcs, which stop at 1000 rows and leave out smaller sites such as Konya.
   const [matchingSites, setMatchingSites] = useState<SiteSuggestion[]>([])
+  // Objects by inventory number ("1974.294.2") or place text, including unlocated ones.
+  const [matchingObjects, setMatchingObjects] = useState<ObjectResult[]>([])
   const latestQueryRef = useRef("")
   const [searchError, setSearchError] = useState<string | null>(null)
   // DB-backed synonym map; falls back to COUNTRY_ALIASES_FALLBACK until loaded
@@ -353,6 +368,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       setMatchingArcs([])
       setMatchingCollections([])
       setMatchingSites([])
+      setMatchingObjects([])
       latestQueryRef.current = ""
       setSearchError(null)
       return
@@ -378,6 +394,24 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
         .filter((r) => r.place_name && r.country_en && r.place_name.toLowerCase() !== r.country_en.toLowerCase()
           && Number.isFinite(r.latitude) && Number.isFinite(r.longitude) && !(r.latitude === 0 && r.longitude === 0))
         .map((r) => ({ name: r.place_name, country: r.country_en!, latitude: r.latitude, longitude: r.longitude, objectCount: r.object_count || 0 })))
+    })
+
+    const objectsPromise = fetch(`/api/proxy/museum-objects/search?q=${encodeURIComponent(query)}&limit=8`)
+      .then(res => res.ok ? res.json() : { data: [] })
+      .then(data => (Array.isArray(data?.data) ? data.data : []) as any[])
+      .catch(() => [] as any[])
+    objectsPromise.then((rows) => {
+      if (latestQueryRef.current !== query) return
+      setMatchingObjects(rows.map((r): ObjectResult => ({
+        id: r.id,
+        inventoryNumber: r.inventory_number || "",
+        institution: r.institution_name || "",
+        placeName: r.place_name || null,
+        imgUrl: r.img_url || null,
+        objectDate: r.object_date || null,
+        located: !!r.located,
+        match: r.match === "inventory_number" ? "inventory_number" : "text",
+      })))
     })
 
     try {
@@ -486,6 +520,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       setMatchingArcs([])
       setMatchingCollections([])
       setMatchingSites([])
+      setMatchingObjects([])
       latestQueryRef.current = ""
     }
   }, [minChars, performSearch])
@@ -496,6 +531,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     setSearchResults([])
     setMatchingArcs([])
     setMatchingCollections([])
+    setMatchingObjects([])
     setSearchError(null)
   }, [])
 
@@ -513,6 +549,7 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     arcs: matchingArcs,
     collections: matchingCollections,
     sites: matchingSites,
+    objects: matchingObjects,
     allCollections: collections,
     arcData,
     cityArcData,
