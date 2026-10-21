@@ -128,7 +128,6 @@ export default function ObjectGrid({
   const lateRef = useRef<Set<string>>(new Set())
   const [slowCheckTick, setSlowCheckTick] = useState(0)
   const emptyAutoloadsRef = useRef(0)
-  const [gridClass, setGridClass] = useState("")
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
 
   // Use virtualization for better performance with large lists
@@ -350,8 +349,9 @@ export default function ObjectGrid({
     }
   }, [handleScroll])
 
-  // Dynamically adjust grid columns based on panel size
-  useEffect(() => {
+  // Grid columns by panel size. Computed during render (not in an effect) so the first
+  // paint already has its columns instead of flashing the unstyled 2-column grid.
+  const gridClass = useMemo(() => {
     let columns: string
 
     if (isFullscreen || panelSize >= 90) {
@@ -372,7 +372,7 @@ export default function ObjectGrid({
       columns = `grid-cols-${mobileColumns} xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8`
     }
 
-    setGridClass(columns)
+    return columns
   }, [panelSize, isFullscreen, mobileColumns])
 
   // When new objects are appended, expand visible range to include them

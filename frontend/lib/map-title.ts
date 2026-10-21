@@ -1,5 +1,5 @@
 // The map with nothing picked: the title search results, tabs and link previews show.
-export const MAP_DEFAULT_TITLE = "Ex Situ — spatial index of cultural artifacts"
+export const MAP_DEFAULT_TITLE = "Ex Situ"
 
 // A picked view's title in tabs, search results and link previews: "Palestine — Ex Situ".
 export const withSiteName = (title: string) => `${title} — Ex Situ`
