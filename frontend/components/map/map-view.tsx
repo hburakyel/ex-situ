@@ -26,7 +26,6 @@ import { ARC_ANCHOR_LAYER, protomapsDarkStyle } from "@/lib/protomaps-dark-style
 import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
-import { arcHeightForZoom } from "@/lib/arc-height"
 import { placeDisplayLabels } from "@/lib/place-label"
 import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
@@ -271,9 +270,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const [isLowZoomArcView, setIsLowZoomArcView] = useState((initialZoom || 2) < 4)
     const [isStreetZoom, setIsStreetZoom] = useState((initialZoom || 2) >= 7)
     const currentZoomRef = useRef(initialZoom || 2)
-    // Pushes the layers to deck.gl with the arc height for the current zoom (set below).
-    const pushLayersRef = useRef<() => void>(() => {})
-    const appliedArcHeight = useRef<number | null>(null)
     const [isMapReady, setIsMapReady] = useState(false)
     const initialBoundsSet = useRef(false)
     const prevViewStateRef = useRef(initialViewState)
@@ -618,7 +614,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         setIsLowZoomArcView(newZoom < 4)
         setIsStreetZoom(newZoom >= 7)
         currentZoomRef.current = newZoom
-        if (appliedArcHeight.current !== arcHeightForZoom(newZoom)) pushLayersRef.current()
         onZoomChangeRef.current?.(newZoom)
       })
 
@@ -1159,18 +1154,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       return result.map((layer) => layer instanceof ArcLayer ? layer.clone({ beforeId: ARC_ANCHOR_LAYER }) : layer)
     }, [isMapReady, arcLayer, drillArcLayer, wikiLayer])
 
-    // Push layers to MapboxOverlay. Arc height follows the exact zoom
-    // (lib/arc-height.ts), so the zoom handler pushes again on every frame;
-    // a constant getHeight is a constant attribute, cheap to change, and the
-    // layers are not rebuilt.
-    pushLayersRef.current = () => {
+    // Push layers to MapboxOverlay
+    useEffect(() => {
       if (!deckOverlay.current || !isMapReady) return
-      const height = arcHeightForZoom(currentZoomRef.current)
-      appliedArcHeight.current = height
-      const withHeight = layers.map((layer) => layer instanceof ArcLayer ? layer.clone({ getHeight: height }) : layer)
-      try { deckOverlay.current.setProps({ layers: withHeight, pickingRadius: isMobile ? 10 : 3 }) } catch (e) {}
-    }
-    useEffect(() => { pushLayersRef.current() }, [layers, isMapReady, isMobile])
+      try { deckOverlay.current.setProps({ layers, pickingRadius: isMobile ? 10 : 3 }) } catch (e) {}
+    }, [layers, isMapReady, isMobile])
 
     // Notify parent when arcCards change
     useEffect(() => { onArcCardsChange?.(arcCards) }, [arcCards, onArcCardsChange])
