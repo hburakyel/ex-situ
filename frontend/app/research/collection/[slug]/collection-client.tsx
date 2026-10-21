@@ -279,7 +279,7 @@ export default function CollectionDetailClient({ params }: { params: Promise<{ s
                 <div className="mb-2">
                   <img
                     src={resolveImageSrc(obj.attributes.img_url)}
-                    alt={obj.attributes.title || ""}
+                    alt=""
                     className="w-full h-40 object-contain bg-gray-50"
                     loading="lazy"
                   />
@@ -294,12 +294,6 @@ export default function CollectionDetailClient({ params }: { params: Promise<{ s
               )}
 
               <div className="space-y-0.5">
-                <div className="truncate">
-                  <span className="text-gray-400">title: </span>
-                  <span className="text-black/60 group-hover:text-black">
-                    {obj.attributes.title || "untitled"}
-                  </span>
-                </div>
                 {obj.attributes.inventory_number && (
                   <div className="truncate">
                     <span className="text-gray-400">inv: </span>

@@ -38,6 +38,7 @@ module.exports = [
     },
   },
   // strapi::poweredBy intentionally removed — hides technology stack
+  'global::strip-object-titles',
   'strapi::query',
   {
     name: 'strapi::body',
