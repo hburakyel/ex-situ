@@ -1,8 +1,8 @@
 # Ex Situ — Collection Roadmap
 
-Current (17 October 2026, from the public API): **284,621 artifacts on the map · 61 collections · 200 territories**
+Current (21 October 2026, from the public API): **306,785 artifacts on the map · 61 collections · 204 territories**
 
-318,828 records are indexed. The others have no located origin in their institution's record yet, have a point but no territory that can be assigned without guessing (regions such as Polynesia, or a place name that does not match its point), or are parts of one object that share an inventory number and are counted once. 10 collections are indexed directly, 51 via Europeana.
+341,203 records are indexed. The others have no located origin in their institution's record yet, have a point but no territory that can be assigned without guessing (regions such as Polynesia, or a place name that does not match its point), or are parts of one object that share an inventory number and are counted once. 10 collections are indexed directly, 51 via Europeana.
 
 This document tracks indexed collections, planned integrations, and contribution priorities.
 
@@ -12,7 +12,7 @@ This document tracks indexed collections, planned integrations, and contribution
 
 | # | Institution | Location | Artifacts | Method | Status |
 |---|-------------|----------|---------|--------|--------|
-| 1 | Ethnologisches Museum | Berlin | 76,990 | SMB API | ✅ Live |
+| 1 | Ethnologisches Museum | Berlin | 99,365 | SMB API, search.smb.museum | ✅ Live |
 | 2 | Victoria and Albert Museum | London | 21,497 | REST API | ✅ Live |
 | 3 | The Metropolitan Museum of Art | New York | 19,587 | REST API (CC0) | ✅ Live |
 | 4 | Ägyptisches Museum und Papyrussammlung | Berlin | 6,328 | SMB API | ✅ Live |

@@ -13,7 +13,7 @@
 
 ---
 
-**Status:** Actively developed. Started as an MA thesis in 2022, now mapping 280,000+ artifacts from 61 collections (10 indexed directly, 51 via Europeana).
+**Status:** Actively developed. Started as an MA thesis in 2022, now mapping 300,000+ artifacts from 61 collections (10 indexed directly, 51 via Europeana).
 
 ---
 
