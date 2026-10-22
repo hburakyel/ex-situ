@@ -418,6 +418,68 @@ def api2015_place(geographies: list) -> tuple:
     return text, point, note
 
 
+# ---------------------------------------------------------------------------
+# Fallback: The Digital Walters manuscript descriptions
+# ---------------------------------------------------------------------------
+# thedigitalwalters.org publishes a TEI description per manuscript (ManuscriptDescriptions/
+# W<number>_tei.xml) with <origPlace>; a leaf (art.csv "W.569.4A") takes the place of its
+# manuscript (W569) when the description names exactly one. The descriptions are
+# GFDL-licensed text; only the place, a fact, is used.
+DW_URL = "https://www.thedigitalwalters.org/Data/WaltersManuscripts/ManuscriptDescriptions/"
+# origPlace wordings the place parser does not read as written
+DW_TEXT = {
+    "Constantinople (Istanbul)": "Constantinople (present-day Istanbul, Turkey)",
+    "Constantinople (?)": "Constantinople (present-day Istanbul, Turkey) (?)",
+    "Herat (present-day Afghanistan)": "Herat, Afghanistan",
+    "Probably Lahore (present-day Pakistan)": "Lahore, Pakistan (?)",
+    "Probably Herat (present-day Afghanistan)": "Herat, Afghanistan (?)",
+    "Possibly area around Lake Van, Turkey": "Lake Van, Turkey (?)",
+}
+
+
+def load_dw(s: requests.Session, refresh: bool) -> dict:
+    """Manuscript number ("569") → set of origPlace texts, from the cached TEI files."""
+    import xml.etree.ElementTree as ET
+    d = os.path.join(CACHE_DIR, "dw_tei")
+    os.makedirs(d, exist_ok=True)
+    listing = os.path.join(d, "list.txt")
+    if refresh or not os.path.exists(listing):
+        r = s.get(DW_URL, timeout=120)
+        r.raise_for_status()
+        open(listing, "w").write("\n".join(sorted(set(re.findall(r'href="(W[^"]*_tei\.xml)"', r.text)))))
+    out = {}
+    for name in open(listing).read().split():
+        path = os.path.join(d, name)
+        if refresh or not os.path.exists(path):
+            r = s.get(DW_URL + name, timeout=120)
+            if r.status_code != 200:
+                continue
+            open(path, "wb").write(r.content)
+            time.sleep(REQUEST_DELAY_SECONDS)
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError:
+            continue
+        places = {" ".join("".join(e.itertext()).split()) for e in root.iter("{http://www.tei-c.org/ns/1.0}origPlace")}
+        out.setdefault(re.match(r"W(\d+)", name).group(1), set()).update(p for p in places if p)
+    return out
+
+
+def dw_place(accession: str, dw: dict) -> tuple:
+    """(place text, note) for a W.-numbered leaf, or (None, reason)."""
+    m = re.match(r"^W\.(\d+)", accession or "")
+    if m and "binding" in accession.lower():   # a binding is not necessarily made where its manuscript was
+        return None, "binding: manuscript place not used"
+    if not m or m.group(1) not in dw:
+        return None, "no manuscript description"
+    places = dw[m.group(1)]
+    if len(places) != 1:
+        return None, "manuscript description names several places"
+    raw = next(iter(places))
+    text = DW_TEXT.get(raw) or re.sub(r"^(?:Probably|Possibly)\s+(.+)$", r"\1 (?)", raw)
+    return text, f"Digital Walters W{m.group(1)} origPlace: {raw}"
+
+
 REVIEW_FILE = os.path.join(ETL_DIR, "place_review_walters.json")
 
 
@@ -469,7 +531,7 @@ def years(row: dict) -> tuple:
 
 
 def map_record(row: dict, commons: dict, places: Places, institution: dict, widths: dict, review: dict,
-               api2015: dict) -> tuple:
+               api2015: dict, dw: dict) -> tuple:
     """Return (decision, record or None)."""
     entry = commons.get(row["ObjectID"]) or {"places": set(), "file": None}
     tgn_point, source = None, "walters commons upload"
@@ -479,11 +541,17 @@ def map_record(row: dict, commons: dict, places: Places, institution: dict, widt
         source_note = f"place_source=walters commons upload (place of origin: {raw})"
     else:
         text, tgn_point, note = api2015_place(api2015.get(row["ObjectID"], []))
-        if not text:
-            return ("conflicting_places" if entry["places"] else "no_place"), {"_reason": note}
-        p = resolve_place(text, places, gazetteer_label=True)
-        p["raw"] = note
-        source, source_note = "walters api 2015", f"place_source=walters api 2015 record ({note})"
+        if text:
+            p = resolve_place(text, places, gazetteer_label=True)
+            p["raw"] = note
+            source, source_note = "walters api 2015", f"place_source=walters api 2015 record ({note})"
+        else:
+            text, dw_note = dw_place(row["AccessionNumber"], dw)
+            if not text:
+                return ("conflicting_places" if entry["places"] else "no_place"), {"_reason": note}
+            p = resolve_place(text, places)
+            p["raw"] = dw_note
+            source, source_note = "walters manuscript description", f"place_source={dw_note}"
     if p["status"] != "resolved":
         return "unresolved", {"_unresolved": p["text"]}
     if places.gaz.is_european(p["iso2"]):
@@ -524,7 +592,9 @@ def map_record(row: dict, commons: dict, places: Places, institution: dict, widt
         "institution_city_en": institution["city"],
         "institution_country_en": institution["country"],
         "source_link": link,
-        "place_name": p["text"] if source != "walters api 2015" else p["raw"].split(": ", 1)[1].rsplit(" (TGN", 1)[0],
+        "place_name": (p["raw"].split(": ", 1)[1].rsplit(" (TGN", 1)[0] if source == "walters api 2015"
+                       else p["raw"].split("origPlace: ", 1)[1] if source == "walters manuscript description"
+                       else p["text"]),
         "place_name_normalized": label,
         "historical_name": p["historical_name"],
         "precise_place": p.get("precise_place"),
@@ -576,6 +646,7 @@ def main():
     places = Places(Gazetteer(GAZETTEER_DIR))
     review = load_review()
     api2015 = load_api2015(s, args.refresh)
+    dw = load_dw(s, args.refresh)
     widths = load_widths(s, [c["file"] for oid, c in commons.items() if oid in art], args.refresh)
 
     rows = list(art.values())
@@ -587,7 +658,7 @@ def main():
     stats, unresolved, levels, countries, reasons = Counter(), Counter(), Counter(), Counter(), Counter()
     kept, shown = [], 0
     for row in rows:
-        decision, record = map_record(row, commons, places, institution, widths, review, api2015)
+        decision, record = map_record(row, commons, places, institution, widths, review, api2015, dw)
         stats[decision] += 1
         if decision == "unresolved":
             unresolved[record["_unresolved"]] += 1

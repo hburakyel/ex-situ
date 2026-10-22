@@ -1231,6 +1231,38 @@
    "source": "GeoNames Nara-shi (city; the prefecture/governorate shares the name)",
    "lat": 34.68505,
    "lon": 135.80485
+  },
+  "Lake Tana|Ethiopia": {
+   "source": "TGN point (2015 record of the same lake)",
+   "lat": 12.0,
+   "lon": 37.333
+  },
+  "Lake Van|Turkey": {
+   "source": "TGN point (2015 record of the same lake)",
+   "lat": 38.55,
+   "lon": 42.766
+  },
+  "Hromkla|Armenia": {
+   "source": "reject",
+   "reject": "source names Armenia; Hromkla (Rumkale) lies in Turkey today"
+  },
+  "Monastery of Surb Amenap'rkič in New Julfa|Iran": {
+   "source": "GeoNames Isfahan (New Julfa is a quarter of Isfahan)",
+   "lat": 32.65246,
+   "lon": 51.67462,
+   "label": "Isfahan",
+   "precise_place": "Holy Saviour Cathedral (New Julfa)"
+  },
+  "Gunda Gunde|Ethiopia": {
+   "source": "Wikidata Q5618555",
+   "lat": 14.3828,
+   "lon": 39.7353,
+   "label": "Gunda Gunde Monastery"
+  },
+  "Allāhābād|India": {
+   "source": "spelling",
+   "keep_point": true,
+   "label": "Allahabad"
   }
  }
 }
