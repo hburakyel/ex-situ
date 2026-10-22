@@ -507,6 +507,8 @@ export default function ImageGallery({
             // - V&A image meta: "© Victoria and Albert Museum, London" (no open licence)
             // - AIC: CC0 only for public-domain works, which isn't stored per object yet,
             //   so no licence is claimed
+            // - Walters: images and metadata CC0 (Rights and Reproductions page), shown from
+            //   the museum's own Wikimedia Commons upload
             const SMB_COLLECTIONS = new Set([
               "Ethnologisches Museum",
               "Antikensammlung",
@@ -519,6 +521,7 @@ export default function ImageGallery({
               "The Metropolitan Museum of Art": "The Metropolitan Museum of Art · CC0",
               "Art Institute of Chicago": "© Art Institute of Chicago",
               "Victoria and Albert Museum": "© Victoria and Albert Museum, London",
+              "The Walters Art Museum": "The Walters Art Museum · CC0",
             }
             const institution = currentObject.attributes.institution_name || ""
             const sourceUrl = getLinkUrl()
