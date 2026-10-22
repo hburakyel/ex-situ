@@ -17,6 +17,16 @@ describe("resolveImageSrc", () => {
   })
 })
 
+describe("resolveImageSrc — Rijksmuseum (micr.io IIIF 3)", () => {
+  const stored = "https://iiif.micr.io/hlNHQ/full/1000,/0/default.jpg"
+  it("fits thumbnails in a box instead of a fixed width that cannot upscale", () => {
+    expect(resolveImageSrc(stored)).toBe("https://iiif.micr.io/hlNHQ/full/!600,600/0/default.jpg")
+  })
+  it("uses a larger box for large views", () => {
+    expect(resolveImageSrc(stored, LARGE_WIDTH)).toBe("https://iiif.micr.io/hlNHQ/full/!1000,1000/0/default.jpg")
+  })
+})
+
 describe("resolveImageSrc — Met renditions", () => {
   const original = "https://images.metmuseum.org/CRDImages/is/original/DT8104.jpg"
   it("uses the small rendition for grid thumbnails", () => {

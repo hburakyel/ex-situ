@@ -55,6 +55,15 @@ export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): strin
     url.pathname = url.pathname.replace(/\/full\/\d+,\//, "/full/!843,843/")
   }
 
+  if (url.hostname === "iiif.micr.io") {
+    // Rijksmuseum (IIIF 3): stored URLs request "1000," wide, which is rejected (400)
+    // when the image is narrower — IIIF 3 does not upscale without "^"
+    // (RP-F-F01141-AV is 970px). "!w,h" fits within the box and works for every size.
+    const box = width <= THUMB_WIDTH ? 600 : 1000
+    url.pathname = url.pathname.replace(/\/full\/\d+,\//, `/full/!${box},${box}/`)
+    return url.toString()
+  }
+
   if (PROXIED_HOSTS.has(url.hostname)) {
     return `/api/proxy/img?url=${encodeURIComponent(url.toString())}&w=${width}`
   }
