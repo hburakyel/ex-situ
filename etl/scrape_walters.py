@@ -480,6 +480,44 @@ def dw_place(accession: str, dw: dict) -> tuple:
     return text, f"Digital Walters W{m.group(1)} origPlace: {raw}"
 
 
+# Objects with no usable place are still indexed (unlocated, searchable) when they belong
+# to one of the museum's non-European collections (art.csv CollectionID). The collection
+# decides only whether the object is indexed; it is never used as a place.
+NON_EUROPEAN_COLLECTIONS = {"AME", "ANE", "CHN", "EGY", "ETH", "INT", "ISL", "JMA", "JPK", "MIS", "SAY", "SEA"}
+
+
+def unlocated_record(row: dict, entry: dict, text: Optional[str], institution: dict, widths: dict) -> Optional[dict]:
+    collections = {c.strip().upper() for c in (row["CollectionID"] or "").split("|") if c.strip()}
+    if not collections & NON_EUROPEAN_COLLECTIONS:
+        return None
+    link = row["ResourceURL"].strip()
+    start, end = years(row)
+    date_text = (row["DateText"] or "").strip() or None
+    return {
+        "object_id": int(row["ObjectID"]),
+        "title": row["Title"].strip(),
+        "img_url": thumb_url(entry["file"], widths.get(entry["file"])) if entry.get("file") else None,
+        "image_rights": "http://creativecommons.org/publicdomain/zero/1.0/" if entry.get("file") else None,
+        "commons_file": entry.get("file"),
+        "latitude": None, "longitude": None,
+        "institution_name": INSTITUTION,
+        "institution_place": f"{institution['city']}, {institution['country']}",
+        "institution_latitude": institution["lat"], "institution_longitude": institution["lon"],
+        "institution_city_en": institution["city"], "institution_country_en": institution["country"],
+        "source_link": link,
+        "place_name": text, "place_name_normalized": None, "historical_name": None, "precise_place": None,
+        "city_en": None, "country_en": None, "place_level": "unlocated", "place_source": "none",
+        "geocoder_source": None, "geocoding_status": "ambiguous",
+        "geocoding_notes": "no place in open sources (Commons, 2015 records, manuscript descriptions)"
+                           + (f": {text}" if text else "") + f" | indexed by collection {'|'.join(sorted(collections))}",
+        "review_status": None,
+        "object_date": date_text,
+        "time": {"time_name": date_text, "time_start": start, "time_end": end} if start is not None else None,
+        "inventory_number": row["AccessionNumber"].strip(),
+        "object_links": [{"link_text": link, "link_display": "Institution object page"}] if link else [],
+    }
+
+
 REVIEW_FILE = os.path.join(ETL_DIR, "place_review_walters.json")
 
 
@@ -548,11 +586,18 @@ def map_record(row: dict, commons: dict, places: Places, institution: dict, widt
         else:
             text, dw_note = dw_place(row["AccessionNumber"], dw)
             if not text:
+                rec = unlocated_record(row, entry, next(iter(entry["places"]), None) if entry["places"] else None,
+                                       institution, widths)
+                if rec:
+                    return "unlocated", rec
                 return ("conflicting_places" if entry["places"] else "no_place"), {"_reason": note}
             p = resolve_place(text, places)
             p["raw"] = dw_note
             source, source_note = "walters manuscript description", f"place_source={dw_note}"
     if p["status"] != "resolved":
+        rec = unlocated_record(row, entry, p["text"], institution, widths)
+        if rec:
+            return "unlocated", rec
         return "unresolved", {"_unresolved": p["text"]}
     if places.gaz.is_european(p["iso2"]):
         return "european", None
@@ -662,6 +707,9 @@ def main():
         stats[decision] += 1
         if decision == "unresolved":
             unresolved[record["_unresolved"]] += 1
+            continue
+        if decision == "unlocated":
+            kept.append(record)
             continue
         if decision != "non_european":
             if record and record.get("_reason"):

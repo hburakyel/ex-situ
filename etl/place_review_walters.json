@@ -78,7 +78,9 @@
   "Memphis|Egypt": {
    "source": "Wikidata Q5715",
    "lat": 29.8447,
-   "lon": 31.2509
+   "lon": 31.2509,
+   "label": "Mit Rahina",
+   "historical_name": "Memphis"
   },
   "Hromklay in Gaziantep|Turkey": {
    "source": "Wikidata Q1477613",
@@ -149,7 +151,9 @@
   },
   "Elam|Iran": {
    "source": "country point",
-   "point": "country"
+   "point": "country",
+   "label": "Iran",
+   "historical_name": "Elam"
   },
   "Ilkhanid|Iran": {
    "source": "country point",
@@ -197,7 +201,9 @@
   "Lan Na|Thailand": {
    "source": "Wikidata Q750014",
    "lat": 19.0,
-   "lon": 99.0
+   "lon": 99.0,
+   "label": "Northern Thailand",
+   "historical_name": "Lan Na"
   },
   "Sukhothai|Thailand": {
    "source": "Wikidata Q380764",
@@ -205,9 +211,10 @@
    "lon": 99.8264
   },
   "Sumer|Iraq": {
-   "source": "Wikidata Q35355",
-   "lat": 32.0,
-   "lon": 45.5
+   "source": "country point",
+   "point": "country",
+   "label": "Iraq",
+   "historical_name": "Sumer"
   },
   "Cappadocia|Turkey": {
    "source": "Wikidata Q217265",
@@ -245,9 +252,10 @@
    "lon": 103.0
   },
   "Babylonia|Iraq": {
-   "source": "Wikidata Q47690",
-   "lat": 32.5,
-   "lon": 44.5
+   "source": "country point",
+   "point": "country",
+   "label": "Iraq",
+   "historical_name": "Babylonia"
   },
   "Araba al-Madfuna|Egypt": {
    "source": "Wikidata Q192268",
@@ -276,14 +284,17 @@
    "label": "Lorestan"
   },
   "Pontos|Turkey": {
-   "source": "Wikidata Q621672",
-   "lat": 40.68,
-   "lon": 37.83
+   "source": "country point",
+   "point": "country",
+   "label": "Turkey",
+   "historical_name": "Pontus"
   },
   "Kii|Japan": {
    "source": "Wikidata Q864053",
    "lat": 33.7753,
-   "lon": 135.7306
+   "lon": 135.7306,
+   "label": "Wakayama",
+   "historical_name": "Kii Province"
   },
   "Khorasan|Iran": {
    "source": "Wikidata Q587090",
@@ -338,7 +349,9 @@
   "Ur|Iraq": {
    "source": "Wikidata Q5699",
    "lat": 30.9622,
-   "lon": 46.1044
+   "lon": 46.1044,
+   "label": "Tell el-Muqayyar",
+   "historical_name": "Ur"
   },
   "Chekiang|China": {
    "source": "Wikidata Q16967",
@@ -349,7 +362,9 @@
   "Larsa|Iraq": {
    "source": "Wikidata Q244746",
    "lat": 31.2858,
-   "lon": 45.8536
+   "lon": 45.8536,
+   "label": "Tell es-Senkereh",
+   "historical_name": "Larsa"
   },
   "Karnak|Egypt": {
    "source": "Wikidata Q522862",
@@ -474,7 +489,9 @@
   "Bubastis|Egypt": {
    "source": "Wikidata Q603841",
    "lat": 30.5728,
-   "lon": 31.51
+   "lon": 31.51,
+   "label": "Zagazig",
+   "historical_name": "Bubastis"
   },
   "Himachal Pradesh|India": {
    "source": "Wikidata Q1177",
@@ -515,7 +532,9 @@
   "Abydos|Egypt": {
    "source": "Wikidata Q192268",
    "lat": 26.1852,
-   "lon": 31.9189
+   "lon": 31.9189,
+   "label": "El Balyana",
+   "historical_name": "Abydos"
   },
   "Garhwal|India": {
    "source": "Wikidata Q1460406",
@@ -525,7 +544,9 @@
   "Shimotsuke Province|Japan": {
    "source": "Wikidata Q1053699",
    "lat": 36.6589,
-   "lon": 139.7908
+   "lon": 139.7908,
+   "label": "Tochigi",
+   "historical_name": "Shimotsuke Province"
   },
   "Ishikawa-ken|Japan": {
    "source": "Wikidata Q131281",
@@ -568,13 +589,16 @@
   "Hitachi Province|Japan": {
    "source": "Wikidata Q1055353",
    "lat": 36.3897,
-   "lon": 140.4064
+   "lon": 140.4064,
+   "label": "Ibaraki",
+   "historical_name": "Hitachi Province"
   },
   "Iwami|Japan": {
    "source": "Wikidata Q1053709",
    "lat": 34.9297,
    "lon": 132.1106,
-   "label": "Iwami Province"
+   "label": "Shimane",
+   "historical_name": "Iwami Province"
   },
   "Dahshur|Egypt": {
    "source": "Wikidata Q685414",
@@ -606,7 +630,9 @@
   "Xoïs|Egypt": {
    "source": "Wikidata Q1068140",
    "lat": 31.0881,
-   "lon": 30.9456
+   "lon": 30.9456,
+   "label": "Sakha",
+   "historical_name": "Xois"
   },
   "White Cloud Temple in Beijing|China": {
    "source": "Wikidata Q956",
@@ -650,12 +676,15 @@
   "Satsuma Province|Japan": {
    "source": "Wikidata Q667475",
    "lat": 31.7586,
-   "lon": 130.48
+   "lon": 130.48,
+   "label": "Kagoshima",
+   "historical_name": "Satsuma Province"
   },
   "Bithynia|Turkey": {
-   "source": "Wikidata Q373189",
-   "lat": 40.5,
-   "lon": 31.0
+   "source": "country point",
+   "point": "country",
+   "label": "Turkey",
+   "historical_name": "Bithynia"
   },
   "Suifu|Japan": {
    "source": "Wikidata Q204249",
@@ -667,7 +696,9 @@
   "Sais|Egypt": {
    "source": "Wikidata Q381038",
    "lat": 30.9647,
-   "lon": 30.7683
+   "lon": 30.7683,
+   "label": "Sa el-Hagar",
+   "historical_name": "Sais"
   },
   "Yunnan|China": {
    "source": "Wikidata Q43194",
@@ -727,13 +758,16 @@
   "Owari Province|Japan": {
    "source": "Wikidata Q514506",
    "lat": 35.1217,
-   "lon": 137.0375
+   "lon": 137.0375,
+   "label": "Aichi",
+   "historical_name": "Owari Province"
   },
   "Owari|Japan": {
    "source": "Wikidata Q514506",
    "lat": 35.1217,
    "lon": 137.0375,
-   "label": "Owari Province"
+   "label": "Aichi",
+   "historical_name": "Owari Province"
   },
   "Bosra|Syria": {
    "source": "Wikidata Q272680",
@@ -741,9 +775,10 @@
    "lon": 36.4833
   },
   "Gandhara|Pakistan": {
-   "source": "Wikidata Q213651",
-   "lat": 33.756,
-   "lon": 72.8291
+   "source": "country point",
+   "point": "country",
+   "label": "Pakistan",
+   "historical_name": "Gandhara"
   },
   "Sardis|Turkey": {
    "source": "Wikidata Q232615",
@@ -839,9 +874,10 @@
    "country": "Palestine"
   },
   "Phrygia|Turkey": {
-   "source": "Wikidata Q32579",
-   "lat": 39.0,
-   "lon": 31.0
+   "source": "country point",
+   "point": "country",
+   "label": "Turkey",
+   "historical_name": "Phrygia"
   },
   "Heliopolis|Egypt": {
    "source": "Wikidata Q2739389",
@@ -895,7 +931,9 @@
   "Myrina|Turkey": {
    "source": "Wikidata Q609532",
    "lat": 38.8453,
-   "lon": 26.9844
+   "lon": 26.9844,
+   "label": "Aliağa",
+   "historical_name": "Myrina"
   },
   "Deccan|India": {
    "source": "Wikidata Q169966",
@@ -941,12 +979,16 @@
   "Nineveh|Iraq": {
    "source": "Wikidata Q5680",
    "lat": 36.3667,
-   "lon": 43.15
+   "lon": 43.15,
+   "label": "Mosul",
+   "historical_name": "Nineveh"
   },
   "Bitchu|Japan": {
    "source": "Wikidata Q1047514",
    "lat": 34.6828,
-   "lon": 133.775
+   "lon": 133.775,
+   "label": "Okayama",
+   "historical_name": "Bitchū Province"
   },
   "Harwan|India": {
    "source": "Wikidata Q59657921",
@@ -1200,7 +1242,8 @@
   "Harima|Japan": {
    "source": "TGN point (2015 record), English label",
    "keep_point": true,
-   "label": "Harima Province"
+   "label": "Hyogo",
+   "historical_name": "Harima Province"
   },
   "Al Fayyum|Egypt": {
    "source": "spelling",
@@ -1263,6 +1306,12 @@
    "source": "spelling",
    "keep_point": true,
    "label": "Allahabad"
+  },
+  "Cilicia|Turkey": {
+   "source": "country point",
+   "point": "country",
+   "label": "Turkey",
+   "historical_name": "Cilicia"
   }
  }
 }

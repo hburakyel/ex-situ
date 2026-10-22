@@ -170,6 +170,7 @@ def main():
         UPDATE museum_objects SET geocoding_status = 'ambiguous', review_status = 'pending',
                geocoding_notes = geocoding_notes || ' | no point: region or site label, review'
         WHERE institution_name = %s AND latitude IS NULL AND review_status IS NULL
+          AND geocoding_notes NOT LIKE '%%no place in open sources%%'
     """, (INSTITUTION,))
     print(f"{cur.rowcount} rows without a point flagged for review")
     conn.commit()
