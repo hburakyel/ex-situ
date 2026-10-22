@@ -21,6 +21,8 @@ for Met objects the index is missing.
 Usage:
     python etl/backfill_met_object_dates.py dates            # dry run: fetch, report, roll back
     python etl/backfill_met_object_dates.py dates --apply    # write
+    python etl/backfill_met_object_dates.py dates --missing --threads 2 --delay 0.5 --apply
+                                     # again, slowly, for rows still without the date line
     python etl/backfill_met_object_dates.py missing --department 14
 Then (dates --apply): SELECT refresh_geospatial_views();
 
@@ -31,6 +33,7 @@ import argparse
 import csv
 import re
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import psycopg2.extras
@@ -79,23 +82,31 @@ def date_fields(obj):
     return display, begin, end, precision
 
 
-def fetch_dates(object_ids):
+def fetch_dates(object_ids, threads=8, delay=0.0):
     session = requests.Session(); session.headers.update(UA)
 
     def one(oid):
         d = get_json(session, f"{API}/objects/{oid}")
-        f = date_fields(d) if d else None
+        if delay:
+            time.sleep(delay)
+        if not d:
+            return "failed"
+        f = date_fields(d)
         return (oid, *f) if f else None
 
-    with ThreadPoolExecutor(8) as ex:
-        return [r for r in ex.map(one, object_ids) if r]
+    with ThreadPoolExecutor(threads) as ex:
+        results = list(ex.map(one, object_ids))
+    failed = sum(1 for r in results if r == "failed")
+    print(f"API did not answer for {failed} objects (rate limit or withdrawn record)")
+    return [r for r in results if r and r != "failed"]
 
 
 def dates(args):
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("""SELECT DISTINCT object_id FROM museum_objects
-            WHERE institution_name = %s AND published_at IS NOT NULL AND object_id IS NOT NULL""", (MET,))
+            WHERE institution_name = %s AND published_at IS NOT NULL AND object_id IS NOT NULL"""
+            + (" AND NULLIF(BTRIM(object_date_display), '') IS NULL" if args.missing else ""), (MET,))
         ids = [r[0] for r in cur.fetchall()]
         cur.execute("""SELECT count(*) FILTER (WHERE NULLIF(BTRIM(object_date_display), '') IS NOT NULL), count(*)
             FROM museum_objects WHERE institution_name = %s AND published_at IS NOT NULL""", (MET,))
@@ -104,7 +115,7 @@ def dates(args):
     # on museum_objects for the whole fetch and blocks pre-strapi's DROP TRIGGER on a deploy.
     conn.rollback()
     print(f"{MET}: {total} rows, {before} with the museum's own date line")
-    found = fetch_dates(ids)
+    found = fetch_dates(ids, args.threads, args.delay)
     print(f"API gives a date for {len(found)} of {len(ids)} objects")
     with conn.cursor() as cur:
         cur.execute("""CREATE TEMP TABLE _met_dates (object_id bigint, display text, earliest int,
@@ -156,6 +167,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("dates"); d.add_argument("--apply", action="store_true", help="write (default: dry run, rolled back)")
+    d.add_argument("--missing", action="store_true", help="only objects whose rows have no date line yet")
+    d.add_argument("--threads", type=int, default=8)
+    d.add_argument("--delay", type=float, default=0.0, help="seconds each thread waits after a request")
     m = sub.add_parser("missing"); m.add_argument("--department", type=int, required=True)
     args = p.parse_args()
     return dates(args) if args.cmd == "dates" else missing(args)
