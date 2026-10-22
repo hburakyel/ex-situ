@@ -49,7 +49,7 @@ Places are labelled with their present-day names; the name in the source record 
 | Staatliche Museen zu Berlin (museum-digital) | Place of the record's "Gefunden" (found) event; if there is none, of its "Hergestellt" (made) or "Gemalt" (painted) event. Collected, recorded, owned and similar events are never used. Whether the place is a findspot is stored with the record. |
 | The Metropolitan Museum of Art | The record's city, state, county, country, region and subregion fields. |
 | Art Institute of Chicago | `place_of_origin`. |
-| Victoria and Albert Museum | `_primaryPlace`. |
+| Victoria and Albert Museum | `_primaryPlace`. Where that is a country and the record's `placesOfOrigin` also names exactly one place inside that country with the same association ("Palestine (made)" and "Bethlehem (made)"), that place. |
 | Rijksmuseum | `dcterms:spatial`, the place of production. Depicted places (`dc:subject`) are not used. |
 | Other institutions, through Europeana | The provider's own `dcterms:spatial` and `dc:coverage`. Only where a provider gives none is Europeana's enrichment (`edmPlace`) used, and those records are marked as such. |
 
