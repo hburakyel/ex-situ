@@ -207,14 +207,14 @@ def thumb_url(file_title: str, original_width: Optional[int], width: int = IMAGE
 class Places:
     def __init__(self, gaz: Gazetteer):
         self.gaz = gaz
-        self.towns = defaultdict(list)            # (lower name, ISO2) → [(pop, lat, lon, own name?)]
+        self.towns = defaultdict(list)            # (lower name, ISO2) → [(pop, lat, lon, own name?, GeoNames name)]
         for lat, lon, pop, iso2, own, names in gaz.towns:
             for n in names:
                 # A town found only by an alternate name must be large: "Iwami" is an
                 # alternate name of Iwai, "Garhwal" of Dugadda, "Aizu" of Ōtera.
                 primary = fold(n) == fold(own)
                 if primary or pop >= 50000:
-                    self.towns[(n, iso2)].append((pop, lat, lon, primary))
+                    self.towns[(n, iso2)].append((pop, lat, lon, primary, own))
         self.town_admin1 = {}                     # (lat, lon) → "JP.35"
         for line in open(os.path.join(GAZETTEER_DIR, "cities500.txt"), encoding="utf-8"):
             c = line.rstrip("\n").split("\t")
@@ -234,24 +234,26 @@ class Places:
     def country_en(self, iso2: str) -> Optional[str]:
         return COUNTRY_EN.get(iso2) or self.gaz.country_name(iso2)
 
-    def town(self, name: str, iso2: str, within: Optional[str] = None) -> Optional[tuple]:  # (lat, lon, population)
+    def town(self, name: str, iso2: str, within: Optional[str] = None) -> Optional[tuple]:
+        # → (lat, lon, population, GeoNames name, matched by its own name?)
         """
         One exact town in the country; or the largest, when every town of that
         name at least a tenth its size lies within 15 km of it (GeoNames lists
         Kashan twice, 2 km apart) and it has 50,000 people or more.
         """
-        hits = sorted(set(self.towns.get((name.lower(), iso2), [])), reverse=True)
+        hits = sorted(set(self.towns.get((name.lower(), iso2), [])
+                          or self.towns.get((name.lower().replace("-", " "), iso2), [])), reverse=True)  # "Al-Qahirah"
         if any(h[3] for h in hits):          # "Shonai" is the town Shonai, not Matsumoto's alternate name
             hits = [h for h in hits if h[3]]
         if within:                           # "Shonai, Yamagata, Japan": only towns in Yamagata
             hits = [h for h in hits if self.town_admin1.get((h[1], h[2])) == within]
         if len(hits) == 1:
-            return hits[0][1], hits[0][2], hits[0][0]
+            return hits[0][1], hits[0][2], hits[0][0], hits[0][4], hits[0][3]
         if hits and hits[0][0] >= 50000:
             top = hits[0]
             rivals = [h for h in hits[1:] if 10 * h[0] >= top[0]]
             if all(km(top[1:3], h[1:3]) <= 15 for h in rivals):
-                return top[1], top[2], top[0]
+                return top[1], top[2], top[0], top[4], top[3]
         return None
 
 
@@ -264,7 +266,9 @@ def clean_wikitext(value: str) -> str:
     return " ".join(v.split())
 
 
-def resolve_place(raw: str, places: Places) -> dict:
+def resolve_place(raw: str, places: Places, gazetteer_label: bool = False) -> dict:
+    """gazetteer_label: a town found by an alternate name takes its GeoNames name
+    (TGN's "Al-Qahirah" → Cairo); the Commons text keeps the museum's own words."""
     text = clean_wikitext(raw)
     if re.search(r"\bor\b", text):            # "X or Y": several places, no guess
         return {"raw": raw, "text": text, "status": "unresolved"}
@@ -305,13 +309,149 @@ def resolve_place(raw: str, places: Places) -> dict:
     within = places.admin1_code.get((parts[1].lower(), iso2)) if len(parts) == 3 else None
     point = places.town(name, iso2, within)
     region = places.admin1.get((name.lower(), iso2))
-    if point and region and point[2] < 100000:  # "Michoacán, Mexico": the state, not a village of that name
+    # "Michoacán, Mexico": the state, not a village of that name; "Nayarit" is also an
+    # alternate name of Tepic, but the state is meant
+    if point and region and (point[2] < 100000 or not point[4]):
         point = None
     if point:                                # "Oaxaca", "Kyoto", "Bihar": also a first-level region → review
-        return {**base, "status": "resolved", "iso2": iso2, "label": name, "also_region": bool(region),
+        label = point[3] if gazetteer_label and not point[4] else name
+        return {**base, "status": "resolved", "iso2": iso2, "label": label, "also_region": bool(region),
                 "level": "city", "lat": point[0], "lon": point[1]}
     return {**base, "status": "resolved", "iso2": iso2, "label": region or parts[0],
             "level": "region" if region else "unmatched", "lat": None, "lon": None}
+
+
+# ---------------------------------------------------------------------------
+# Fallback: the museum's 2015 API records
+# ---------------------------------------------------------------------------
+# When the API closed (Feb 2015) the museum committed every object record to the
+# same GitHub repository (objects/data/…/<ObjectID>.json, CC0). Each record has
+# "Geographies": GeoType ("Place of Origin", "Place of Discovery", …), a Getty TGN
+# term in its native form ("Misr", "Nihon", "Tokyo"), the TGN hierarchy and point.
+# Used for objects whose Commons file has no place, or has two different ones.
+API2015_COMMIT = "2437921"
+API2015_TYPES = ("Place of Origin", "Place of Discovery")
+TGN_NATIONS = {   # TGN nation (native form) → English name the gazetteer knows
+    "Nihon": "Japan", "Italia": "Italy", "Italy": "Italy", "France": "France", "Îran": "Iran", "Türkiye": "Turkey",
+    "Misr": "Egypt", "Egypt": "Egypt", "Deutschland": "Germany", "Germany": "Germany", "United States": "United States",
+    "Bharat": "India", "Índia": "India", "Zhonghua": "China", "United Kingdom": "United Kingdom", "Ellás": "Greece",
+    "Nederland": "Netherlands", "Rossiya": "Russia", "Russia": "Russia", "Afghanestan": "Afghanistan",
+    "België": "Belgium", "Pakistan": "Pakistan", "Prathet Thai": "Thailand", "Ityop'iya": "Ethiopia",
+    "España": "Spain", "Österreich": "Austria", "México": "Mexico", "Suriyah": "Syria", "Perú": "Peru",
+    "Schweiz": "Switzerland", "România": "Romania", "Al-‘Iraq": "Iraq", "Kampuchea": "Cambodia",
+    "Colombia": "Colombia", "Ukrayina": "Ukraine", "Hrvatska": "Croatia", "Panamá": "Panama",
+    "Ceská Republika": "Czechia", "Al-Yaman": "Yemen", "Guatemala": "Guatemala", "Tunis": "Tunisia",
+    "Hayastan": "Armenia", "Taehan Min'guk": "South Korea", "Yisra'el": "Israel", "Al-Jaza'ir": "Algeria",
+    "Nepal": "Nepal", "Costa Rica": "Costa Rica", "Ecuador": "Ecuador", "Ozbekistan": "Uzbekistan",
+    "Kípros": "Cyprus", "Honduras": "Honduras", "Belize": "Belize", "Choson Minjujuui In'min Konghwaguk": "North Korea",
+    "Éire": "Ireland", "Libiya": "Libya", "Sakartvelo": "Georgia", "Pilipinas": "Philippines", "Al-Lubnan": "Lebanon",
+    "Slovenija": "Slovenia", "Al-Magreb": "Morocco", "Indonesia": "Indonesia", "Sverige": "Sweden",
+    "Sri Lanka": "Sri Lanka", "Norge": "Norway", "Magyarország": "Hungary", "Bangladesh": "Bangladesh",
+    "Portugal": "Portugal", "Mongol Uls": "Mongolia", "Shqipëria": "Albania", "República Dominicana": "Dominican Republic",
+    "Slovenská Republika": "Slovakia", "Lao": "Laos", "Polska": "Poland", "Santa Sede": "Vatican City",
+    "Congo": "Republic of the Congo", "Viet Nam": "Vietnam", "Myanmar": "Myanmar", "As-Sudan": "Sudan",
+    "Bulgaria": "Bulgaria", "Malta": "Malta", "Sierra Leone": "Sierra Leone",
+}
+# TGN files these as regions; Ex Situ treats Palestine as a country (CLAUDE.md).
+TGN_REGION_COUNTRIES = {"Palestine": "Palestine"}
+
+
+def load_api2015(s: requests.Session, refresh: bool) -> dict:
+    """ObjectID → list of Geographies from the 2015 bulk records (cached as JSONL)."""
+    path = os.path.join(CACHE_DIR, "api2015_geographies.jsonl")
+    if refresh or not os.path.exists(path):
+        import io, tarfile
+        url = f"https://codeload.github.com/WaltersArtMuseum/api-thewalters-org/tar.gz/{API2015_COMMIT}"
+        logger.info("Downloading the 2015 object records (%s)", url)
+        r = s.get(url, timeout=600)
+        r.raise_for_status()
+        with tarfile.open(fileobj=io.BytesIO(r.content), mode="r:gz") as tar, open(path + ".tmp", "w", encoding="utf-8") as out:
+            for m in tar:
+                if m.isfile() and "/objects/data/" in m.name and m.name.endswith(".json"):
+                    d = json.load(tar.extractfile(m))
+                    if isinstance(d, dict) and d.get("ObjectID"):
+                        out.write(json.dumps({"id": str(d["ObjectID"]), "geographies": d.get("Geographies") or []},
+                                             ensure_ascii=False) + "\n")
+        os.replace(path + ".tmp", path)
+    out = {}
+    for line in open(path, encoding="utf-8"):
+        d = json.loads(line)
+        out[d["id"]] = d["geographies"]
+    return out
+
+
+def api2015_place(geographies: list) -> tuple:
+    """
+    (place text for resolve_place, TGN point or None, note) from the 2015 record,
+    or (None, None, reason). Place of Origin first, else Place of Discovery; places
+    in different countries are not resolved (no guess).
+    """
+    for kind in API2015_TYPES:
+        geos = [g for g in geographies if g.get("GeoType") == kind and g.get("GeographyTerm")]
+        if geos:
+            break
+    else:
+        return None, None, "no origin in 2015 record"
+    found = {}
+    for g in geos:
+        h = (g.get("GeoHierarchy") or "").split("\\")
+        term = g["GeographyTerm"].strip()
+        if "nations" in h:
+            i = h.index("nations")
+            nation = h[i + 1] if i + 1 < len(h) and h[i + 1] else term
+            country = TGN_NATIONS.get(nation)
+            text = country if nation == term else f"{term}, {country}"
+        elif term in TGN_REGION_COUNTRIES:
+            country = text = nation = TGN_REGION_COUNTRIES[term]
+        else:
+            return None, None, f"2015 place without a country: {term}"
+        if not country:
+            return None, None, f"2015 place in an unknown TGN nation: {nation}"
+        lat, lon = g.get("LatitudeNumber"), g.get("LongitudeNumber")
+        point = (lat, lon) if lat and lon and nation != term else None
+        depth = len([x for x in h if x])
+        if country not in found or depth > found[country][0]:
+            found[country] = (depth, text, point, f"{kind}: {term} (TGN {g.get('GeographyID')})")
+    if len(found) > 1:
+        return None, None, "2015 places in several countries: " + ", ".join(sorted(found))
+    _, text, point, note = next(iter(found.values()))
+    return text, point, note
+
+
+REVIEW_FILE = os.path.join(ETL_DIR, "place_review_walters.json")
+
+
+def load_review() -> dict:
+    return json.load(open(REVIEW_FILE, encoding="utf-8")) if os.path.exists(REVIEW_FILE) else {}
+
+
+def apply_review(p: dict, places: Places, review: dict) -> dict:
+    """
+    Desk-review decisions (place_review_walters.json) for labels the exact lookup
+    left without a point or placed on the wrong kind of place: a Wikidata point,
+    the country point, a corrected label, or a rejection (stays unlocated).
+    """
+    text = re.sub(r"\s*\(\?\)\s*$|\?$", "", p["text"]).strip()
+    key = f"{p['label']}|{places.country_en(p['iso2'])}"
+    r = review.get("by_text", {}).get(text) or review.get("by_label", {}).get(key)
+    if not r:
+        return p
+    p = dict(p, review=r["source"])
+    if r.get("reject"):
+        p["review_note"] = "desk review: not placed (" + r["reject"] + ")"
+        return p
+    if r.get("country"):
+        p["iso2"] = places.country(r["country"]) or {"Palestine": "PS"}.get(r["country"], p["iso2"])
+    p["label"] = r.get("label", p["label"])
+    if "historical_name" in r:
+        p["historical_name"] = r["historical_name"]
+    p["precise_place"] = r.get("precise_place")
+    if r.get("point") == "country":
+        p.update(lat=None, lon=None, level="country_point")
+    elif not r.get("keep_point"):
+        p.update(lat=r["lat"], lon=r["lon"], level="reviewed")
+    p["review_note"] = "desk review: " + r["source"]
+    return p
 
 
 # ---------------------------------------------------------------------------
@@ -328,37 +468,52 @@ def years(row: dict) -> tuple:
     return (start, end) if start <= end else (None, None)
 
 
-def map_record(row: dict, commons: dict, places: Places, institution: dict, widths: dict) -> tuple:
+def map_record(row: dict, commons: dict, places: Places, institution: dict, widths: dict, review: dict,
+               api2015: dict) -> tuple:
     """Return (decision, record or None)."""
-    entry = commons.get(row["ObjectID"])
-    if not entry or not entry["places"]:
-        return "no_place", None
-    if len(entry["places"]) > 1:
-        return "conflicting_places", None
-    p = resolve_place(next(iter(entry["places"])), places)
+    entry = commons.get(row["ObjectID"]) or {"places": set(), "file": None}
+    tgn_point, source = None, "walters commons upload"
+    if len(entry["places"]) == 1:
+        raw = next(iter(entry["places"]))
+        p = resolve_place(raw, places)
+        source_note = f"place_source=walters commons upload (place of origin: {raw})"
+    else:
+        text, tgn_point, note = api2015_place(api2015.get(row["ObjectID"], []))
+        if not text:
+            return ("conflicting_places" if entry["places"] else "no_place"), {"_reason": note}
+        p = resolve_place(text, places, gazetteer_label=True)
+        p["raw"] = note
+        source, source_note = "walters api 2015", f"place_source=walters api 2015 record ({note})"
     if p["status"] != "resolved":
         return "unresolved", {"_unresolved": p["text"]}
     if places.gaz.is_european(p["iso2"]):
         return "european", None
     if p["iso2"] == "US":                    # made in the museum's own country: not a migration
         return "domestic", None
+    p = apply_review(p, places, review)
+    if p["lat"] is None and tgn_point and p["level"] in ("unmatched", "region"):
+        p.update(lat=tgn_point[0], lon=tgn_point[1], level="tgn")   # the point in the museum's own record
 
     label = p["label"] + ("?" if p["hedged"] else "")
-    flagged = p["level"] == "unmatched"
+    flagged = p["level"] == "unmatched" or (p["lat"] is None and p["level"] not in ("country", "country_point"))
     start, end = years(row)
     date_text = (row["DateText"] or "").strip() or None
     link = row["ResourceURL"].strip()
-    notes = [f"place_source=walters commons upload (place of origin: {p['raw']})", f"level={p['level']}"]
+    notes = [source_note, f"level={p['level']}"]
     if p["level"] == "unmatched":
         notes.append("place not found in GeoNames for this country: review")
-    if p.get("also_region"):
+    if p.get("also_region") and not p.get("review"):
         notes.append("name is also a first-level region of this country: city or region? review")
+    if p.get("review_note"):
+        notes.append(p["review_note"])
+    if p["level"] == "country_point":
+        notes.append("point=country")
 
     record = {
         "object_id": int(row["ObjectID"]),
         "title": row["Title"].strip(),
-        "img_url": thumb_url(entry["file"], widths.get(entry["file"])),
-        "image_rights": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "img_url": thumb_url(entry["file"], widths.get(entry["file"])) if entry["file"] else None,
+        "image_rights": "http://creativecommons.org/publicdomain/zero/1.0/" if entry["file"] else None,
         "commons_file": entry["file"],
         "latitude": p["lat"],
         "longitude": p["lon"],
@@ -369,14 +524,15 @@ def map_record(row: dict, commons: dict, places: Places, institution: dict, widt
         "institution_city_en": institution["city"],
         "institution_country_en": institution["country"],
         "source_link": link,
-        "place_name": p["text"],
+        "place_name": p["text"] if source != "walters api 2015" else p["raw"].split(": ", 1)[1].rsplit(" (TGN", 1)[0],
         "place_name_normalized": label,
         "historical_name": p["historical_name"],
+        "precise_place": p.get("precise_place"),
         "city_en": p["label"] if p["level"] == "city" else None,
         "country_en": places.country_en(p["iso2"]),
         "place_level": p["level"],
-        "place_source": "provider",
-        "geocoder_source": "geonames_exact",
+        "place_source": source,
+        "geocoder_source": "desk_review" if p.get("review") and p["level"] == "reviewed" else "geonames_exact",
         "geocoding_status": "ambiguous" if flagged else "ok",
         "geocoding_notes": " | ".join(notes),
         "review_status": "pending" if flagged else None,
@@ -418,6 +574,8 @@ def main():
     logger.info("art.csv: %d objects; Commons: %d objects", len(art), len(commons))
     logger.info("Loading GeoNames gazetteer from %s", GAZETTEER_DIR)
     places = Places(Gazetteer(GAZETTEER_DIR))
+    review = load_review()
+    api2015 = load_api2015(s, args.refresh)
     widths = load_widths(s, [c["file"] for oid, c in commons.items() if oid in art], args.refresh)
 
     rows = list(art.values())
@@ -426,20 +584,23 @@ def main():
     elif args.limit:
         rows = rows[:args.limit]
 
-    stats, unresolved, levels, countries = Counter(), Counter(), Counter(), Counter()
+    stats, unresolved, levels, countries, reasons = Counter(), Counter(), Counter(), Counter(), Counter()
     kept, shown = [], 0
     for row in rows:
-        decision, record = map_record(row, commons, places, institution, widths)
+        decision, record = map_record(row, commons, places, institution, widths, review, api2015)
         stats[decision] += 1
         if decision == "unresolved":
             unresolved[record["_unresolved"]] += 1
             continue
-        if not record:
+        if decision != "non_european":
+            if record and record.get("_reason"):
+                reasons[record["_reason"].split(":")[0]] += 1
             continue
         kept.append(record)
         levels[record["place_level"]] += 1
         countries[record["country_en"]] += 1
         stats["with_image"] += bool(record["img_url"])
+        stats["source: " + record["place_source"]] += 1
         if not args.apply and shown < args.show:
             shown += 1
             print(json.dumps({k: record[k] for k in (
@@ -452,6 +613,7 @@ def main():
     print("Kept by level:", dict(levels))
     print("Kept by country:", countries.most_common(30))
     print("Most common unresolved places:", unresolved.most_common(30))
+    print("Not placed (no Commons place):", reasons.most_common(10))
     if args.apply:
         json.dump(kept, open(args.output, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         print(f"Wrote {len(kept)} records to {args.output}")

@@ -2,8 +2,10 @@
 """
 import_walters.py — load walters_objects.json (scrape_walters.py) into museum_objects
 
-Replaces every row with institution_name = 'The Walters Art Museum' (and their
-time / link components) in one transaction, so a re-run gives the same result.
+Upserts the rows with institution_name = 'The Walters Art Museum' by object_id in
+one transaction: existing rows keep their id (so artifact links stay), new objects
+are inserted, objects no longer in the data are deleted; time / link components
+are rebuilt. Rows with review_status = 'verified' are never touched.
 Only columns that exist in the target database are written: a local database
 without historical_name still imports. Rows marked [walters] in geocoding_notes.
 
@@ -29,7 +31,7 @@ COLUMNS = [
     "object_id", "title", "img_url", "image_rights", "latitude", "longitude",
     "institution_name", "institution_place", "institution_latitude", "institution_longitude",
     "institution_city_en", "institution_country_en", "source_link",
-    "place_name", "place_name_normalized", "historical_name", "city_en", "country_en",
+    "place_name", "place_name_normalized", "historical_name", "precise_place", "city_en", "country_en",
     "geocoder_source", "geocoding_status", "geocoding_notes", "review_status",
     "object_date", "object_date_earliest", "object_date_latest", "object_date_precision", "object_date_display",
     "inventory_number",
@@ -71,9 +73,13 @@ def main():
     existing = {c for (c,) in cur.fetchall()}
     cols = [c for c in COLUMNS if c in existing]
     skipped = [c for c in COLUMNS if c not in existing]
-    cur.execute("SELECT COUNT(*) FROM museum_objects WHERE institution_name = %s", (INSTITUTION,))
-    before = cur.fetchone()[0]
-    print(f"{len(records)} records to import; {before} existing {INSTITUTION} rows will be replaced")
+    cur.execute("SELECT object_id, id, review_status FROM museum_objects WHERE institution_name = %s", (INSTITUTION,))
+    existing_rows = {oid: (mid, status) for oid, mid, status in cur.fetchall()}
+    wanted = set(ids)
+    gone = [mid for oid, (mid, status) in existing_rows.items() if oid not in wanted and status != "verified"]
+    print(f"{len(records)} records: {sum(1 for i in ids if i in existing_rows)} update existing rows (ids and "
+          f"artifact links kept), {sum(1 for i in ids if i not in existing_rows)} new; {len(gone)} rows no longer "
+          f"in the data will be deleted")
     if skipped:
         print("Columns not in this database (left out):", ", ".join(skipped))
     if not args.apply:
@@ -81,24 +87,47 @@ def main():
         conn.rollback()
         return
 
-    # Component rows are not deleted by the cascade on museum_objects_components.
-    cur.execute("""
-        WITH c AS (
-            SELECT mc.component_id, mc.component_type FROM museum_objects_components mc
-            JOIN museum_objects m ON m.id = mc.entity_id WHERE m.institution_name = %s)
-        , t AS (DELETE FROM components_time_name_time_infos WHERE id IN
-                (SELECT component_id FROM c WHERE component_type = 'time-name.time-info'))
-        DELETE FROM components_object_links_object_link_infos WHERE id IN
-                (SELECT component_id FROM c WHERE component_type = 'object-links.object-link-info')
-    """, (INSTITUTION,))
-    cur.execute("DELETE FROM museum_objects WHERE institution_name = %s", (INSTITUTION,))
+    def drop_components(row_ids):
+        # Component rows are not deleted by the cascade on museum_objects_components.
+        if not row_ids:
+            return
+        cur.execute("""
+            WITH c AS (DELETE FROM museum_objects_components WHERE entity_id = ANY(%s)
+                       RETURNING component_id, component_type)
+            , t AS (DELETE FROM components_time_name_time_infos WHERE id IN
+                    (SELECT component_id FROM c WHERE component_type = 'time-name.time-info'))
+            DELETE FROM components_object_links_object_link_infos WHERE id IN
+                    (SELECT component_id FROM c WHERE component_type = 'object-links.object-link-info')
+        """, (list(row_ids),))
+
+    drop_components(gone)
+    if gone:
+        cur.execute("DELETE FROM museum_objects WHERE id = ANY(%s)", (gone,))
 
     insert = (f"INSERT INTO museum_objects ({', '.join(cols)}, created_at, updated_at, published_at) "
               f"VALUES ({', '.join(['%s'] * len(cols))}, now(), now(), now()) RETURNING id")
+    update = (f"UPDATE museum_objects SET {', '.join(c + ' = %s' for c in cols)}, updated_at = now() "
+              f"WHERE id = %s")
+    updated, inserted, kept_verified = [], 0, 0
     for r in records:
         v = row_values(r)
-        cur.execute(insert, [v[c] for c in cols])
-        mid = cur.fetchone()[0]
+        mid, status = existing_rows.get(r["object_id"], (None, None))
+        if status == "verified":             # never touched by scripts
+            kept_verified += 1
+            continue
+        if mid:
+            cur.execute(update, [v[c] for c in cols] + [mid])
+            updated.append(mid)
+        else:
+            cur.execute(insert, [v[c] for c in cols])
+            mid = cur.fetchone()[0]
+            inserted += 1
+        r["_row_id"] = mid
+    drop_components(updated)
+    for r in records:
+        mid = r.get("_row_id")
+        if not mid:
+            continue
         t = r.get("time")
         if t:
             cur.execute("INSERT INTO components_time_name_time_infos (time_name, time_start, time_end) "
@@ -111,8 +140,10 @@ def main():
                         "VALUES (%s, %s) RETURNING id", (link["link_text"], link["link_display"]))
             cur.execute('INSERT INTO museum_objects_components (entity_id, component_id, component_type, field, "order") '
                         "VALUES (%s, %s, 'object-links.object-link-info', 'object_links', %s)", (mid, cur.fetchone()[0], i))
-    # Country labels ("Egypt", "Iran?") get the point other collections already use for
-    # that country label (the most common one), so they join the existing site. Region and
+    print(f"{len(updated)} rows updated, {inserted} inserted, {len(gone)} deleted, {kept_verified} verified rows left alone")
+    # Country labels ("Egypt", "Iran?"), and labels the desk review gave the country point
+    # ("North Syria", "Ilkhanid"), get the point other collections already use for that
+    # country label (the most common one), so they join the existing site. Region and
     # site labels do not: existing points for them are often wrong (Kashmir in Rajasthan,
     # Karnak in the Western Desert), so they stay unlocated and are flagged for review.
     cur.execute(r"""
@@ -130,8 +161,9 @@ def main():
             geocoding_notes = m.geocoding_notes || ' | point of ' || sib.n || ' existing "' || sib.label || '" records'
         FROM sib
         WHERE m.institution_name = %(inst)s AND m.latitude IS NULL AND sib.rk = 1
-          AND sib.label = lower(regexp_replace(m.place_name_normalized, '[' || CHR(63) || ']$', ''))
           AND sib.label = lower(m.country_en) AND sib.country_en = m.country_en
+          AND (sib.label = lower(regexp_replace(m.place_name_normalized, '[' || CHR(63) || ']$', ''))
+               OR m.geocoding_notes LIKE '%%point=country%%')
     """, {"inst": INSTITUTION})
     print(f"{cur.rowcount} country-level rows got the country point existing records use")
     cur.execute("""

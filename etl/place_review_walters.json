@@ -1,0 +1,1236 @@
+{
+ "_about": "Desk review (2026-10-22) of Walters place labels the exact GeoNames lookup could not place, or placed on the wrong kind of place. Each entry names its source: a Wikidata item (point = its P625, country checked against P17), 'country point' (the point existing records use for the country), or 'reject' (left unlocated). Keys: resolver label|country, or the full place text.",
+ "by_text": {
+  "Deir el-Bahri (present-day Western Thebes, Egypt)": {
+   "source": "Wikidata Q373909",
+   "lat": 25.7375,
+   "lon": 32.6075,
+   "label": "Luxor",
+   "precise_place": "Deir el-Bahri"
+  },
+  "Deir el-Bahari (present-day Western Thebes, Egypt)": {
+   "source": "Wikidata Q373909",
+   "lat": 25.7375,
+   "lon": 32.6075,
+   "label": "Luxor",
+   "precise_place": "Deir el-Bahri"
+  },
+  "Deir el-Medina (present-day Western Thebes, Egypt)": {
+   "source": "Wikidata Q750212",
+   "lat": 25.7283,
+   "lon": 32.6014,
+   "label": "Luxor",
+   "precise_place": "Deir el-Medina"
+  },
+  "Malkata (present-day Western Thebes, Egypt)": {
+   "source": "Wikidata Q431422",
+   "lat": 25.7153,
+   "lon": 32.5911,
+   "label": "Luxor",
+   "precise_place": "Malkata"
+  },
+  "Tomb of Nes-pa-ka-shuty (TT 312) in Western Thebes, Egypt": {
+   "source": "Wikidata Q29223",
+   "lat": 25.7333,
+   "lon": 32.6,
+   "label": "Luxor",
+   "precise_place": "Tomb of Nes-pa-ka-shuty (TT 312)"
+  }
+ },
+ "by_label": {
+  "Kashmir|India": {
+   "source": "Wikidata Q2361576",
+   "lat": 34.05,
+   "lon": 74.8
+  },
+  "Western Thebes|Egypt": {
+   "source": "Wikidata Q29223",
+   "lat": 25.7333,
+   "lon": 32.6,
+   "label": "Luxor",
+   "precise_place": "Western Thebes"
+  },
+  "Upper Egypt|Egypt": {
+   "source": "Wikidata Q203751",
+   "lat": 24.1,
+   "lon": 32.7
+  },
+  "North India|India": {
+   "source": "Wikidata Q1058785",
+   "lat": 31.0562,
+   "lon": 76.5911
+  },
+  "Northern India|India": {
+   "source": "Wikidata Q1058785",
+   "lat": 31.0562,
+   "lon": 76.5911
+  },
+  "Veraguas-Gran Chiriquí|Panama": {
+   "source": "Wikidata Q593137",
+   "lat": 8.0,
+   "lon": -81.0
+  },
+  "Central Thailand|Thailand": {
+   "source": "Wikidata Q190829",
+   "lat": 15.0,
+   "lon": 100.0
+  },
+  "Memphis|Egypt": {
+   "source": "Wikidata Q5715",
+   "lat": 29.8447,
+   "lon": 31.2509
+  },
+  "Hromklay in Gaziantep|Turkey": {
+   "source": "Wikidata Q1477613",
+   "lat": 37.2708,
+   "lon": 37.8379,
+   "label": "Rumkale",
+   "historical_name": "Hromkla"
+  },
+  "Northern Yemen|Yemen": {
+   "source": "country point",
+   "point": "country"
+  },
+  "North central Thailand|Thailand": {
+   "source": "country point",
+   "point": "country"
+  },
+  "East Thailand|Thailand": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Northwest Iran|Iran": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Eastern Iran|Iran": {
+   "source": "country point",
+   "point": "country"
+  },
+  "North Iran|Iran": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Anatolia|Turkey": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Northwestern Colombia|Colombia": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Northeast Colombia|Colombia": {
+   "source": "country point",
+   "point": "country"
+  },
+  "North Peru|Peru": {
+   "source": "country point",
+   "point": "country"
+  },
+  "North Syria|Syria": {
+   "source": "country point",
+   "point": "country"
+  },
+  "West Sudan|Sudan": {
+   "source": "country point",
+   "point": "country"
+  },
+  "West Nepal|Nepal": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Northwest India|India": {
+   "source": "country point",
+   "point": "country"
+  },
+  "North China|China": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Elam|Iran": {
+   "source": "country point",
+   "point": "country"
+  },
+  "Ilkhanid|Iran": {
+   "source": "country point",
+   "point": "country",
+   "label": "Iran"
+  },
+  "Persia|Iran": {
+   "source": "country point",
+   "point": "country",
+   "label": "Iran",
+   "historical_name": "Persia"
+  },
+  "Ceylon|Sri Lanka": {
+   "source": "country point",
+   "point": "country",
+   "label": "Sri Lanka",
+   "historical_name": "Ceylon"
+  },
+  "Burma|Myanmar": {
+   "source": "country point",
+   "point": "country",
+   "label": "Myanmar",
+   "historical_name": "Burma"
+  },
+  "Lopburi|Thailand": {
+   "source": "Wikidata Q336122",
+   "lat": 14.8006,
+   "lon": 100.6514
+  },
+  "Meir|Egypt": {
+   "source": "Wikidata Q690841",
+   "lat": 27.4097,
+   "lon": 30.7117
+  },
+  "Tamil Nadu|India": {
+   "source": "Wikidata Q1445",
+   "lat": 11.0,
+   "lon": 79.0
+  },
+  "Saqqara|Egypt": {
+   "source": "Wikidata Q192134",
+   "lat": 29.85,
+   "lon": 31.2333
+  },
+  "Lan Na|Thailand": {
+   "source": "Wikidata Q750014",
+   "lat": 19.0,
+   "lon": 99.0
+  },
+  "Sukhothai|Thailand": {
+   "source": "Wikidata Q380764",
+   "lat": 17.0058,
+   "lon": 99.8264
+  },
+  "Sumer|Iraq": {
+   "source": "Wikidata Q35355",
+   "lat": 32.0,
+   "lon": 45.5
+  },
+  "Cappadocia|Turkey": {
+   "source": "Wikidata Q217265",
+   "lat": 38.6706,
+   "lon": 34.8392
+  },
+  "Tell Halaf|Syria": {
+   "source": "Wikidata Q2142541",
+   "lat": 36.8268,
+   "lon": 40.0397
+  },
+  "Uttar Pradesh|India": {
+   "source": "Wikidata Q1498",
+   "lat": 26.85,
+   "lon": 80.91
+  },
+  "Aizu|Japan": {
+   "source": "Wikidata Q1205071",
+   "lat": 37.4875,
+   "lon": 139.93
+  },
+  "Jalisco|Mexico": {
+   "source": "Wikidata Q13160",
+   "lat": 20.6764,
+   "lon": -103.3458
+  },
+  "Northeast Thailand|Thailand": {
+   "source": "Wikidata Q381897",
+   "lat": 16.0,
+   "lon": 103.0
+  },
+  "Northeastern Thailand|Thailand": {
+   "source": "Wikidata Q381897",
+   "lat": 16.0,
+   "lon": 103.0
+  },
+  "Babylonia|Iraq": {
+   "source": "Wikidata Q47690",
+   "lat": 32.5,
+   "lon": 44.5
+  },
+  "Araba al-Madfuna|Egypt": {
+   "source": "Wikidata Q192268",
+   "lat": 26.1852,
+   "lon": 31.9189
+  },
+  "Madhya Pradesh|India": {
+   "source": "Wikidata Q1188",
+   "lat": 22.9734,
+   "lon": 78.6569
+  },
+  "Samsun|Turkey": {
+   "source": "Wikidata Q160450",
+   "lat": 41.2867,
+   "lon": 36.33
+  },
+  "Lasta|Ethiopia": {
+   "source": "Wikidata Q1806743",
+   "lat": 12.0356,
+   "lon": 39.0472
+  },
+  "Luristan|Iran": {
+   "source": "Wikidata Q1131727",
+   "lat": 33.4871,
+   "lon": 48.3538,
+   "label": "Lorestan"
+  },
+  "Pontos|Turkey": {
+   "source": "Wikidata Q621672",
+   "lat": 40.68,
+   "lon": 37.83
+  },
+  "Kii|Japan": {
+   "source": "Wikidata Q864053",
+   "lat": 33.7753,
+   "lon": 135.7306
+  },
+  "Khorasan|Iran": {
+   "source": "Wikidata Q587090",
+   "lat": 35.7725,
+   "lon": 58.7852
+  },
+  "Thebes|Egypt": {
+   "source": "Wikidata Q101583",
+   "lat": 25.7206,
+   "lon": 32.6103,
+   "label": "Luxor",
+   "historical_name": "Thebes"
+  },
+  "Lower Egypt|Egypt": {
+   "source": "Wikidata Q463871",
+   "lat": 30.6,
+   "lon": 31.1
+  },
+  "Tuna el-Gebel|Egypt": {
+   "source": "Wikidata Q734370",
+   "lat": 27.7383,
+   "lon": 30.7044
+  },
+  "Antioch|Syria": {
+   "source": "Wikidata Q200441",
+   "lat": 36.2047,
+   "lon": 36.1817,
+   "label": "Antakya",
+   "historical_name": "Antioch",
+   "country": "Turkey"
+  },
+  "Medamud|Egypt": {
+   "source": "Wikidata Q287716",
+   "lat": 25.7333,
+   "lon": 32.7125
+  },
+  "Guler|India": {
+   "source": "Wikidata Q17311418",
+   "lat": 32.0,
+   "lon": 76.16
+  },
+  "Phitsanulok|Thailand": {
+   "source": "Wikidata Q275781",
+   "lat": 16.8264,
+   "lon": 100.2603
+  },
+  "Lamphun|Thailand": {
+   "source": "Wikidata Q240540",
+   "lat": 18.5792,
+   "lon": 99.0064
+  },
+  "Ur|Iraq": {
+   "source": "Wikidata Q5699",
+   "lat": 30.9622,
+   "lon": 46.1044
+  },
+  "Chekiang|China": {
+   "source": "Wikidata Q16967",
+   "lat": 30.2667,
+   "lon": 120.15,
+   "label": "Zhejiang"
+  },
+  "Larsa|Iraq": {
+   "source": "Wikidata Q244746",
+   "lat": 31.2858,
+   "lon": 45.8536
+  },
+  "Karnak|Egypt": {
+   "source": "Wikidata Q522862",
+   "lat": 25.7183,
+   "lon": 32.6583,
+   "label": "Luxor",
+   "precise_place": "Karnak"
+  },
+  "Karnak Cachette at Karnak|Egypt": {
+   "source": "Wikidata Q522862",
+   "lat": 25.7183,
+   "lon": 32.6583,
+   "label": "Luxor",
+   "precise_place": "Karnak Cachette (Karnak)"
+  },
+  "Temple of Amun-Re in Karnak|Egypt": {
+   "source": "Wikidata Q522862",
+   "lat": 25.7183,
+   "lon": 32.6583,
+   "label": "Luxor",
+   "precise_place": "Temple of Amun-Re (Karnak)"
+  },
+  "Jaina Island in Campeche|Mexico": {
+   "source": "Wikidata Q283573",
+   "lat": 20.2086,
+   "lon": -90.4842,
+   "label": "Jaina Island"
+  },
+  "southern Veracruz|Mexico": {
+   "source": "Wikidata Q60130",
+   "lat": 19.8394,
+   "lon": -96.0556,
+   "label": "Southern Veracruz"
+  },
+  "Gulf Coast Lowlands|Mexico": {
+   "source": "Wikidata Q60130",
+   "lat": 19.8394,
+   "lon": -96.0556
+  },
+  "Kerala|India": {
+   "source": "Wikidata Q1186",
+   "lat": 10.0,
+   "lon": 76.3
+  },
+  "Fars|Iran": {
+   "source": "Wikidata Q1004666",
+   "lat": 29.625,
+   "lon": 52.5317
+  },
+  "Gujarat|India": {
+   "source": "Wikidata Q1061",
+   "lat": 23.1564,
+   "lon": 71.838
+  },
+  "Jiangsu [Chiang-su]|China": {
+   "source": "Wikidata Q16963",
+   "lat": 33.0,
+   "lon": 120.0,
+   "label": "Jiangsu"
+  },
+  "Orissa|India": {
+   "source": "Wikidata Q22048",
+   "lat": 20.15,
+   "lon": 83.5,
+   "label": "Odisha"
+  },
+  "Angkor|Cambodia": {
+   "source": "Wikidata Q163607",
+   "lat": 13.4333,
+   "lon": 103.8333
+  },
+  "Angkor Wat|Cambodia": {
+   "source": "Wikidata Q43473",
+   "lat": 13.4125,
+   "lon": 103.8667,
+   "label": "Angkor",
+   "precise_place": "Angkor Wat"
+  },
+  "Angkor Wat in Angkor|Cambodia": {
+   "source": "Wikidata Q43473",
+   "lat": 13.4125,
+   "lon": 103.8667,
+   "label": "Angkor",
+   "precise_place": "Angkor Wat"
+  },
+  "Central Java|Indonesia": {
+   "source": "Wikidata Q3557",
+   "lat": -7.5,
+   "lon": 110.0
+  },
+  "Kom Gieif|Egypt": {
+   "source": "Wikidata Q137721",
+   "lat": 30.9,
+   "lon": 30.6167
+  },
+  "Naukratis|Egypt": {
+   "source": "Wikidata Q137721",
+   "lat": 30.9,
+   "lon": 30.6167,
+   "label": "Kom Gieif",
+   "historical_name": "Naukratis"
+  },
+  "Ratchaburi|Thailand": {
+   "source": "Wikidata Q335492",
+   "lat": 13.5289,
+   "lon": 99.8144
+  },
+  "Karnataka|India": {
+   "source": "Wikidata Q1185",
+   "lat": 15.0,
+   "lon": 76.0
+  },
+  "Yamagata|Japan": {
+   "source": "Wikidata Q205526",
+   "lat": 38.2554,
+   "lon": 140.3396
+  },
+  "Poghoskan|Turkey": {
+   "source": "reject",
+   "reject": "no source for this place name"
+  },
+  "Bubastis|Egypt": {
+   "source": "Wikidata Q603841",
+   "lat": 30.5728,
+   "lon": 31.51
+  },
+  "Himachal Pradesh|India": {
+   "source": "Wikidata Q1177",
+   "lat": 31.1033,
+   "lon": 77.1722
+  },
+  "Rusafah|Syria": {
+   "source": "Wikidata Q631407",
+   "lat": 35.6278,
+   "lon": 38.7564,
+   "label": "Resafa"
+  },
+  "Honnon ji|Japan": {
+   "source": "reject",
+   "reject": "Wikidata match is a temple in Yamanashi; source unclear"
+  },
+  "Takata|Japan": {
+   "source": "reject",
+   "reject": "several Takata (Fukuoka, Bungo); source does not say which"
+  },
+  "Tepe Giyan|Iran": {
+   "source": "Wikidata Q15210545",
+   "lat": 34.1814,
+   "lon": 48.2436
+  },
+  "West Bengal|India": {
+   "source": "Wikidata Q1356",
+   "lat": 23.0,
+   "lon": 87.0
+  },
+  "Calah|Iraq": {
+   "source": "Wikidata Q237614",
+   "lat": 36.0981,
+   "lon": 43.3289,
+   "label": "Nimrud",
+   "historical_name": "Calah"
+  },
+  "Abydos|Egypt": {
+   "source": "Wikidata Q192268",
+   "lat": 26.1852,
+   "lon": 31.9189
+  },
+  "Garhwal|India": {
+   "source": "Wikidata Q1460406",
+   "lat": 30.5,
+   "lon": 78.5
+  },
+  "Shimotsuke Province|Japan": {
+   "source": "Wikidata Q1053699",
+   "lat": 36.6589,
+   "lon": 139.7908
+  },
+  "Ishikawa-ken|Japan": {
+   "source": "Wikidata Q131281",
+   "lat": 36.595,
+   "lon": 136.625,
+   "label": "Ishikawa"
+  },
+  "Kültepe|Turkey": {
+   "source": "Wikidata Q538605",
+   "lat": 38.85,
+   "lon": 35.6333
+  },
+  "Punjab|India": {
+   "source": "Wikidata Q22424",
+   "lat": 30.7667,
+   "lon": 75.4667
+  },
+  "Amarna|Egypt": {
+   "source": "Wikidata Q5736",
+   "lat": 27.6617,
+   "lon": 30.9056
+  },
+  "Shanxi [Shansi]|China": {
+   "source": "Wikidata Q46913",
+   "lat": 37.8733,
+   "lon": 112.5644,
+   "label": "Shanxi"
+  },
+  "Shanxi [Shan-hsi]|China": {
+   "source": "Wikidata Q46913",
+   "lat": 37.8733,
+   "lon": 112.5644,
+   "label": "Shanxi"
+  },
+  "Shimane|Japan": {
+   "source": "Wikidata Q132751",
+   "lat": 35.4722,
+   "lon": 133.0503
+  },
+  "Hitachi Province|Japan": {
+   "source": "Wikidata Q1055353",
+   "lat": 36.3897,
+   "lon": 140.4064
+  },
+  "Iwami|Japan": {
+   "source": "Wikidata Q1053709",
+   "lat": 34.9297,
+   "lon": 132.1106,
+   "label": "Iwami Province"
+  },
+  "Dahshur|Egypt": {
+   "source": "Wikidata Q685414",
+   "lat": 29.8,
+   "lon": 31.2333
+  },
+  "Tegray|Ethiopia": {
+   "source": "Wikidata Q200127",
+   "lat": 13.575,
+   "lon": 39.0875,
+   "label": "Tigray"
+  },
+  "Tigray Kifle Håger|Ethiopia": {
+   "source": "Wikidata Q200127",
+   "lat": 13.575,
+   "lon": 39.0875,
+   "label": "Tigray"
+  },
+  "Guerrero|Mexico": {
+   "source": "Wikidata Q60158",
+   "lat": 17.6131,
+   "lon": -99.95
+  },
+  "Behbeit el-Hagar|Egypt": {
+   "source": "Wikidata Q814450",
+   "lat": 31.0311,
+   "lon": 31.2867
+  },
+  "Xoïs|Egypt": {
+   "source": "Wikidata Q1068140",
+   "lat": 31.0881,
+   "lon": 30.9456
+  },
+  "White Cloud Temple in Beijing|China": {
+   "source": "Wikidata Q956",
+   "lat": 39.904,
+   "lon": 116.4075,
+   "label": "Beijing",
+   "precise_place": "White Cloud Temple"
+  },
+  "Guangdong [Kwangtung]|China": {
+   "source": "Wikidata Q15175",
+   "lat": 23.4,
+   "lon": 113.5,
+   "label": "Guangdong"
+  },
+  "Baliana|Egypt": {
+   "source": "Wikidata Q2210877",
+   "lat": 26.2329,
+   "lon": 31.9993,
+   "label": "El Balyana"
+  },
+  "Kansu|China": {
+   "source": "Wikidata Q42392",
+   "lat": 38.0,
+   "lon": 102.0,
+   "label": "Gansu"
+  },
+  "Kurin|Syria": {
+   "source": "reject",
+   "reject": "no source for this place name"
+  },
+  "Mitsugu|Japan": {
+   "source": "Wikidata Q98328413",
+   "lat": 34.5108,
+   "lon": 133.1456,
+   "label": "Mitsugi"
+  },
+  "Konoura|Japan": {
+   "source": "reject",
+   "reject": "several Konoura; source does not say which"
+  },
+  "Satsuma Province|Japan": {
+   "source": "Wikidata Q667475",
+   "lat": 31.7586,
+   "lon": 130.48
+  },
+  "Bithynia|Turkey": {
+   "source": "Wikidata Q373189",
+   "lat": 40.5,
+   "lon": 31.0
+  },
+  "Suifu|Japan": {
+   "source": "Wikidata Q204249",
+   "lat": 36.3658,
+   "lon": 140.4712,
+   "label": "Mito",
+   "historical_name": "Suifu"
+  },
+  "Sais|Egypt": {
+   "source": "Wikidata Q381038",
+   "lat": 30.9647,
+   "lon": 30.7683
+  },
+  "Yunnan|China": {
+   "source": "Wikidata Q43194",
+   "lat": 25.0494,
+   "lon": 102.7089
+  },
+  "Mito in Hitachi province|Japan": {
+   "source": "Wikidata Q204249",
+   "lat": 36.3658,
+   "lon": 140.4712,
+   "label": "Mito"
+  },
+  "Mtio|Japan": {
+   "source": "Wikidata Q204249",
+   "lat": 36.3658,
+   "lon": 140.4712,
+   "label": "Mito"
+  },
+  "Java|Indonesia": {
+   "source": "Wikidata Q3757",
+   "lat": -7.3117,
+   "lon": 109.4183
+  },
+  "Iznik|Turkey": {
+   "source": "Wikidata Q217125",
+   "lat": 40.4289,
+   "lon": 29.7194
+  },
+  "Abu Mina|Egypt": {
+   "source": "Wikidata Q9278",
+   "lat": 30.841,
+   "lon": 29.6635
+  },
+  "Sultanabad|Iran": {
+   "source": "Wikidata Q212628",
+   "lat": 34.095,
+   "lon": 49.6981,
+   "label": "Arak",
+   "historical_name": "Sultanabad"
+  },
+  "Naga ed-Dêr|Egypt": {
+   "source": "Wikidata Q1479631",
+   "lat": 26.5667,
+   "lon": 31.8333
+  },
+  "Ephesus|Turkey": {
+   "source": "Wikidata Q47611",
+   "lat": 37.9406,
+   "lon": 27.3394
+  },
+  "Ghiordes|Turkey": {
+   "source": "Wikidata Q1827015",
+   "lat": 38.9331,
+   "lon": 28.2886,
+   "label": "Gördes"
+  },
+  "Owari Province|Japan": {
+   "source": "Wikidata Q514506",
+   "lat": 35.1217,
+   "lon": 137.0375
+  },
+  "Owari|Japan": {
+   "source": "Wikidata Q514506",
+   "lat": 35.1217,
+   "lon": 137.0375,
+   "label": "Owari Province"
+  },
+  "Bosra|Syria": {
+   "source": "Wikidata Q272680",
+   "lat": 32.5167,
+   "lon": 36.4833
+  },
+  "Gandhara|Pakistan": {
+   "source": "Wikidata Q213651",
+   "lat": 33.756,
+   "lon": 72.8291
+  },
+  "Sardis|Turkey": {
+   "source": "Wikidata Q232615",
+   "lat": 38.4883,
+   "lon": 28.0403
+  },
+  "West India|India": {
+   "source": "Wikidata Q1151567",
+   "lat": 19.0,
+   "lon": 74.15
+  },
+  "Central India|India": {
+   "source": "Wikidata Q29024970",
+   "lat": 22.7,
+   "lon": 81.6
+  },
+  "South India|India": {
+   "source": "Wikidata Q542146",
+   "lat": 13.0,
+   "lon": 77.0
+  },
+  "Fukien|China": {
+   "source": "Wikidata Q41705",
+   "lat": 25.9,
+   "lon": 118.3,
+   "label": "Fujian"
+  },
+  "Central Ang Thong|Thailand": {
+   "source": "Wikidata Q243795",
+   "lat": 14.5889,
+   "lon": 100.4547,
+   "label": "Ang Thong"
+  },
+  "DeltaSamannud|Egypt": {
+   "source": "Wikidata Q1243772",
+   "lat": 30.9622,
+   "lon": 31.2425,
+   "label": "Samannud"
+  },
+  "Anhui|China": {
+   "source": "Wikidata Q40956",
+   "lat": 31.8333,
+   "lon": 117.0
+  },
+  "Kyushu|Japan": {
+   "source": "Wikidata Q13987",
+   "lat": 33.0,
+   "lon": 131.0
+  },
+  "Tlatilco|Mexico": {
+   "source": "Wikidata Q1929180",
+   "lat": 19.5,
+   "lon": -99.25
+  },
+  "Kagawa|Japan": {
+   "source": "Wikidata Q161454",
+   "lat": 34.34,
+   "lon": 134.0431
+  },
+  "Nicomedia|Turkey": {
+   "source": "Wikidata Q129649",
+   "lat": 40.7719,
+   "lon": 29.9498,
+   "label": "Izmit",
+   "historical_name": "Nicomedia"
+  },
+  "Chiapas|Mexico": {
+   "source": "Wikidata Q60123",
+   "lat": 16.53,
+   "lon": -92.45
+  },
+  "Temple of Apedemak in Meroë|Sudan": {
+   "source": "Wikidata Q5780",
+   "lat": 16.9351,
+   "lon": 33.7507,
+   "label": "Meroë",
+   "precise_place": "Temple of Apedemak"
+  },
+  "Mankot|India": {
+   "source": "reject",
+   "reject": "Wikidata match is a village in Uttarakhand; Mankot painting is from Jammu"
+  },
+  "Suphanburi|Thailand": {
+   "source": "Wikidata Q272247",
+   "lat": 14.4744,
+   "lon": 100.1183
+  },
+  "Cain Feshkha|Israel": {
+   "source": "Wikidata Q405816",
+   "lat": 31.7144,
+   "lon": 35.4533,
+   "label": "Ein Feshkha",
+   "country": "Palestine"
+  },
+  "Phrygia|Turkey": {
+   "source": "Wikidata Q32579",
+   "lat": 39.0,
+   "lon": 31.0
+  },
+  "Heliopolis|Egypt": {
+   "source": "Wikidata Q2739389",
+   "lat": 30.1333,
+   "lon": 31.3,
+   "label": "Cairo",
+   "historical_name": "Heliopolis"
+  },
+  "Tolima|Colombia": {
+   "source": "Wikidata Q234501",
+   "lat": 4.05,
+   "lon": -75.25
+  },
+  "Qalat Seman|Syria": {
+   "source": "Wikidata Q1112125",
+   "lat": 36.3342,
+   "lon": 36.8442,
+   "label": "Qal'at Sim'an"
+  },
+  "Kalat Siman|Syria": {
+   "source": "Wikidata Q1112125",
+   "lat": 36.3342,
+   "lon": 36.8442,
+   "label": "Qal'at Sim'an"
+  },
+  "Dendera|Egypt": {
+   "source": "Wikidata Q29019",
+   "lat": 26.1422,
+   "lon": 32.6697
+  },
+  "Bengal|India": {
+   "source": "Wikidata Q1356",
+   "lat": 23.0,
+   "lon": 87.0
+  },
+  "Hawara|Egypt": {
+   "source": "Wikidata Q26237",
+   "lat": 29.274,
+   "lon": 30.899
+  },
+  "Nishapur|Iran": {
+   "source": "Wikidata Q131350",
+   "lat": 36.2133,
+   "lon": 58.7958
+  },
+  "Veraguas|Panama": {
+   "source": "Wikidata Q593137",
+   "lat": 8.0,
+   "lon": -81.0
+  },
+  "Myrina|Turkey": {
+   "source": "Wikidata Q609532",
+   "lat": 38.8453,
+   "lon": 26.9844
+  },
+  "Deccan|India": {
+   "source": "Wikidata Q169966",
+   "lat": 15.0,
+   "lon": 77.0
+  },
+  "Matva|India": {
+   "source": "reject",
+   "reject": "no source for this place name"
+  },
+  "Mit Rahina|Egypt": {
+   "source": "Wikidata Q12246507",
+   "lat": 29.8538,
+   "lon": 31.2538
+  },
+  "Prakhon Chai|Thailand": {
+   "source": "Wikidata Q476522",
+   "lat": 14.6058,
+   "lon": 103.1211
+  },
+  "Malwa|India": {
+   "source": "Wikidata Q550691",
+   "lat": 22.42,
+   "lon": 75.54
+  },
+  "Wat Chai Watthanaram in Ayutthaya|Thailand": {
+   "source": "GeoNames Ayutthaya",
+   "lat": 14.35167,
+   "lon": 100.57739,
+   "label": "Ayutthaya",
+   "precise_place": "Wat Chai Watthanaram"
+  },
+  "Kamphaeng Phet|Thailand": {
+   "source": "Wikidata Q273807",
+   "lat": 16.5581,
+   "lon": 99.5111
+  },
+  "Jiangxi|China": {
+   "source": "Wikidata Q57052",
+   "lat": 27.3,
+   "lon": 116.0
+  },
+  "Nineveh|Iraq": {
+   "source": "Wikidata Q5680",
+   "lat": 36.3667,
+   "lon": 43.15
+  },
+  "Bitchu|Japan": {
+   "source": "Wikidata Q1047514",
+   "lat": 34.6828,
+   "lon": 133.775
+  },
+  "Harwan|India": {
+   "source": "Wikidata Q59657921",
+   "lat": 34.1544,
+   "lon": 74.8983,
+   "label": "Srinagar",
+   "precise_place": "Harwan"
+  },
+  "Toprakkale|Turkey": {
+   "source": "Wikidata Q1521344",
+   "lat": 38.5206,
+   "lon": 43.4039
+  },
+  "Kashan|Iran": {
+   "source": "Wikidata Q240475",
+   "lat": 33.9881,
+   "lon": 51.4425
+  },
+  "Kanagawa|Japan": {
+   "source": "Wikidata Q127513",
+   "lat": 35.4477,
+   "lon": 139.6425
+  },
+  "Yangcheng [Yang-ch'eng]|China": {
+   "source": "reject",
+   "reject": "Yangcheng may be Guangzhou or Yangcheng county, Shanxi"
+  },
+  "Tunis Governorate|Tunisia": {
+   "source": "Wikidata Q328109",
+   "lat": 36.8,
+   "lon": 10.17,
+   "label": "Tunis"
+  },
+  "Rajasthan|India": {
+   "source": "Wikidata Q1437",
+   "lat": 26.5728,
+   "lon": 73.8389
+  },
+  "Yagami|Japan": {
+   "source": "reject",
+   "reject": "several Yagami; source does not say which"
+  },
+  "Gebelein|Egypt": {
+   "source": "Wikidata Q1496830",
+   "lat": 25.4833,
+   "lon": 32.4833
+  },
+  "Balawat|Iraq": {
+   "source": "Wikidata Q1659846",
+   "lat": 36.2167,
+   "lon": 43.4167
+  },
+  "Teotihuacán|Mexico": {
+   "source": "Wikidata Q172613",
+   "lat": 19.6925,
+   "lon": -98.8439
+  },
+  "Charsada|Pakistan": {
+   "source": "Wikidata Q1642808",
+   "lat": 34.1453,
+   "lon": 71.7308,
+   "label": "Charsadda"
+  },
+  "Tell Telloh|Iraq": {
+   "source": "Wikidata Q853946",
+   "lat": 31.5653,
+   "lon": 46.1896,
+   "label": "Tello",
+   "historical_name": "Girsu"
+  },
+  "Phayao|Thailand": {
+   "source": "Wikidata Q244618",
+   "lat": 19.1917,
+   "lon": 99.8794
+  },
+  "Marib|Yemen": {
+   "source": "Wikidata Q498465",
+   "lat": 15.45,
+   "lon": 45.3333
+  },
+  "Nikkô|Japan": {
+   "source": "Wikidata Q235753",
+   "lat": 36.7198,
+   "lon": 139.6982,
+   "label": "Nikko"
+  },
+  "Central Mexico|Mexico": {
+   "source": "Wikidata Q2945563",
+   "lat": 19.7,
+   "lon": -98.43
+  },
+  "Michoacán|Mexico": {
+   "source": "Wikidata Q79861",
+   "lat": 19.21,
+   "lon": -101.91
+  },
+  "Nayarit|Mexico": {
+   "source": "Wikidata Q79920",
+   "lat": 22.0,
+   "lon": -105.0
+  },
+  "Bihar|India": {
+   "source": "Wikidata Q1165",
+   "lat": 25.37,
+   "lon": 85.13
+  },
+  "Goa|India": {
+   "source": "Wikidata Q1171",
+   "lat": 15.4019,
+   "lon": 74.0433
+  },
+  "Honan|China": {
+   "source": "Wikidata Q43684",
+   "lat": 33.9,
+   "lon": 113.5,
+   "label": "Henan"
+  },
+  "Aichi|Japan": {
+   "source": "Wikidata Q80434",
+   "lat": 35.1802,
+   "lon": 136.9064
+  },
+  "Colima|Mexico": {
+   "source": "Wikidata Q61309",
+   "lat": 19.1,
+   "lon": -103.9
+  },
+  "Oaxaca|Mexico": {
+   "source": "Wikidata Q34110",
+   "lat": 17.055,
+   "lon": -96.6539
+  },
+  "Puebla|Mexico": {
+   "source": "Wikidata Q79923",
+   "lat": 19.0036,
+   "lon": -97.8883
+  },
+  "Veracruz|Mexico": {
+   "source": "Wikidata Q60130",
+   "lat": 19.8394,
+   "lon": -96.0556
+  },
+  "Campeche|Mexico": {
+   "source": "Wikidata Q80908",
+   "lat": 19.0,
+   "lon": -90.4
+  },
+  "Dehli|India": {
+   "source": "spelling",
+   "keep_point": true,
+   "label": "Delhi"
+  },
+  "Latakieh|Syria": {
+   "source": "spelling",
+   "keep_point": true,
+   "label": "Latakia"
+  },
+  "Assiout|Egypt": {
+   "source": "spelling",
+   "keep_point": true,
+   "label": "Asyut"
+  },
+  "Trebizond|Turkey": {
+   "source": "former name",
+   "keep_point": true,
+   "label": "Trabzon",
+   "historical_name": "Trebizond"
+  },
+  "Gaziantep Ili|Turkey": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "Gaziantep"
+  },
+  "Xizang Zizhiqu|China": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "Tibet"
+  },
+  "Anadolu|Turkey": {
+   "source": "country point",
+   "point": "country",
+   "label": "Anatolia"
+  },
+  "T'ana Hayk'|Ethiopia": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "Lake Tana"
+  },
+  "Dayr al-Bahri|Egypt": {
+   "source": "Wikidata Q373909",
+   "lat": 25.7375,
+   "lon": 32.6075,
+   "label": "Luxor",
+   "precise_place": "Deir el-Bahri"
+  },
+  "Akdeniz kiyisi|Turkey": {
+   "source": "country point",
+   "point": "country",
+   "label": "Mediterranean coast"
+  },
+  "Belkis|Turkey": {
+   "source": "reject",
+   "reject": "Belkıs (Zeugma) not checked against a source"
+  },
+  "Telloh|Iraq": {
+   "source": "Wikidata Q853946",
+   "lat": 31.5653,
+   "lon": 46.1896,
+   "label": "Tello",
+   "historical_name": "Girsu"
+  },
+  "‘Iraq ‘Arabi|Iraq": {
+   "source": "country point",
+   "point": "country",
+   "label": "Iraq"
+  },
+  "Ninawa|Iraq": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "Nineveh"
+  },
+  "Tall al-Muqayyar|Iraq": {
+   "source": "Wikidata Q5699",
+   "lat": 30.9622,
+   "lon": 46.1044,
+   "label": "Tell el-Muqayyar",
+   "historical_name": "Ur"
+  },
+  "Al Karnak|Egypt": {
+   "source": "Wikidata Q522862",
+   "lat": 25.7183,
+   "lon": 32.6583,
+   "label": "Luxor",
+   "precise_place": "Karnak"
+  },
+  "Al-Ashmunayn|Egypt": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "El Ashmunein"
+  },
+  "Al Gharbiyah|Egypt": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "Gharbia"
+  },
+  "Van Gölü|Turkey": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "Lake Van"
+  },
+  "Harima|Japan": {
+   "source": "TGN point (2015 record), English label",
+   "keep_point": true,
+   "label": "Harima Province"
+  },
+  "Al Fayyum|Egypt": {
+   "source": "spelling",
+   "keep_point": true,
+   "label": "Faiyum"
+  },
+  "Yerushalayim, Mehoz|Israel": {
+   "source": "spelling",
+   "keep_point": true,
+   "label": "Jerusalem"
+  },
+  "Asyut|Egypt": {
+   "source": "GeoNames Assiut (city; the prefecture/governorate shares the name)",
+   "lat": 27.18096,
+   "lon": 31.18368
+  },
+  "Fukui|Japan": {
+   "source": "GeoNames Fukui-shi (city; the prefecture/governorate shares the name)",
+   "lat": 36.06443,
+   "lon": 136.22257
+  },
+  "Tottori|Japan": {
+   "source": "GeoNames Tottori-shi (city; the prefecture/governorate shares the name)",
+   "lat": 35.5,
+   "lon": 134.23333
+  },
+  "Nara|Japan": {
+   "source": "GeoNames Nara-shi (city; the prefecture/governorate shares the name)",
+   "lat": 34.68505,
+   "lon": 135.80485
+  }
+ }
+}
