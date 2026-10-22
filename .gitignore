@@ -67,6 +67,9 @@ etl/scrape_smb.py
 etl/backfill_*.py
 etl/normalize_place_names.py
 etl/postgis_geocoder.py
+!etl/normalize_place_names.py
+!etl/postgis_geocoder.py
+!etl/backfill_smb_event_attribution.py
 
 # Credentials / keys
 *.pem
@@ -136,3 +139,9 @@ frontend/.next-local/
 
 # Local roadmap notes
 ROADMAP.local.md
+
+# One-off migrations and plans, already applied (history keeps them)
+backend/.strapi/
+etl/backfill_*.sql
+docs/IMPLEMENTATION_PLAN.md
+docs/screenshot.png
