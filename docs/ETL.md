@@ -130,31 +130,32 @@ node scripts/populate-institution-locality.js
 
 ## Materialized Views
 
-Two materialized views power the arc performance at low zoom levels:
+The map reads pre-aggregated materialized views instead of the `museum_objects` table; they are
+defined in `backend/src/map-views.js`:
 
-| View | Refresh trigger |
+| View | Used for |
 |---|---|
-| `mv_country_institution_stats` | **Manual only** — no lifecycle hook exists. Call after any bulk import/update. |
-| `mv_city_institution_stats` | Same as above |
+| `mv_country_institution_stats` | Arcs at low zoom (country → institution) |
+| `mv_city_institution_stats` | Arcs at zoom 4–6 (site → institution) |
+| `mv_time_bucket_stats`, `mv_acquisition_year_stats`, `mv_date_span_stats` | Time / Migration counts without filters |
+| `mv_time_bucket_by_group`, `mv_acquisition_year_by_group`, `mv_date_span_by_group` | The same per institution and country (institution/country filters) |
+| `mv_place_suggest` | Place search suggestions |
 
-> **Corrected 2026-07-17:** this table previously (and incorrectly) said these views auto-refresh via a Strapi lifecycle hook. No such hook exists in the codebase — `refreshGeospatialViews()` in `museum-object.js` ("Call after data imports") must be invoked explicitly, either via `SELECT refresh_geospatial_views();` or an admin action that calls it. Believing it was automatic is exactly what let a bulk import go unreflected on the live map until someone noticed and it was traced back to this.
-
-Preferred: call the maintained function, which refreshes both views together —
+They are **not refreshed automatically**: after any import or fix, run
 
 ```sql
 SELECT refresh_geospatial_views();
 ```
 
-Manual fallback (equivalent to what that function does):
+It refreshes every view `CONCURRENTLY` (each has a unique index `<view>_key`), so the map keeps
+answering from the old rows while the new ones are counted (about 5 seconds on production,
+October 2026). Until 2026-10-23 the function refreshed only the two arc views; the Time /
+Migration counts were rebuilt only when Strapi restarted.
 
-```sql
-REFRESH MATERIALIZED VIEW CONCURRENTLY mv_country_institution_stats;
-REFRESH MATERIALIZED VIEW CONCURRENTLY mv_city_institution_stats;
-```
-
-`CONCURRENTLY` requires a unique index on each view (`mv_country_institution_stats_uniq` on `(origin_country, institution_name)`, `mv_city_institution_stats_uniq` on `(origin_city, country_en, institution_name)`). Production was missing both until 2026-07-17 — `refresh_geospatial_views()` was silently failing on every call (the error was swallowed by a try/catch), so prod served a stale snapshot regardless of DB fixes underneath it. Confirm both indexes exist (`\d mv_country_institution_stats`) before relying on this in a new environment.
-
-**Expected refresh time:** < 5 seconds against ~200k records.
+Strapi start (`backend/scripts/pre-strapi.js`) keeps the views unless their definitions or
+Strapi's schemas changed; then they are dropped and rebuilt. When a deploy changes a view's
+definition, `backend/scripts/rebuild-map-views.js` builds the new views beside the live ones and
+swaps them in before the restart (`scripts/deploy/deploy.sh` runs it).
 
 ---
 
