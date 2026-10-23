@@ -32,6 +32,61 @@ function normalizeInventoryNumber(value) {
 // expression (pg_trgm); change both together or the index stops being used.
 const OBJECT_SEARCH_TEXT = `lower(coalesce(inventory_number, '') || ' ' || coalesce(place_name, '') || ' ' || coalesce(place_name_normalized, '') || ' ' || coalesce(city_en, '') || ' ' || coalesce(country_en, '') || ' ' || coalesce(historical_name, '') || ' ' || coalesce(precise_place, '') || ' ' || coalesce(institution_name, ''))`;
 
+// One object per inventory number and institution, so duplicate rows show once;
+// rows without an inventory number stay apart. COLLATE "C" sorts the DISTINCT ON
+// key by bytes: the same groups (equal strings are byte-equal either way), but
+// sorting the 500k objects of a large country takes ~2 s instead of ~25 s under
+// the database's locale collation.
+const DEDUP_KEY = `CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
+    THEN inventory_number ELSE id::text END COLLATE "C", institution_name COLLATE "C"`;
+
+// Identical requests that arrive while the same query runs share its result
+// instead of each running it again: a map view opened by several visitors at once,
+// or one visitor's repeated requests, cost one query. Nothing is kept afterwards.
+const inFlight = new Map();
+function singleFlight(key, fn) {
+  if (!inFlight.has(key)) {
+    inFlight.set(key, Promise.resolve().then(fn).finally(() => inFlight.delete(key)));
+  }
+  return inFlight.get(key);
+}
+
+// The rows only change through imports and corrections. This counter of rows
+// written to museum_objects (inserted + updated + deleted, from Postgres' table
+// statistics) moves with every such change, so a result stored with it is current
+// for as long as the counter has not moved.
+async function dataVersion(db) {
+  const { rows } = await db.raw(
+    "SELECT (n_tup_ins + n_tup_upd + n_tup_del)::text AS v FROM pg_stat_user_tables WHERE relname = 'museum_objects'"
+  );
+  return rows[0]?.v ?? null;
+}
+
+// Results that took long to compute (a whole Smithsonian collection or country in
+// the object grid: half a million rows to read), kept until the data changes.
+const SLOW_RESULT_MS = 300;
+const RESULT_CACHE_MAX = 300;
+const resultCache = new Map(); // key → { version, value }, oldest first
+
+async function cachedUntilDataChanges(db, key, fn) {
+  const version = await dataVersion(db);
+  const hit = resultCache.get(key);
+  if (hit && hit.version === version) {
+    resultCache.delete(key); // move to the end: most recently used
+    resultCache.set(key, hit);
+    return hit.value;
+  }
+  const started = Date.now();
+  const value = await fn();
+  if (version !== null && Date.now() - started >= SLOW_RESULT_MS) {
+    resultCache.set(key, { version, value });
+    if (resultCache.size > RESULT_CACHE_MAX) resultCache.delete(resultCache.keys().next().value);
+  }
+  return value;
+}
+
+const resolverStatsCache = { value: null, version: null, pending: null };
+
 /**
  * Decade sub-buckets within a single century bucket, for the Time section's
  * expand-to-drill-down UI (matches frontend/lib/era-buckets.ts's
@@ -235,7 +290,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
    * @param {object} filters - filters.institution / filters.city / filters.country (comma-separated)
    * @returns {Promise<{ objectDateBuckets: Array, acquisitionBuckets: Array }>}
    */
-  async getDateBucketCounts(filters = {}) {
+  getDateBucketCounts(filters = {}) {
+    const key = `date-buckets:${JSON.stringify(filters)}`;
+    return singleFlight(key, () =>
+      cachedUntilDataChanges(strapi.db.connection, key, () => this._dateBucketCounts(filters)));
+  },
+
+  async _dateBucketCounts(filters = {}) {
     const db = strapi.db.connection;
     const hasFilters = !!(filters.institution || filters.city || filters.country);
 
@@ -244,6 +305,16 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     const mvReady = !hasFilters
       && await this._materializedViewExists(db, 'mv_time_bucket_stats')
       && await this._materializedViewExists(db, 'mv_acquisition_year_stats');
+    // Institution and/or country filters (no city): sums over the views' rows per
+    // institution and country (src/map-views.js), the same counts as the live query.
+    const groupedReady = hasFilters && !filters.city
+      && await this._materializedViewExists(db, 'mv_time_bucket_by_group')
+      && await this._materializedViewExists(db, 'mv_acquisition_year_by_group')
+      && await this._materializedViewExists(db, 'mv_date_span_by_group');
+    const groupInstitution = this.buildMultiValueFilter('institution_name', filters.institution, 'grp_inst');
+    const groupCountry = this.buildMultiValueFilter('country_en', filters.country, 'grp_country');
+    const groupWhere = `WHERE TRUE ${groupInstitution.clause} ${groupCountry.clause}`;
+    const groupBindings = { ...groupInstitution.bindings, ...groupCountry.bindings };
 
     if (mvReady) {
       // ── Fast path: pre-aggregated materialized views (unfiltered case only) ──
@@ -256,8 +327,23 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       acqYearRows = acqRows
         .filter((r) => r.year !== null)
         .sort((a, b) => a.year - b.year);
+    } else if (groupedReady) {
+      const timeCols = ['time_undated', 'time_exact_total', ...ERA_BUCKETS.map((b) => `time_${b.id.replace(/-/g, '_')}`)];
+      const timeResult = await db.raw(
+        `SELECT ${timeCols.map((c) => `COALESCE(SUM(${c}), 0)::bigint AS ${c}`).join(', ')}
+         FROM mv_time_bucket_by_group ${groupWhere}`,
+        groupBindings
+      );
+      timeRow = this.getRows(timeResult)[0] || {};
+      const [acqUndatedResult, acqYearsResult] = await Promise.all([
+        db.raw(`SELECT COALESCE(SUM(count), 0)::integer AS count FROM mv_acquisition_year_by_group ${groupWhere} AND NOT confirmed`, groupBindings),
+        db.raw(`SELECT year, SUM(count)::integer AS count FROM mv_acquisition_year_by_group ${groupWhere} AND confirmed
+                GROUP BY year ORDER BY year`, groupBindings),
+      ]);
+      acqUndatedCount = parseInt(this.getRows(acqUndatedResult)[0]?.count, 10) || 0;
+      acqYearRows = this.getRows(acqYearsResult);
     } else {
-      // ── Fallback: live aggregate query (filtered case, or MVs not yet
+      // ── Fallback: live aggregate query (city filter, or MVs not yet
       // created) — Time uses overlap-FILTER per bucket since object_date
       // ranges can be wide and span multiple centuries. ──
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'db_inst');
@@ -372,11 +458,16 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         ${spanCountryFilter.clause}
       GROUP BY object_date_earliest, object_date_latest
     `;
-    const spansResult = await db.raw(spansQuery, {
-      ...spanInstitutionFilter.bindings,
-      ...spanCityFilter.bindings,
-      ...spanCountryFilter.bindings,
-    });
+    const spansResult = !hasFilters && await this._materializedViewExists(db, 'mv_date_span_stats')
+      ? await db.raw('SELECT earliest, latest, count FROM mv_date_span_stats')
+      : groupedReady
+      ? await db.raw(`SELECT earliest, latest, SUM(count)::integer AS count FROM mv_date_span_by_group ${groupWhere}
+                      GROUP BY earliest, latest`, groupBindings)
+      : await db.raw(spansQuery, {
+        ...spanInstitutionFilter.bindings,
+        ...spanCityFilter.bindings,
+        ...spanCountryFilter.bindings,
+      });
     const objectDateSpans = this.getRows(spansResult).map((r) => ({
       earliest: parseInt(r.earliest, 10),
       latest: parseInt(r.latest, 10),
@@ -808,12 +899,22 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
       // SAFETY GATE: Use Named Bindings to ensure query always sees 4 bindings
       // Deduplicate by inventory_number+institution so duplicate DB rows show only once
+      // The link lookups run outside the LIMIT, for the returned rows only: inside
+      // it the planner evaluated them for every row in the bbox (48k in the eastern
+      // United States, 4 s instead of 0.6 s).
       const query = `
+        SELECT page.*,
+          (SELECT ol.link_text FROM museum_objects_components moc
+           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
+           WHERE moc.entity_id = page.id AND moc.field = 'object_links'
+           ORDER BY moc."order" LIMIT 1) as object_link_url,
+          (SELECT ol.link_display FROM museum_objects_components moc
+           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
+           WHERE moc.entity_id = page.id AND moc.field = 'object_links'
+           ORDER BY moc."order" LIMIT 1) as object_link_display
+        FROM (
         SELECT * FROM (
-          SELECT DISTINCT ON (
-            CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
-              THEN inventory_number ELSE id::text END, institution_name
-          )
+          SELECT DISTINCT ON (${DEDUP_KEY})
           id,
           object_id,
           title,
@@ -837,15 +938,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           origin_person_name,
           historical_name,
           precise_place,
-          ${manualSelect},
-          (SELECT ol.link_text FROM museum_objects_components moc
-           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
-           WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
-           ORDER BY moc."order" LIMIT 1) as object_link_url,
-          (SELECT ol.link_display FROM museum_objects_components moc
-           JOIN components_object_links_object_link_infos ol ON ol.id = moc.component_id
-           WHERE moc.entity_id = museum_objects.id AND moc.field = 'object_links'
-           ORDER BY moc."order" LIMIT 1) as object_link_display
+          ${manualSelect}
           FROM museum_objects
           WHERE published_at IS NOT NULL
             AND ${latFilter}
@@ -859,12 +952,12 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             ${countryFilter.clause}
             ${dateFilter.clause}
             ${acqDateFilter.clause}
-          ORDER BY
-            CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
-              THEN inventory_number ELSE id::text END, institution_name, id
+          ORDER BY ${DEDUP_KEY}, id
         ) deduped
         ORDER BY object_id
-        LIMIT 5000;
+        LIMIT 5000
+        ) page
+        ORDER BY object_id;
       `;
 
       // Create named bindings object
@@ -971,7 +1064,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     }));
   },
 
-  async getObjectsByCountry(country, options = {}) {
+  getObjectsByCountry(country, options = {}) {
+    const key = `by-country:${JSON.stringify([country, options])}`;
+    return singleFlight(key, () =>
+      cachedUntilDataChanges(strapi.db.connection, key, () => this._objectsByCountry(country, options)));
+  },
+
+  async _objectsByCountry(country, options = {}) {
     const db = strapi.db.connection;
     const { site, precise, institution, page = 1, pageSize = 60, onlyWithImages = false, located = false, countOnly = false } = options;
     const offset = (page - 1) * pageSize;
@@ -1026,25 +1125,18 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       whereClause += ` ${dateFilter.clause} ${acqDateFilter.clause}`;
       Object.assign(bindings, dateFilter.bindings, acqDateFilter.bindings);
 
-      // Dedup key: use inventory_number when present, else fall back to id so rows
-      // without an inventory number are never merged together.
-      const dedupKey = `CASE WHEN inventory_number IS NOT NULL AND inventory_number != ''
-          THEN inventory_number ELSE id::text END, institution_name`;
-
       // Count query — deduplicate first so the count reflects unique objects
       const countQuery = `
         SELECT COUNT(*)::integer as total FROM (
-          SELECT DISTINCT ON (${dedupKey}) id
+          SELECT DISTINCT ON (${DEDUP_KEY}) id
           FROM museum_objects
           ${whereClause}
-          ORDER BY ${dedupKey}, id
+          ORDER BY ${DEDUP_KEY}, id
         ) deduped
       `;
-      const countResult = await db.raw(countQuery, bindings);
-      const total = this.getRows(countResult)[0]?.total || 0;
-
       // Count-only callers (the MCP server) skip the much slower row query.
       if (countOnly) {
+        const total = this.getRows(await db.raw(countQuery, bindings))[0]?.total || 0;
         return { data: [], meta: { pagination: { page, pageSize, pageCount: Math.ceil(total / pageSize), total } } };
       }
 
@@ -1054,12 +1146,14 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       // matching row (33k for AIC) and made each page take 1–2 s.
       const dataQuery = `
         WITH page AS (
-          SELECT id, has_image FROM (
-            SELECT DISTINCT ON (${dedupKey}) id,
+          -- total: the deduplicated count, from the same pass (window functions run
+          -- before LIMIT), so the matching rows are deduplicated once, not twice.
+          SELECT id, has_image, COUNT(*) OVER () AS total FROM (
+            SELECT DISTINCT ON (${DEDUP_KEY}) id,
               NULLIF(BTRIM(COALESCE(img_url, '')), '') IS NOT NULL AS has_image
             FROM museum_objects
             ${whereClause}
-            ORDER BY ${dedupKey}, id
+            ORDER BY ${DEDUP_KEY}, id
           ) deduped
           -- Objects with an image first, so the grid shows images before the
           -- inventory-number tiles of objects without one.
@@ -1068,6 +1162,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         )
         SELECT
             m.id,
+            page.total,
             object_id,
             title,
             img_url,
@@ -1125,12 +1220,12 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         ORDER BY page.has_image DESC, m.id DESC
       `;
 
-      const dataResult = await db.raw(dataQuery, {
-        ...bindings,
-        limit: pageSize,
-        offset: offset,
-      });
+      const dataResult = await db.raw(dataQuery, { ...bindings, limit: pageSize, offset: offset });
       const rows = this.getRows(dataResult);
+      // A page past the end has no row to carry the total.
+      const total = rows.length
+        ? parseInt(rows[0].total, 10)
+        : this.getRows(await db.raw(countQuery, bindings))[0]?.total || 0;
 
       const pageCount = Math.ceil(total / pageSize);
 
@@ -1372,6 +1467,27 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
    * stable for the frontend.
    */
   async getResolverStats() {
+    // Every map page and the MCP overview ask for these totals, and over a million
+    // rows they take seconds to count. Served from memory while the data is
+    // unchanged; after a change the stored totals are still returned while new ones
+    // are counted in the background, so only the very first request waits.
+    const version = await dataVersion(strapi.db.connection);
+    if (!resolverStatsCache.pending && (!resolverStatsCache.value || resolverStatsCache.version !== version)) {
+      resolverStatsCache.pending = this._countResolverStats()
+        .then((value) => Object.assign(resolverStatsCache, { value, version }))
+        .catch((error) => {
+          // A failed background count keeps the stored totals; only a request
+          // with nothing stored to return sees the error.
+          if (!resolverStatsCache.value) throw error;
+        })
+        .finally(() => { resolverStatsCache.pending = null; });
+    }
+    if (resolverStatsCache.value) return resolverStatsCache.value;
+    await resolverStatsCache.pending;
+    return resolverStatsCache.value;
+  },
+
+  async _countResolverStats() {
     const db = strapi.db.connection;
     try {
       // Main per-institution aggregation (only existing columns)
@@ -1387,7 +1503,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             COUNT(CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN 1 END)::numeric
             / NULLIF(COUNT(*), 0) * 100, 1
           ) AS resolved_pct,
-          COUNT(DISTINCT country_en)::integer AS distinct_countries,
+          COUNT(DISTINCT country_en COLLATE "C")::integer AS distinct_countries,
           MIN(img_url) AS sample_img_url
         FROM museum_objects
         WHERE published_at IS NOT NULL
@@ -1397,20 +1513,18 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         ORDER BY total_objects DESC;
       `;
 
-      const result = await db.raw(query);
-      const rows = this.getRows(result);
-
       // Global totals
       const totalsQuery = `
         SELECT
           COUNT(*)::integer AS total_objects,
           COUNT(CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN 1 END)::integer AS total_geocoded,
-          COUNT(DISTINCT institution_name)::integer AS total_institutions,
-          COUNT(DISTINCT country_en)::integer AS total_countries
+          COUNT(DISTINCT institution_name COLLATE "C")::integer AS total_institutions,
+          COUNT(DISTINCT country_en COLLATE "C")::integer AS total_countries
         FROM museum_objects
         WHERE published_at IS NOT NULL;
       `;
-      const totalsResult = await db.raw(totalsQuery);
+      const [result, totalsResult] = await Promise.all([db.raw(query), db.raw(totalsQuery)]);
+      const rows = this.getRows(result);
       const totals = this.getRows(totalsResult)[0] || {};
 
       // Compute a simple "confidence" proxy: geocoded_pct / 100
@@ -1977,8 +2091,44 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           LIMIT :limit
         `, { tsQuery, limit: safeLimit });
         rows = this.getRows(result);
+      } else if (await this._materializedViewExists(db, 'mv_place_suggest')) {
+        // The live query below, answered from the pre-grouped rows of
+        // mv_place_suggest (src/index.js): the same matches, counts and points.
+        // The site's name is its most frequent display name among the matches,
+        // as mode() picks it.
+        const result = await db.raw(`
+          WITH m AS (
+            SELECT * FROM mv_place_suggest
+            WHERE LOWER(place_name) LIKE :prefix
+               OR LOWER(place_name_normalized) LIKE :prefix
+               OR LOWER(country_en) LIKE :prefix
+               OR LOWER(city_en) LIKE :prefix
+          ),
+          names AS (
+            SELECT DISTINCT ON (place_key, country_en) place_key, country_en, display_name
+            FROM (
+              SELECT place_key, country_en, display_name, SUM(object_count) AS n
+              FROM m GROUP BY place_key, country_en, display_name
+            ) d
+            ORDER BY place_key, country_en, n DESC, display_name
+          )
+          SELECT names.display_name AS place_name, g.country_en, g.city_en, g.latitude, g.longitude, g.object_count
+          FROM (
+            SELECT place_key, country_en,
+                   MIN(city_en)                        AS city_en,
+                   SUM(sum_lat) / NULLIF(SUM(n_lat), 0) AS latitude,
+                   SUM(sum_lon) / NULLIF(SUM(n_lon), 0) AS longitude,
+                   SUM(object_count)                   AS object_count
+            FROM m GROUP BY place_key, country_en
+          ) g
+          JOIN names ON names.place_key = g.place_key
+                    AND names.country_en IS NOT DISTINCT FROM g.country_en
+          ORDER BY g.object_count DESC
+          LIMIT :limit
+        `, { prefix: `${cleanQuery.toLowerCase()}%`, limit: safeLimit });
+        rows = this.getRows(result);
       } else {
-        // Fallback: ILIKE on key columns before migration is applied
+        // Fallback: ILIKE on key columns before the view exists
         const result = await db.raw(`
           SELECT
             mode() WITHIN GROUP (ORDER BY ${PLACE_DISPLAY_EXPR}) AS place_name,
@@ -1994,11 +2144,15 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             OR country_en ILIKE :pattern
             OR city_en ILIKE :pattern
           )
+            -- Implied by the prefix match above (all four fields are in the search
+            -- text), and the object search's trigram index (migration 017) can
+            -- answer it, so the match needs no scan of every row.
+            AND ${OBJECT_SEARCH_TEXT} LIKE :contains
             AND place_name IS NOT NULL
           GROUP BY ${PLACE_GROUP_KEY}, country_en
           ORDER BY object_count DESC
           LIMIT :limit
-        `, { pattern: `${cleanQuery}%`, limit: safeLimit });
+        `, { pattern: `${cleanQuery}%`, contains: `%${cleanQuery.toLowerCase()}%`, limit: safeLimit });
         rows = this.getRows(result);
       }
 

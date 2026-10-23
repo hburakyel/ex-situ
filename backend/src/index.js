@@ -7,8 +7,8 @@
  * Post-boot: ensure the columns + all dependent objects exist.
  */
 
-const { buildEraBuckets } = require('./api/museum-object/services/era-buckets');
-const { PLACE_GROUP_EXPR, PLACE_GROUP_KEY, PLACE_DISPLAY_EXPR, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG } = require('./api/museum-object/services/place-group');
+const { viewFingerprints, FINGERPRINT_TABLE_SQL } = require('../scripts/view-fingerprint');
+const { ensureMapViews } = require('./map-views');
 
 const DROP_DEPENDENCIES_SQL = `
   DROP INDEX IF EXISTS idx_museum_objects_resolved_lat;
@@ -57,126 +57,6 @@ const RESTORE_DEPENDENCIES_SQL = `
       );
 `;
 
-const MV_COUNTRY_SQL = `
-  CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_country_institution_stats AS
-  SELECT
-      COALESCE(NULLIF(country_en::text, ''), 'Unknown') AS origin_country,
-      avg(COALESCE(manual_latitude, latitude))          AS origin_lat,
-      avg(COALESCE(manual_longitude, longitude))        AS origin_lon,
-      institution_name,
-      avg(institution_latitude)                         AS inst_lat,
-      avg(institution_longitude)                        AS inst_lon,
-      COUNT(DISTINCT CASE
-          WHEN inventory_number IS NOT NULL AND inventory_number != ''
-          THEN inventory_number ELSE id::text END)::integer AS object_count,
-      min(img_url)                                      AS sample_img_url
-  FROM museum_objects
-  WHERE
-      published_at IS NOT NULL
-      AND (manual_latitude IS NOT NULL OR latitude IS NOT NULL)
-      AND (manual_longitude IS NOT NULL OR longitude IS NOT NULL)
-      AND institution_latitude IS NOT NULL
-      AND institution_longitude IS NOT NULL
-      AND country_en IS NOT NULL
-      AND country_en::text <> ''
-      AND institution_name IS NOT NULL
-  GROUP BY
-      COALESCE(NULLIF(country_en::text, ''), 'Unknown'),
-      institution_name
-  WITH DATA;
-`;
-
-// Origin place grouping is shared with getClusteredData — see place-group.js.
-const MV_CITY_SQL = `
-  CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_city_institution_stats AS
-  SELECT
-      mode() WITHIN GROUP (ORDER BY ${PLACE_DISPLAY_EXPR}) AS origin_city,
-      ${PLACE_VARIANTS_AGG}                      AS place_variants,
-      ${HISTORICAL_NAMES_AGG}                    AS historical_names,
-      country_en,
-      avg(COALESCE(manual_latitude, latitude))   AS origin_lat,
-      avg(COALESCE(manual_longitude, longitude)) AS origin_lon,
-      institution_name,
-      avg(institution_latitude)                  AS inst_lat,
-      avg(institution_longitude)                 AS inst_lon,
-      COUNT(DISTINCT CASE
-          WHEN inventory_number IS NOT NULL AND inventory_number != ''
-          THEN inventory_number ELSE id::text END)::integer AS object_count,
-      min(img_url)                               AS sample_img_url,
-      min(COALESCE(manual_latitude, latitude))   AS min_lat,
-      max(COALESCE(manual_latitude, latitude))   AS max_lat,
-      min(COALESCE(manual_longitude, longitude)) AS min_lon,
-      max(COALESCE(manual_longitude, longitude)) AS max_lon
-  FROM museum_objects
-  WHERE
-      published_at IS NOT NULL
-      AND (manual_latitude IS NOT NULL OR latitude IS NOT NULL)
-      AND (manual_longitude IS NOT NULL OR longitude IS NOT NULL)
-      AND institution_latitude IS NOT NULL
-      AND institution_longitude IS NOT NULL
-      AND institution_name IS NOT NULL
-  GROUP BY
-      ${PLACE_GROUP_KEY},
-      country_en,
-      institution_name
-  WITH DATA;
-`;
-
-// ── Time/Migration ("date bucket") stats — fast path for getDateBucketCounts
-// when no institution/city/country filter is active. Mirrors the shape of
-// the live aggregate query in services/museum-object.js exactly, built from
-// the same buildEraBuckets() list so the two never drift out of sync. ──
-const ERA_BUCKETS = buildEraBuckets(new Date().getFullYear());
-
-const MV_TIME_SQL = (() => {
-  const selects = [
-    `COUNT(*) FILTER (WHERE object_date_precision = 'unknown') AS time_undated`,
-    `COUNT(*) FILTER (WHERE object_date_precision = 'exact') AS time_exact_total`,
-  ];
-  for (const bucket of ERA_BUCKETS) {
-    const overlapConds = [];
-    if (bucket.end !== null) overlapConds.push(`object_date_earliest <= ${bucket.end}`);
-    if (bucket.start !== null) overlapConds.push(`object_date_latest >= ${bucket.start}`);
-    selects.push(`COUNT(*) FILTER (WHERE ${overlapConds.join(' AND ')}) AS time_${bucket.id.replace(/-/g, '_')}`);
-  }
-  return `
-  CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_time_bucket_stats AS
-  SELECT ${selects.join(',\n      ')}
-  FROM museum_objects
-  WHERE published_at IS NOT NULL
-  WITH DATA;
-`;
-})();
-
-// One row per acquisition year (year IS NULL represents the "Unknown"
-// bucket — everything not acquisition_date_confidence = 'confirmed').
-const MV_ACQUISITION_YEAR_SQL = `
-  CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_acquisition_year_stats AS
-  SELECT acquisition_year_earliest AS year, COUNT(*)::integer AS count
-  FROM museum_objects
-  WHERE published_at IS NOT NULL AND acquisition_date_confidence = 'confirmed'
-  GROUP BY acquisition_year_earliest
-  UNION ALL
-  SELECT NULL::integer AS year, COUNT(*)::integer AS count
-  FROM museum_objects
-  WHERE published_at IS NOT NULL AND acquisition_date_confidence IS DISTINCT FROM 'confirmed'
-  WITH DATA;
-`;
-
-// Called after data imports (services/museum-object.js refreshGeospatialViews,
-// etl/normalize_country_names.py). Not CONCURRENTLY: the views have no unique
-// index, so a concurrent refresh always failed; a plain refresh takes about
-// two seconds and only holds readers of these two views for that long.
-const REFRESH_FUNCTION_SQL = `
-  CREATE OR REPLACE FUNCTION public.refresh_geospatial_views() RETURNS void
-  LANGUAGE plpgsql AS $$
-  BEGIN
-    REFRESH MATERIALIZED VIEW public.mv_country_institution_stats;
-    REFRESH MATERIALIZED VIEW public.mv_city_institution_stats;
-  END;
-  $$;
-`;
-
 module.exports = {
   register() {},
 
@@ -197,29 +77,23 @@ module.exports = {
       }
 
       // 2. Ensure materialized views
-      const [{ exists: mvCountry }] = (await db.raw(
-        "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_country_institution_stats') AS exists"
-      )).rows;
-      if (!mvCountry) await db.raw(MV_COUNTRY_SQL);
+      await ensureMapViews(db);
 
-      const [{ exists: mvCity }] = (await db.raw(
-        "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_city_institution_stats') AS exists"
-      )).rows;
-      if (!mvCity) await db.raw(MV_CITY_SQL);
-
-      const [{ exists: mvTime }] = (await db.raw(
-        "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_time_bucket_stats') AS exists"
-      )).rows;
-      if (!mvTime) await db.raw(MV_TIME_SQL);
-
-      const [{ exists: mvAcqYear }] = (await db.raw(
-        "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_acquisition_year_stats') AS exists"
-      )).rows;
-      if (!mvAcqYear) await db.raw(MV_ACQUISITION_YEAR_SQL);
-
-      await db.raw(REFRESH_FUNCTION_SQL);
+      // Built from this code: the next start keeps them unless it changes.
+      await db.raw(FINGERPRINT_TABLE_SQL);
+      const fp = viewFingerprints();
+      await db.raw(
+        `INSERT INTO public.exsitu_view_state (id, views_fp, schema_fp) VALUES (1, :views, :schema)
+         ON CONFLICT (id) DO UPDATE SET views_fp = EXCLUDED.views_fp, schema_fp = EXCLUDED.schema_fp, built_at = now()`,
+        fp
+      );
 
       strapi.log.info('[lifecycle] Restored manual-coord columns + dependent objects (post-sync)');
+
+      // Count the totals every map page asks for now, in the background, so the
+      // first visitors after a restart don't wait for them.
+      strapi.service('api::museum-object.museum-object').getResolverStats()
+        .catch((err) => strapi.log.warn(`[bootstrap] resolver stats not counted: ${err.message}`));
     } catch (err) {
       strapi.log.error('[lifecycle] Failed to restore dependencies:', err.message);
     }

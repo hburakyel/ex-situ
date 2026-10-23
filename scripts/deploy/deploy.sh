@@ -6,8 +6,10 @@
 #   old=$(git rev-parse HEAD) && git fetch origin main && git reset --hard origin/main \
 #     && bash scripts/deploy/deploy.sh "$old" "$(git rev-parse HEAD)"
 #
-#   backend changed  → database backup, npm ci if deps changed, restart Strapi,
-#                      wait until the map API answers again (~2 min: map views rebuild)
+#   backend changed  → database backup, npm ci if deps changed, map views rebuilt
+#                      beside the live ones if their definitions changed, restart
+#                      Strapi, wait until the map API answers again (seconds; minutes
+#                      only when Strapi's schemas changed: the views rebuild at start)
 #   frontend changed → build into the inactive of .next-a/.next-b while the site
 #                      keeps serving the current build, switch, health check,
 #                      switch back if the new build doesn't answer
@@ -67,7 +69,14 @@ if $backend; then
     log "admin panel changed → strapi build"
     (cd backend && npm run build >/dev/null)
   fi
-  log "restarting backend (map API is unavailable while the map views rebuild)"
+  # New map view definitions are built beside the live views while the running
+  # backend keeps serving, then swapped in; the restart then keeps them and the API
+  # is back in seconds. A Strapi schema change still rebuilds them at startup.
+  schema_flag=--schema-unchanged
+  has '^backend/src/(api/[^/]+/content-types|components)/' && schema_flag=
+  log "map views: rebuild beside the live ones if their definitions changed"
+  node backend/scripts/rebuild-map-views.js --if-changed $schema_flag
+  log "restarting backend"
   pm2 restart exsitu-backend >/dev/null
   if ! wait_for "$API/api/museum-objects/geospatial?zoom=2" 600; then
     log "ERROR: backend did not answer within 10 minutes — check: pm2 logs exsitu-backend"
