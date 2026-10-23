@@ -13,7 +13,7 @@
     "delete-entries": "node ./scripts/deleteAllEntries.js",
     "publish-entries": "node ./scripts/publishAllEntries.js",
     "setup-postgis": "node ./scripts/setupPostGIS.js",
-    "test": "node --test tests/"
+    "test": "node --test \"tests/*.test.js\""
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
@@ -24,7 +24,7 @@
     "@strapi/plugin-users-permissions": "^4.26.2",
     "@strapi/strapi": "^4.26.2",
     "axios": "^1.20.0",
-    "better-sqlite3": "8.6.0",
+    "better-sqlite3": "11.10.0",
     "pg": "^8.13.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
@@ -39,7 +39,7 @@
     "uuid": "13444a80-c460-46a8-a41d-593817da0e01"
   },
   "engines": {
-    "node": ">=18.0.0 <=20.x.x",
+    "node": ">=22.0.0 <=22.x.x",
     "npm": ">=6.0.0"
   },
   "license": "AGPL-3.0",
