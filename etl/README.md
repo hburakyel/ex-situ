@@ -13,6 +13,8 @@ etl/
 ├── scrape_vam.py              # Victoria and Albert Museum resolver
 ├── scrape_aic_api.py          # Art Institute of Chicago resolver
 ├── scrape_europeana.py        # Europeana resolver — institutions via Europeana, non-European origins only
+├── scrape_si.py               # Smithsonian Open Access resolver — Asian Art, American Indian, NMNH Anthropology
+├── si_points.py               # Smithsonian: county, state and place points from GeoNames allCountries
 ├── check_europeana_images.py  # Finds Europeana image URLs that do not load (objects are left out)
 ├── backfill_europeana_fields.py # After import: country/city, museum locality, licence, inventory number
 ├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
@@ -101,6 +103,34 @@ python scrape_europeana.py --apply --finalize-only # rebuild from the last scan,
 (images that fail in a browser: TIFF, viewer pages, 404/403, hotlink-blocked). Then import with
 `backend/scripts/importData.js` (copy the output to `data/museum_objects.json`), run
 `backfill_europeana_fields.py --apply`, and restart Strapi.
+
+### Smithsonian Open Access
+
+**Not imported (2026-10-23).** The open data links almost no photographs: none for NMNH
+Anthropology, and the American Indian museum's few CC0 photographs are of its "Non-Indian"
+records. The museums' own pages show photographs under the Smithsonian's usage conditions, but
+neither the bulk files nor the Open Access API (api.si.edu) link to them. The resolver is kept for
+a later source of image links.
+
+`scrape_si.py` reads the Smithsonian's CC0 bulk metadata on AWS (no API key) for three units:
+`fsg` (National Museum of Asian Art), `nmai` (National Museum of the American Indian) and
+`nmnhanthro` (NMNH Anthropology). Origin is the record's geoLocation (country → state → county →
+city), resolved by exact GeoNames lookup; a point only for a uniquely named town. Korea, Tibet and
+multi-country places go to `si_flagged.json` for review. Asian Art objects of US or European origin
+(the Freer's American paintings) are left out. Only CC0 images are linked.
+
+```bash
+python scrape_si.py --unit fsg --limit 20     # dry run, sample
+python scrape_si.py --apply                   # all units → si_objects.json (+ si_flagged.json); ~1.9 GB cached in si_cache/
+python si_points.py                           # dry run: point levels, si_points_review.json sample
+python si_points.py --apply                   # → si_objects_points.json
+```
+
+Most NMNH and American Indian origins name a county or a state, not a town. `si_points.py` places
+every record by exact name in GeoNames allCountries (`data/gazetteer/allcountries/allCountries.zip`,
+download from download.geonames.org): town or site inside the record's state and county, else the
+county, else the state; the label is the matched GeoNames name, with the state added for names that
+occur in several states ("Bethel, Alaska"). Country-only records get no point here.
 
 Common flags available on all resolvers:
 

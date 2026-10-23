@@ -49,6 +49,14 @@ SUPRANATIONAL = {
 }
 
 
+# A Smithsonian place_name is only the finest level of the record's place
+# hierarchy; import_si.py keeps the whole hierarchy in geocoding_notes
+# ("[si] place_source=si geoLocation (nmai) | Lebanon, Warren County, Ohio, USA: city").
+SOURCE_PLACE_SQL = (
+    r"substring(geocoding_notes from '^\[si\] place_source=si geoLocation \([^)]*\) \| ([^|]+): (?:city|region|country)')"
+)
+
+
 def effective(lat, lon):
     return (lat, lon) if lat is not None and lon is not None else None
 
@@ -102,8 +110,16 @@ class Classifier:
         parts = [p.strip(" ?)").strip() for p in re.split(r"[,(;]", raw or "") if p.strip(" ?)").strip()]
         return {self.label_names[country_key(p)] for p in parts if country_key(p) in self.label_names}
 
-    def classify(self, raw, label, country, pt):
-        """[(check, finding, named countries)] for one origin."""
+    def in_source_country(self, source, pt):
+        """Does the point lie in a country the record's own place hierarchy names?
+        A town or state named like a country (Lebanon, Ohio; the state of Georgia)
+        is then no country name."""
+        named = self.named_countries(re.sub(r"\bUSA\b", "United States", source or ""))
+        return any(self.inside(cc, pt) for cc in {self.name_to_cc.get(c) for c in named} - {None})
+
+    def classify(self, raw, label, country, pt, source=None):
+        """[(check, finding, named countries)] for one origin; source is the record's
+        full place hierarchy when place_name holds only its finest level."""
         out = []
         raw = raw or ""
         named = self.named_countries(raw)
@@ -112,6 +128,8 @@ class Classifier:
         if pt and named:
             named_cc = {self.name_to_cc.get(c) for c in named} - {None}
             if named_cc and not any(self.inside(cc, pt) for cc in named_cc):
+                if source and self.in_source_country(source, pt):
+                    return out
                 out.append(("named_country", "coordinates outside " + "/".join(sorted(named)), named))
             elif have not in named:
                 out.append(("named_country", "country_en should be " + "/".join(sorted(named)), named))
@@ -138,17 +156,18 @@ def main():
     cur.execute(
         """SELECT institution_name, place_name, place_name_normalized, country_en,
                   ROUND(COALESCE(manual_latitude, latitude)::numeric, 3)::float,
-                  ROUND(COALESCE(manual_longitude, longitude)::numeric, 3)::float, COUNT(*)
+                  ROUND(COALESCE(manual_longitude, longitude)::numeric, 3)::float,
+                  """ + SOURCE_PLACE_SQL + """, COUNT(*)
            FROM museum_objects
            WHERE published_at IS NOT NULL AND COALESCE(review_status, '') <> 'verified'
-           GROUP BY 1, 2, 3, 4, 5, 6"""
+           GROUP BY 1, 2, 3, 4, 5, 6, 7"""
     )
     rows = cur.fetchall()
     conn.close()
 
     found = defaultdict(list)
-    for inst, raw, label, country, lat, lon, n in rows:
-        for check, finding, _ in classifier.classify(raw, label, country, effective(lat, lon)):
+    for inst, raw, label, country, lat, lon, source, n in rows:
+        for check, finding, _ in classifier.classify(raw, label, country, effective(lat, lon), source):
             found[check].append((n, inst, raw or "", country, lat, lon, finding))
 
     print("Origin data quality — rows grouped by (institution, place, label, country, point)\n")

@@ -59,6 +59,15 @@ etl/smb_*.json
 etl/met_*.json
 etl/europeana_*.json
 etl/rijks_*.json
+etl/wmw_*.json
+!etl/wmw_countries.json
+etl/wmw_*.csv
+etl/wmw_fetch.log
+etl/si_*.json
+etl/si_cache/
+etl/si_fetch.log
+etl/si_points.log
+etl/si_import.log
 etl/walters_*.json
 etl/walters_cache/
 etl/updated_*.json

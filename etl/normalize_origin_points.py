@@ -32,7 +32,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import date
 
-from audit_data_quality import Classifier, effective
+from audit_data_quality import SOURCE_PLACE_SQL, Classifier, effective
 from audit_places import get_conn
 
 NOTE_TAG = "[origin-audit]"
@@ -97,7 +97,6 @@ def un_country(lat, lon, country, label=None):
 # for these place_name values, mostly because the point is right.
 SKIP = {
     "Cook Islands, Cook Islands",  # point in the Cook Islands; GeoNames' town extent is too small
-    "New Caledonia",               # likewise (outlying islands)
     "Niger (Fluss)",               # the Niger river, not the country; left for review
     "Sbaita, Palestine",           # Shivta in the Negev; the source uses the historical region name
     "Herat, Iran",                 # Herat (Afghanistan); a historical Khurasan attribution
@@ -116,6 +115,7 @@ COUNTRY = {
     "Bahrain (Swat)": "Pakistan",  # Bahrain, a town in the Swat valley; the point is right
     "Faras (Sudan)": "Sudan",      # Faras, on the Sudanese side of the border; the point is right
     "Malaysia": "Malaysia",        # country point at sea between Malaya and Borneo
+    "New Caledonia": "New Caledonia",  # point in New Caledonia (outlying islands beyond GeoNames' town extent)
 }
 AREA = {
     "Guinea (Region)",             # the Guinea coast region, not the country Guinea
@@ -131,7 +131,8 @@ def note(*columns):
 def plan(cur, classifier):
     """{(action, value): [ids]} and example place names per action."""
     cur.execute(
-        """SELECT id, place_name, place_name_normalized, country_en, latitude, longitude
+        """SELECT id, place_name, place_name_normalized, country_en, latitude, longitude,
+                  """ + SOURCE_PLACE_SQL + """
            FROM museum_objects
            WHERE published_at IS NOT NULL AND COALESCE(review_status, '') <> 'verified'
              AND manual_latitude IS NULL AND manual_longitude IS NULL
@@ -140,7 +141,7 @@ def plan(cur, classifier):
     actions = defaultdict(list)
     examples = defaultdict(Counter)
     cache = {}
-    for oid, raw, label, country, lat, lon in cur.fetchall():
+    for oid, raw, label, country, lat, lon, source in cur.fetchall():
         raw = raw or ""
         un = un_country(lat, lon, country, label or raw)
         if un:
@@ -159,9 +160,9 @@ def plan(cur, classifier):
                 actions[("country", COUNTRY[raw])].append(oid)
                 examples["country"][raw] += 1
             continue
-        k = (raw, label, country, round(lat, 3), round(lon, 3))
+        k = (raw, label, country, round(lat, 3), round(lon, 3), source)
         if k not in cache:
-            cache[k] = classifier.classify(raw, label, country, effective(*k[3:]))
+            cache[k] = classifier.classify(raw, label, country, effective(*k[3:5]), source)
         found = {check: (finding, named) for check, finding, named in cache[k]}
         if "supranational" in found:
             actions[("area", None)].append(oid)
@@ -195,7 +196,12 @@ def apply(cur, actions):
             )
         elif action == "area":
             cur.execute(
-                f"""UPDATE museum_objects SET {note('latitude', 'longitude', 'country_en')},
+                # A label that names the row's country (an import labels a place it could not
+                # locate with its country: "Caucasus" → "Russia") gives way to the area's own name.
+                f"""UPDATE museum_objects SET {note('latitude', 'longitude', 'country_en', 'place_name_normalized')},
+                      place_name_normalized = CASE
+                        WHEN rtrim(place_name_normalized, CHR(63)) = country_en THEN place_name
+                        ELSE place_name_normalized END,
                       latitude = NULL, longitude = NULL, country_en = NULL,
                       origin_type = 'cultural_area', geocoding_status = 'ambiguous'
                     WHERE id = ANY(%s)""",
