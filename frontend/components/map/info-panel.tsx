@@ -5,6 +5,7 @@ import React from "react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Globe, Info, Search } from "lucide-react"
+import { useScrollFades } from "@/hooks/use-scroll-fades"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { IconClose, IconMinimize } from "@/components/icons"
 import SearchBar from "./search-bar"
@@ -33,18 +34,18 @@ const PANEL_TOP_FADE_STYLE = {
 const formatCount = (n: number) => n.toLocaleString("en-US")
 
 // Mobile drill-down section header (Places / Sites / Time / Collections): the whole
-// row toggles, not just the chevron. It keeps the old 32px look; an invisible
-// extension above and below makes the touch target 44px.
+// row toggles, and the chevron sits right after the label. An invisible
+// extension above and below makes the 32px row a 44px touch target.
 function SectionToggle({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
-      className="relative flex w-full h-8 items-center justify-between text-left before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-['']"
+      className="relative flex w-full h-8 items-center gap-1 text-left before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-['']"
       onClick={onToggle}
       aria-expanded={open}
     >
       <span className="panel-text-muted">{children}</span>
-      {open ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+      {open ? <ChevronUp className="h-4 w-4 text-gray-600" /> : <ChevronDown className="h-4 w-4 text-gray-600" />}
     </button>
   )
 }
@@ -64,8 +65,8 @@ function SectionHeader({ columns, open, onToggle, children }: { columns?: boolea
 export function AboutText() {
   return (
     <>
-      <p className="mb-2.5 text-[#555]">
-        Ex Situ is an open-source spatial index of the migration of cultural artifacts. Each artifact is an arc from its place of origin to the institution that holds it today. Ex Situ does not host images or copy records. Every arc links back to the institution&rsquo;s own page. The index shows what museum records state. Many objects have no located origin, and some locations are uncertain.
+      <p className="mb-2.5">
+        Ex Situ is an open-source spatial index that maps cultural artifacts from their place of origin to the institution that holds them today. Each artifact is drawn as an arc that links back to the institution&rsquo;s own page. Ex Situ does not host images or copy records. The index shows what museum records state. Many artifacts have no located origin, and some locations are uncertain.
       </p>
       <p>
         <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" className="text-link">GitHub ↗</a>
@@ -77,21 +78,26 @@ export function AboutText() {
 }
 
 function FadedAccordionList({ children }: { children: React.ReactNode }) {
+  const { ref, fades } = useScrollFades<HTMLDivElement>()
   return (
     <div className="relative">
-      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-4">
+      <div ref={ref} className="max-h-40 overflow-y-auto pr-1 pb-4">
         {children}
       </div>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-5"
-        style={PANEL_TOP_FADE_STYLE}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
-        style={PANEL_BOTTOM_FADE_STYLE}
-      />
+      {fades.top && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-5"
+          style={PANEL_TOP_FADE_STYLE}
+        />
+      )}
+      {fades.bottom && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+          style={PANEL_BOTTOM_FADE_STYLE}
+        />
+      )}
     </div>
   )
 }
@@ -219,6 +225,39 @@ export default function InfoPanel({
       ? activeSite
       : (activeCountry || '')
 
+  // Breadcrumb segments; `offset` keeps the original index when the trail is split.
+  const renderTrail = (segs: typeof breadcrumb, offset: number) => segs.map((seg, k) => {
+    const i = k + offset
+    const isLast = i === breadcrumb.length - 1
+    return (
+      <span
+        key={i}
+        className={`flex items-center ${isLast ? "min-w-0 overflow-hidden" : "flex-shrink-0"}`}
+      >
+        {k > 0 && <span className="text-black/30 mx-1 flex-shrink-0">/</span>}
+        {isLast ? (
+          <span
+            className="text-black font-medium truncate"
+            title={seg.label}
+          >
+            {seg.label}
+          </span>
+        ) : (
+          <button
+            className="text-black hover:underline transition-colors whitespace-nowrap flex-shrink-0"
+            onClick={() => onBreadcrumbClick?.(seg.level)}
+            title={seg.label}
+          >
+            {seg.label}
+          </button>
+        )}
+      </span>
+    )
+  })
+  // Phones: "Ex Situ" stays beside the icons and the drill-down path gets its own
+  // line below, so a long site or collection name isn't cut to a few letters.
+  const splitTrail = mobileVariant === "drill" && !sectionColumns && breadcrumb.length > 1
+
   return (
     <div className={`${
       mobileVariant === "summary" ? "px-4 py-0"
@@ -230,37 +269,11 @@ export default function InfoPanel({
       {breadcrumb.length > 0 && (
         <div className="flex py-1 items-center justify-between gap-2 pb-1.5">
           <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm">
-            {breadcrumb.map((seg, i) => {
-              const isLast = i === breadcrumb.length - 1
-              return (
-                <span
-                  key={i}
-                  className={`flex items-center ${isLast ? "min-w-0 overflow-hidden" : "flex-shrink-0"}`}
-                >
-                  {i > 0 && <span className="text-black/30 mx-1 flex-shrink-0">/</span>}
-                  {isLast ? (
-                    <span
-                      className="text-black font-medium truncate"
-                      title={seg.label}
-                    >
-                      {seg.label}
-                    </span>
-                  ) : (
-                    <button
-                      className="text-black/60 hover:text-black hover:underline transition-colors whitespace-nowrap flex-shrink-0"
-                      onClick={() => onBreadcrumbClick?.(seg.level)}
-                      title={seg.label}
-                    >
-                      {seg.label}
-                    </button>
-                  )}
-                </span>
-              )
-            })}
+            {renderTrail(splitTrail ? breadcrumb.slice(0, 1) : breadcrumb, 0)}
           </div>
           {/* About — on phones this replaces the map's info control */}
           {mobileVariant === "drill" && onAboutToggle && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onAboutToggle}
+            <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${aboutOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onAboutToggle}
               title="About" aria-label="About" aria-expanded={aboutOpen}
             >
               <Info className={`w-5 h-5 ${aboutOpen ? "text-black" : "text-gray-500"}`} />
@@ -269,24 +282,24 @@ export default function InfoPanel({
           {mobileVariant === "drill" && !onAboutToggle && (
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" title="About" aria-label="About">
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 data-[state=open]:bg-gray-200" title="About" aria-label="About">
                   <Info className="w-5 h-5 text-gray-500" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-64 rounded-xl text-[13px] leading-normal text-[#333]">
+              <PopoverContent align="end" className="w-64 rounded-xl text-[13px] leading-normal">
                 <AboutText />
               </PopoverContent>
             </Popover>
           )}
           {mobileVariant === "drill" && onMapToggle && mapToggle !== "collapse" && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onMapToggle}
+            <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${mapOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onMapToggle}
               title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
             >
               <Globe className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
             </Button>
           )}
           {mobileVariant === "drill" && onInfoToggle && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onInfoToggle}
+            <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${infoOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onInfoToggle}
               title={infoOpen ? "Hide search and lists" : "Search and lists"} aria-label={infoOpen ? "Hide search and lists" : "Search and lists"} aria-pressed={infoOpen}
             >
               <Search className={`w-5 h-5 ${infoOpen ? "text-black" : "text-gray-500"}`} />
@@ -304,9 +317,14 @@ export default function InfoPanel({
           )}
         </div>
       )}
+      {splitTrail && (
+        <div className="flex items-center min-w-0 overflow-hidden text-sm pb-1.5">
+          {renderTrail(breadcrumb.slice(1), 1)}
+        </div>
+      )}
 
       {mobileVariant === "drill" && aboutOpen && (
-        <div className="pt-1 pb-2 text-[13px] leading-normal text-[#333]">
+        <div className="pt-1 pb-2 text-[13px] leading-normal">
                 <AboutText />
         </div>
       )}
@@ -336,14 +354,7 @@ export default function InfoPanel({
                   <>
                     <span className="inline-block whitespace-nowrap">
                       <span className="text-black font-medium">{formatCount(totalCount)}</span>
-                      <span className="ml-1">artifact{totalCount !== 1 ? "s" : ""}</span>
-                    </span>
-                    <span>
-                      {drillLevel === "global"
-                        ? (collectionCount > 0 ? ` from ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "")
-                        : drillInstitutions.length > 0
-                          ? ` · ${drillInstitutions.length} collection${drillInstitutions.length !== 1 ? "s" : ""}`
-                          : ""}
+                      <span className="ml-1">indexed artifact{totalCount !== 1 ? "s" : ""}</span>
                     </span>
                     {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </>
@@ -383,7 +394,7 @@ export default function InfoPanel({
                   {showOrigins && (
                     <FadedAccordionList>
                         {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5"
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
@@ -407,7 +418,7 @@ export default function InfoPanel({
                         {groupedSites.map((site, index) => (
                           <React.Fragment key={index}>
                           <div
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeSite === site.name ? "bg-gray-300" : ""}`}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
                             <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
@@ -439,7 +450,7 @@ export default function InfoPanel({
                           .filter((row) => row.count > 0)
                           .map((row) => (
                             <div key={row.id}
-                              className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
+                              className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-300" : ""}`}
                               onClick={() => onToggleEra?.(row.era)}
                             >
                               <span className="truncate max-w-[70%]" title={row.label}>{row.label}</span>
@@ -461,7 +472,7 @@ export default function InfoPanel({
                     <FadedAccordionList>
                         {drillInstitutions.map((inst, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-0 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeInstitution === inst.name ? "bg-gray-300" : ""}`}
                             onClick={() => onToggleInstitution?.(inst.name)}
                           >
                             <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>

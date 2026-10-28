@@ -13,6 +13,7 @@
 // - id.smb.museum: hotlink-blocks headerless requests; proxied for the same reason.
 // - www.weltmuseumwien.at: /pics/ files are the full-size scans (often 300 KB+) and
 //   the page's own thumbnails have hashed names; proxied so tiles are resized.
+// - ids.si.edu (Smithsonian): stored URLs have no size; "max" asks for a web-sized one.
 // - recherche.smb.museum: dead (301 to the homepage). Rows not yet remapped by
 //   etl/refetch_smb_image_urls.py point there; the same asset lives on
 //   search.smb.museum (see smbSearchUrl).
@@ -63,6 +64,13 @@ export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): strin
     // (RP-F-F01141-AV is 970px). "!w,h" fits within the box and works for every size.
     const box = width <= THUMB_WIDTH ? 600 : 1000
     url.pathname = url.pathname.replace(/\/full\/\d+,\//, `/full/!${box},${box}/`)
+    return url.toString()
+  }
+
+  if (url.hostname === "ids.si.edu") {
+    // Smithsonian IDS: stored URLs carry no size and return the full image; "max"
+    // caps the longer side (it does not upscale).
+    url.searchParams.set("max", String(width <= THUMB_WIDTH ? 600 : 1000))
     return url.toString()
   }
 

@@ -40,7 +40,7 @@
     --panel-bg: 0 0% 100%;
     --panel-border: 0 0% 90%;
     --panel-text: 0 0% 0%;
-    --panel-text-muted: 0 0% 45%;
+    --panel-text-muted: 0 0% 36%;
     --panel-backdrop: 0 0% 100% / 0.9;
     /* Text links: the same blue as a grid tile's hover/selected ring (blue-500). */
     --link: 217.2 91.2% 59.8%;
@@ -60,12 +60,13 @@
   background-color: white !important;
 }
 
+/* Fills the frame (object-fit: contain), exactly like the thumbnail shown while it
+   loads: sized at its natural size instead, a smaller image first showed big (the
+   stretched thumbnail) and then shrank. */
 .gallery-image-bg img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  width: auto;
-  height: auto;
   display: block;
   margin: auto;
 }
@@ -87,6 +88,8 @@
 
   /* Optimize font rendering */
   html {
+    /* rem base: 15px (was 14px from the `*` rule), so text reads a little larger. */
+    font-size: 15px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -457,19 +460,6 @@ img {
 /* Hide attribution controls */
 .maplibregl-ctrl-attrib {
   display: none !important;
-}
-
-/* Desktop: bottom-left controls */
-.maplibregl-ctrl-bottom-left {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  gap: 10px !important;
-  margin: 0 0 40px 40px !important;
-}
-
-.maplibregl-ctrl-bottom-left .maplibregl-ctrl {
-  margin: 0 !important;
 }
 
 /* Mobile: top-right controls */

@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
-import { ChevronDown, ChevronUp, Check, FileText, FileJson, Loader2 } from "lucide-react"
-import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconPanelOpen, IconGridSize } from "@/components/icons"
+import { ChevronDown, ChevronUp, Check, FileText, FileJson, Loader2, List } from "lucide-react"
+import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconGridSize } from "@/components/icons"
 import { fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -214,38 +215,75 @@ export default function ObjectPanel({
   const toggleMobileHeaderPanel = (panel: "search" | "about") => setMobileHeaderPanel((cur) => (cur === panel ? null : panel))
   // One scrolling panel with the header (breadcrumb, info/globe/search/grid icons,
   // unfolding search + Places/Time/Collections) on top of the grid: always on phones,
-  // and on desktop while the panel is expanded (the left card is covered then).
+  // and on desktop while the panel is expanded (full page, covering the side panel).
   const unifiedPanel = isMobile ? MOBILE_FULL_SCREEN : containerSize === "expanded"
   const [showCopied, setShowCopied] = useState(false)
-  // Grid density: null = the responsive default; otherwise 1 / 3 / 5 columns (remembered per browser).
+  // Grid density: null = the responsive default; otherwise a fixed column count
+  // (remembered per browser): 1 (Feed) or 3 (Grid) on phones, 4 (Spacious) on desktop.
   const [gridColumns, setGridColumns] = useState<number | null>(null)
   useEffect(() => {
     try {
       const saved = Number(localStorage.getItem("exsitu:grid-columns"))
-      if (saved === 1 || saved === 3 || saved === 5) setGridColumns(saved)
+      if (saved === 1 || saved === 3 || saved === 4) setGridColumns(saved)
     } catch {}
   }, [])
-  // Mobile toggles 3 ↔ 1, desktop full-screen toggles 3 ↔ 5. A saved value from the
-  // other context is ignored (null = the responsive default, shown as 3).
-  const gridOptions = isMobile ? [3, 1] : [3, 5]
-  const activeGridColumns = gridColumns !== null && gridOptions.includes(gridColumns) ? gridColumns : null
-  const cycleGridColumns = useCallback(() => {
-    const cur = activeGridColumns ?? 3
-    const next = gridOptions.find((n) => n !== cur) ?? 3
-    setGridColumns(next)
-    try { localStorage.setItem("exsitu:grid-columns", String(next)) } catch {}
-  }, [activeGridColumns, isMobile])
-  const gridSizeButton = (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8 flex-shrink-0"
-      onClick={cycleGridColumns}
-      title={activeGridColumns ? `Grid size: ${activeGridColumns} per row` : "Grid size: automatic"}
-      aria-label={`Grid size: ${activeGridColumns ? `${activeGridColumns} per row` : "automatic"}. Change`}
-    >
-      <IconGridSize className="w-5 h-5 text-gray-500" columns={activeGridColumns ?? 3} />
-    </Button>
+  // A value saved on the other kind of screen is ignored.
+  const activeGridColumns = isMobile
+    ? (gridColumns === 1 || gridColumns === 3 ? gridColumns : null)
+    : (gridColumns === 4 ? 4 : null)
+  const setGridSize = (n: number | null) => {
+    setGridColumns(n)
+    try {
+      if (n === null) localStorage.removeItem("exsitu:grid-columns")
+      else localStorage.setItem("exsitu:grid-columns", String(n))
+    } catch {}
+  }
+  // Grid or list (remembered per browser), only in the full-page panel (phones, desktop
+  // expanded); the 40% desktop panel is always the responsive grid.
+  const [objectView, setObjectView] = useState<"grid" | "list">("grid")
+  useEffect(() => {
+    try { if (localStorage.getItem("exsitu:object-view") === "list") setObjectView("list") } catch {}
+  }, [])
+  const showObjectView = (next: "grid" | "list") => {
+    setObjectView(next)
+    try { localStorage.setItem("exsitu:object-view", next) } catch {}
+  }
+  const isGrid = !unifiedPanel || objectView === "grid"
+  // One Display menu, as on Are.na. Phones: Feed (one per row), Grid (three per row),
+  // List. Desktop: Spacious (four per row), Dense (the responsive grid), List.
+  type DisplayKey = "feed" | "grid" | "spacious" | "dense" | "list"
+  const displayMode: DisplayKey = !isGrid ? "list"
+    : isMobile ? (activeGridColumns === 1 ? "feed" : "grid")
+    : (activeGridColumns === 4 ? "spacious" : "dense")
+  const showGrid = (n: number | null) => { setGridSize(n); showObjectView("grid") }
+  const listOption = { key: "list" as DisplayKey, label: "List", icon: <List className="w-5 h-5" />, pick: () => showObjectView("list") }
+  const displayOptions = isMobile ? [
+    { key: "feed" as DisplayKey, label: "Feed", icon: <IconGridSize className="w-5 h-5" columns={1} />, pick: () => showGrid(1) },
+    { key: "grid" as DisplayKey, label: "Grid", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(3) },
+    listOption,
+  ] : [
+    { key: "spacious" as DisplayKey, label: "Spacious", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(4) },
+    { key: "dense" as DisplayKey, label: "Dense", icon: <IconGridSize className="w-5 h-5" columns={5} />, pick: () => showGrid(null) },
+    listOption,
+  ]
+  const viewButtons = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 data-[state=open]:bg-gray-200" title="Display" aria-label="Display">
+          {displayOptions.find((o) => o.key === displayMode)!.icon}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[180px]">
+        <DropdownMenuLabel className="text-sm font-normal text-gray-500">Display</DropdownMenuLabel>
+        {displayOptions.map((o) => (
+          <DropdownMenuItem key={o.key} onClick={o.pick} className="gap-2 cursor-pointer text-base">
+            <Check className={`h-4 w-4 ${displayMode === o.key ? "" : "invisible"}`} />
+            {o.icon}
+            {o.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
   const [isExporting, setIsExporting] = useState(false)
   const hasSiteExportScope = Boolean(activeSite)
@@ -292,6 +330,19 @@ export default function ObjectPanel({
 
   // Keep containerSizeRef in sync
   useEffect(() => { containerSizeRef.current = containerSize }, [containerSize])
+
+  // Desktop: Esc takes the expanded panel back to the map, unless something on top of it
+  // (gallery, palette, a menu or popover) is open and takes the Esc itself.
+  useEffect(() => {
+    if (isMobile || containerSize !== "expanded" || galleryOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return
+      if (document.querySelector('[role="dialog"], [role="menu"], [data-radix-popper-content-wrapper]')) return
+      setContainerSize("default")
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [isMobile, containerSize, galleryOpen, setContainerSize])
 
   // Lock background body scroll when sheet is expanded on mobile (prevents page scroll behind)
   useEffect(() => {
@@ -838,8 +889,9 @@ export default function ObjectPanel({
       case "expanded":
         return {
           transition: desktopTransition,
-          width: "calc(100% - 5rem)",
-          height: "calc(100dvh - 5rem)",
+          // Full page, edge to edge.
+          width: "100%",
+          height: "100dvh",
         }
       case "default":
       default:
@@ -1355,7 +1407,7 @@ export default function ObjectPanel({
         onInfoToggle={variant === "drill" && unifiedPanel ? () => toggleMobileHeaderPanel("search") : undefined}
         aboutOpen={variant === "drill" && unifiedPanel ? mobileHeaderPanel === "about" : undefined}
         onAboutToggle={variant === "drill" && unifiedPanel ? () => toggleMobileHeaderPanel("about") : undefined}
-        headerSlot={variant === "drill" && unifiedPanel ? gridSizeButton : undefined}
+        headerSlot={variant === "drill" && unifiedPanel ? viewButtons : undefined}
         sectionColumns={variant === "drill" && unifiedPanel && !isMobile}
         mapToggle={isMobile ? "globe" : "collapse"}
         breadcrumb={variant === "drill" ? breadcrumb : []}
@@ -1398,7 +1450,7 @@ export default function ObjectPanel({
               {reportIssueMenuItem}
             </DropdownMenuContent>
           </DropdownMenu>
-          {!unifiedPanel && gridSizeButton}
+          {!unifiedPanel && viewButtons}
           </div>
         )}
         totalCount={totalCount}
@@ -1547,7 +1599,6 @@ export default function ObjectPanel({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              {containerSize === "expanded" && gridSizeButton}
               {/* Expand/minimize — desktop only */}
               <Button
                 variant="ghost"
@@ -1569,7 +1620,7 @@ export default function ObjectPanel({
                   title="Hide panel"
                   aria-label="Hide panel"
                 >
-                  <IconPanelOpen className="h-5 w-5 text-gray-500" />
+                  <IconClose className="h-5 w-5 text-gray-500" />
                 </Button>
               )}
             </div>
@@ -1590,7 +1641,8 @@ export default function ObjectPanel({
             isFullscreen={containerSize === "expanded"}
             panelSize={containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
-            columns={isMobile || containerSize === "expanded" ? activeGridColumns : null}
+            columns={unifiedPanel ? activeGridColumns : null}
+            view={isGrid ? "grid" : "list"}
             // Map card: 40dvh + its 12px bottom margin + safe area, plus a 12px gap.
             bottomInset={isMobile && MOBILE_FULL_SCREEN && mapOpen ? "calc(40dvh + 24px + env(safe-area-inset-bottom))" : undefined}
             header={unifiedPanel ? (
@@ -1701,11 +1753,11 @@ export default function ObjectPanel({
       className={`fixed ${
         isMobile
           ? "" // all positioning/sizing handled by inline style
-          : "top-10 right-10 bottom-10 shadow-lg"
+          : containerSize === "expanded" ? "inset-0" : "top-8 right-8 bottom-8 shadow-lg"
       } bg-white ${isMobile && MOBILE_FULL_SCREEN && galleryOpen ? "z-[60]" : "z-20"} overflow-hidden`}
       style={{
         ...containerStyle,
-        ...(!isMobile ? { borderRadius: "1rem" } : {}),
+        ...(!isMobile ? { borderRadius: containerSize === "expanded" ? 0 : "1rem" } : {}),
         ...(isMobile && liveHeight !== null ? { willChange: "height" } : {}),
       }}
     >

@@ -459,6 +459,8 @@ function MapContent() {
           img_url: item.sample_img_url,
           title: '',
           inventory_number: '',
+          // An arc's sample image, not one object: the list shows the arc and its count.
+          arc_object_count: item.object_count,
         } as any,
       }))
   }, [arcData, cityArcData, facetedFilters.cities.length])
@@ -1571,14 +1573,15 @@ function MapContent() {
             <button
               type="button"
               onClick={() => setMobileMap("hidden")}
-              className="absolute top-3 right-3 z-50 flex h-10 items-center rounded-xl bg-white/95 px-3.5 text-sm text-gray-700 shadow-md"
+              className="absolute top-3 right-3 z-50 flex h-10 items-center rounded-xl bg-white/95 px-3.5 text-sm font-medium text-black shadow-md"
               style={mobileMap === "full" ? { top: "calc(12px + env(safe-area-inset-top))" } : undefined}
             >
               Done
             </button>
             {mobileMap === "full" && mapPreviewOpen && (
               <div
-                className="absolute left-3 right-3 z-50 rounded-2xl bg-white p-3 shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
+                // Same size and place as the small map card (40dvh, 12px from the edges).
+                className="absolute left-3 right-3 z-50 flex h-[40dvh] flex-col rounded-2xl bg-white p-3 shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
                 style={{ bottom: "calc(12px + env(safe-area-inset-bottom))" }}
                 role="region"
                 aria-label="Selection preview"
@@ -1596,22 +1599,22 @@ function MapContent() {
                   </Button>
                 </div>
                 {/* Thumbnail row fades out at both edges, like the accordion lists. */}
-                <div className="relative -mx-3 mt-2">
-                <div className="flex h-20 gap-2 overflow-x-auto px-3" style={{ overscrollBehaviorX: "contain" }}>
+                <div className="relative -mx-3 mt-2 min-h-0 flex-1">
+                <div className="flex h-full gap-2 overflow-x-auto px-3" style={{ overscrollBehaviorX: "contain" }}>
                   {mapPreviewObjects.map((o) => (
                     <button
                       key={o.id}
                       type="button"
-                      className="h-20 flex-shrink-0"
+                      className="h-full flex-shrink-0"
                       // Opens the gallery on this object (the map steps aside, and comes back on close).
                       onClick={() => setInitialGalleryArtifact({ ...o })}
                       aria-label={o.attributes.title || o.attributes.inventory_number || "Artifact"}
                     >
-                      <ObjectImage src={o.attributes.img_url!} alt="" className="h-20 rounded-[4px]" imgClassName="h-20 w-auto" />
+                      <ObjectImage src={o.attributes.img_url!} alt="" className="h-full rounded-[4px]" imgClassName="h-full w-auto" />
                     </button>
                   ))}
                   {arcObjectsLoading && mapPreviewObjects.length === 0 && (
-                    <div className="flex h-20 w-full items-center justify-center"><Spinner size="1" /></div>
+                    <div className="flex h-full w-full items-center justify-center"><Spinner size="1" /></div>
                   )}
                 </div>
                 <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-5" style={{ background: "linear-gradient(to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)" }} />
@@ -1620,7 +1623,8 @@ function MapContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-3 h-8 w-full rounded-md text-sm"
+                  // Same height and corners as the map's own buttons (expand, Done).
+                  className="mt-3 h-10 w-full rounded-xl text-sm"
                   onClick={() => setMobileMap("hidden")}
                 >
                   See all

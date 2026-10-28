@@ -27,6 +27,16 @@ describe("resolveImageSrc — Rijksmuseum (micr.io IIIF 3)", () => {
   })
 })
 
+describe("resolveImageSrc — Smithsonian (IDS)", () => {
+  const stored = "https://ids.si.edu/ids/deliveryService?id=FS-8004_11"
+  it("asks for a web-sized image for thumbnails", () => {
+    expect(resolveImageSrc(stored)).toBe("https://ids.si.edu/ids/deliveryService?id=FS-8004_11&max=600")
+  })
+  it("uses a larger size for large views", () => {
+    expect(resolveImageSrc(stored, LARGE_WIDTH)).toBe("https://ids.si.edu/ids/deliveryService?id=FS-8004_11&max=1000")
+  })
+})
+
 describe("resolveImageSrc — Met renditions", () => {
   const original = "https://images.metmuseum.org/CRDImages/is/original/DT8104.jpg"
   it("uses the small rendition for grid thumbnails", () => {

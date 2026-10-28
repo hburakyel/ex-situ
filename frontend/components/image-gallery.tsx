@@ -509,6 +509,8 @@ export default function ImageGallery({
             //   so no licence is claimed
             // - Walters: images and metadata CC0 (Rights and Reproductions page), shown from
             //   the museum's own Wikimedia Commons upload
+            // - Smithsonian (National Museum of Asian Art): only images whose media record says
+            //   CC0 are linked; image_rights holds the CC0 URI, so the per-object credit applies
             const SMB_COLLECTIONS = new Set([
               "Ethnologisches Museum",
               "Antikensammlung",

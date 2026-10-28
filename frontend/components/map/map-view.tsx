@@ -8,10 +8,13 @@ import { Protocol } from "pmtiles"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { ChevronDown, ChevronUp, Info } from "lucide-react"
+import { useScrollFades } from "@/hooks/use-scroll-fades"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
-import { iconSvgStrings } from "@/components/icons"
+import { iconSvgStrings, IconClose } from "@/components/icons"
 import SearchBar from "./search-bar"
+import { AboutText } from "./info-panel"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ArcLayer, ScatterplotLayer } from "@deck.gl/layers"
@@ -124,21 +127,26 @@ function hasValidCoordinatePair(position?: [number, number] | number[]): boolean
 }
 
 function HeaderAccordionList({ children }: { children: React.ReactNode }) {
+  const { ref, fades } = useScrollFades<HTMLDivElement>()
   return (
     <div className="relative">
-      <div className="space-y-0.5 max-h-40 overflow-y-auto pr-1 pb-1">
+      <div ref={ref} className="max-h-40 overflow-y-auto pr-1 pb-1">
         {children}
       </div>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-5"
-        style={HEADER_ACCORDION_TOP_FADE_STYLE}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
-        style={HEADER_ACCORDION_FADE_STYLE}
-      />
+      {fades.top && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-5"
+          style={HEADER_ACCORDION_TOP_FADE_STYLE}
+        />
+      )}
+      {fades.bottom && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+          style={HEADER_ACCORDION_FADE_STYLE}
+        />
+      )}
     </div>
   )
 }
@@ -414,14 +422,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const setObjectsRef = useRef(setObjects)
     const setTotalCountRef = useRef(setTotalCount)
     const onErrorRef = useRef(onError)
-    const onBreadcrumbClickRef = useRef(onBreadcrumbClick)
     useEffect(() => {
       onBoundsChangeRef.current = onBoundsChange
       setObjectsRef.current = setObjects
       setTotalCountRef.current = setTotalCount
       onErrorRef.current = onError
-      onBreadcrumbClickRef.current = onBreadcrumbClick
-    }, [onBoundsChange, setObjects, setTotalCount, onError, onBreadcrumbClick])
+    }, [onBoundsChange, setObjects, setTotalCount, onError])
 
     useImperativeHandle(ref, () => ({
       map: map.current,
@@ -617,80 +623,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         onZoomChangeRef.current?.(newZoom)
       })
 
-      // Nav controls – read media query synchronously so the value is correct
-      // even if the React `isMobile` hook hasn't hydrated yet.
-      const mobileNow = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
-      const controlPosition = "bottom-left"
-      const ctrlPrefix = "maplibregl"
-      // Info control
-      class InfoControl {
-        _container: HTMLDivElement | null = null; _popup: HTMLDivElement | null = null; _closeFn: ((ev: MouseEvent) => void) | null = null
-        onAdd() {
-          this._container = document.createElement("div")
-          this._container.className = `${ctrlPrefix}-ctrl ${ctrlPrefix}-ctrl-group`
-          const btn = document.createElement("button")
-          btn.className = `${ctrlPrefix}-ctrl-icon`
-          btn.setAttribute("aria-label", "About")
-          btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 1C3.91 1 1 3.91 1 7.5S3.91 14 7.5 14 14 11.09 14 7.5 11.09 1 7.5 1Zm0 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm-.5 3h1v1h-1V5Zm0 2h1v4h-1V7Z" fill="currentColor"/></svg>'
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation()
-            if (this._popup) { this._popup.remove(); this._popup = null; return }
-            const rect = btn.getBoundingClientRect()
-            this._popup = document.createElement("div")
-            this._popup.style.cssText = `position:fixed;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);padding:14px 16px;width:320px;font-family:system-ui,sans-serif;z-index:9999;font-size:13px;line-height:1.5;color:#333`
-            this._popup.style.bottom = `${window.innerHeight - rect.bottom}px`
-            this._popup.style.left = `${rect.right + 8}px`
-            this._popup.innerHTML = `
-              <div style="margin-bottom:10px;color:#555">Ex Situ is an open-source spatial index of the migration of cultural artifacts. Each artifact is an arc from its place of origin to the institution that holds it today. Ex Situ does not host images or copy records. Every arc links back to the institution’s own page. The index shows what museum records state. Many artifacts have no located origin, and some locations are uncertain.</div>
-              <div style="white-space:nowrap">
-                <a href="https://github.com/hburakyel/ex-situ" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:none">GitHub ↗</a>
-                ·
-                <a href="https://github.com/hburakyel/ex-situ/issues/new" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:none">Report issue ↗</a>
-              </div>
-            `
-            const close = (ev: MouseEvent) => {
-              if (this._popup && !this._popup.contains(ev.target as Node) && ev.target !== btn) {
-                this._popup.remove(); this._popup = null; document.removeEventListener("click", close); this._closeFn = null
-              }
-            }
-            this._closeFn = close
-            setTimeout(() => document.addEventListener("click", close), 0)
-            document.body.appendChild(this._popup)
-          })
-          this._container.appendChild(btn)
-          return this._container
-        }
-        onRemove() { if (this._popup) { this._popup.remove(); this._popup = null }; if (this._closeFn) { document.removeEventListener("click", this._closeFn); this._closeFn = null }; if (this._container?.parentNode) this._container.parentNode.removeChild(this._container) }
-      }
-
-      // Globe view control
-      class GlobeViewControl {
-        _map: any = null; _container: HTMLDivElement | null = null
-        onAdd(map: any) {
-          this._map = map
-          this._container = document.createElement("div")
-          this._container.className = `${ctrlPrefix}-ctrl ${ctrlPrefix}-ctrl-group`
-          const btn = document.createElement("button")
-          btn.className = `${ctrlPrefix}-ctrl-icon`
-          btn.setAttribute("aria-label", "Global View")
-          btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.49996 1.80002C4.35194 1.80002 1.79996 4.352 1.79996 7.50002C1.79996 10.648 4.35194 13.2 7.49996 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.352 10.648 1.80002 7.49996 1.80002ZM0.899963 7.50002C0.899963 3.85494 3.85488 0.900024 7.49996 0.900024C11.145 0.900024 14.1 3.85494 14.1 7.50002C14.1 11.1451 11.145 14.1 7.49996 14.1C3.85488 14.1 0.899963 11.1451 0.899963 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M13.4999 7.89998H1.49994V7.09998H13.4999V7.89998Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M7.09991 13.5V1.5H7.89991V13.5H7.09991zM10.375 7.49998C10.375 5.32724 9.59364 3.17778 8.06183 1.75656L8.53793 1.24341C10.2396 2.82218 11.075 5.17273 11.075 7.49998 11.075 9.82724 10.2396 12.1778 8.53793 13.7566L8.06183 13.2434C9.59364 11.8222 10.375 9.67273 10.375 7.49998zM3.99969 7.5C3.99969 5.17611 4.80786 2.82678 6.45768 1.24719L6.94177 1.75281C5.4582 3.17323 4.69969 5.32389 4.69969 7.5 4.6997 9.67611 5.45822 11.8268 6.94179 13.2472L6.45769 13.7528C4.80788 12.1732 3.9997 9.8239 3.99969 7.5z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>'
-          btn.addEventListener("click", () => {
-            // Trigger parent's breadcrumb "global" handler to clear drill state
-            onBreadcrumbClickRef.current?.("global" as any)
-          })
-          this._container.appendChild(btn)
-          return this._container
-        }
-        onRemove() { if (this._container?.parentNode) this._container.parentNode.removeChild(this._container); this._map = null }
-      }
-
-      // Phones get no map controls: pinch zooms, the breadcrumb root goes back to the
-      // globe, and About sits next to search in the info card (info-panel.tsx).
-      if (showControls && !mobileNow) {
-        mapInstance.addControl(new GlobeViewControl(), controlPosition)
-        mapInstance.addControl(new InfoControl(), controlPosition)
-        mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), controlPosition)
-      }
+      // No map controls: zoom by scroll or pinch, the breadcrumb root goes back to the
+      // globe, and About sits in the side panel (desktop) or the info card (phones).
 
       window.addEventListener("resize", handleResize)
       // The mobile map card changes size (card, full screen, put away) without a window
@@ -1215,7 +1149,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         />
 
         {/* Map attribution */}
-        <div className="absolute bottom-1 right-1 z-10 text-[9px] text-white/20 px-1.5 py-0.5 rounded">
+        <div className="absolute bottom-1 left-1 z-10 text-[9px] text-white/50 px-1.5 py-0.5 rounded">
           <span><a href="https://protomaps.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Protomaps</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">OpenStreetMap contributors</a></span>
         </div>
 
@@ -1344,8 +1278,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
         {!isMobile && (
-        <div className="absolute top-10 left-10 sm:w-80 z-20">
-        <div className="bg-white rounded-2xl shadow-lg flex flex-col relative max-h-[calc(100dvh-5rem)] overflow-y-auto">
+        <div className="absolute top-8 left-8 sm:w-80 z-20">
+        <div className="bg-white rounded-2xl shadow-lg flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto">
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. */}
@@ -1371,6 +1305,24 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 )
               })}
             </div>
+            {/* About — opens in the middle of the screen, like the search palette */}
+            <DialogPrimitive.Root>
+              <DialogPrimitive.Trigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-1.5 data-[state=open]:bg-gray-200" title="About" aria-label="About">
+                  <Info className="w-5 h-5 text-gray-600" />
+                </Button>
+              </DialogPrimitive.Trigger>
+              <DialogPrimitive.Portal>
+                <DialogPrimitive.Overlay className="fixed inset-0 z-[80] bg-black/25 backdrop-blur-[2px]" />
+                <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[80] w-[calc(100%-1.5rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[20px] border border-gray-200 bg-white p-5 pr-12 shadow-2xl text-sm leading-normal focus-visible:outline-none">
+                  <DialogPrimitive.Title className="sr-only">About Ex Situ</DialogPrimitive.Title>
+                  <AboutText />
+                  <DialogPrimitive.Close className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md hover:bg-gray-100" aria-label="Close">
+                    <IconClose className="h-5 w-5 text-gray-500" />
+                  </DialogPrimitive.Close>
+                </DialogPrimitive.Content>
+              </DialogPrimitive.Portal>
+            </DialogPrimitive.Root>
           </div>
           <div className="px-4 pb-2">
             <SearchBar onOpen={() => onCommandPaletteOpen?.()} />
@@ -1380,7 +1332,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           {!isObjectContainerVisible && (
             <div className="px-4 pb-1">
               <span className="text-sm text-gray-700 block">
-                {totalCount} artifact{totalCount !== 1 ? "s" : ""}{locationName ? ` from ${locationName}` : ""}
+                {totalCount} indexed artifact{totalCount !== 1 ? "s" : ""}{locationName ? ` from ${locationName}` : ""}
               </span>
               {closedResolvedPlaceName && (
                 <span style={{ color: '#444', fontSize: '10px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }} className="block truncate">
@@ -1397,24 +1349,21 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 instead of popping in only once groupedOrigins is non-empty. ── */}
             {drillLevel === "global" && (
               <div className="pt-0 mt-1">
-                <div className="flex items-center justify-between">
+                <button type="button" className="flex items-center gap-1 h-8 -ml-1 px-1 rounded-md hover:bg-gray-200"
+                  onClick={() => setShowArcs(!showArcs)}
+                  aria-expanded={showArcs}
+                >
                   <span className="panel-text-muted">
                     Places
                   </span>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                    onClick={() => setShowArcs(!showArcs)}
-                    title={showArcs ? "Collapse Places" : "Expand Places"}
-                    aria-label={showArcs ? "Collapse Places" : "Expand Places"}
-                  >
-                    {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                  </Button>
-                </div>
+                  {showArcs ? <ChevronUp className="h-4 w-4 text-gray-600" /> : <ChevronDown className="h-4 w-4 text-gray-600" />}
+                </button>
 
                 {showArcs && (
                   <div className="mt-1">
                     <HeaderAccordionList>
                       {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5"
+                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5"
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
                             {...listHoverProps("country", origin.country)}
                           >
@@ -1424,7 +1373,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                               </TooltipTrigger>
                               <TooltipContent side="top">{origin.country}</TooltipContent>
                             </Tooltip>
-                            <span className="ml-2 text-gray-500 text-sm">{origin.totalCount}</span>
+                            <span className="ml-2 text-gray-600 text-sm">{origin.totalCount}</span>
                           </div>
                       ))}
                     </HeaderAccordionList>
@@ -1436,19 +1385,16 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             {/* ── Sites Section (country drill-down) — hidden when there is nothing to list ── */}
             {drillLevel !== "global" && (groupedSites.length > 0 || isLoadingSubArcs) && (
               <div className="pt-0 mt-1">
-                <div className="flex items-center justify-between">
+                <button type="button" className="flex items-center gap-1 h-8 -ml-1 px-1 rounded-md hover:bg-gray-200"
+                  onClick={() => setShowArcs(!showArcs)}
+                  aria-expanded={showArcs}
+                >
                   <span className="panel-text-muted">
                     Sites
                     {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </span>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                    onClick={() => setShowArcs(!showArcs)}
-                    title={showArcs ? "Collapse Sites" : "Expand Sites"}
-                    aria-label={showArcs ? "Collapse Sites" : "Expand Sites"}
-                  >
-                    {showArcs ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                  </Button>
-                </div>
+                  {showArcs ? <ChevronUp className="h-4 w-4 text-gray-600" /> : <ChevronDown className="h-4 w-4 text-gray-600" />}
+                </button>
 
                 {showArcs && (
                   <div className="mt-1 pl-0">
@@ -1456,7 +1402,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                       {groupedSites.map((site, index) => (
                         <Fragment key={index}>
                         <div
-                          className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeSite === site.name ? "bg-gray-100" : ""}`}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeSite === site.name ? "bg-gray-300" : ""}`}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           {...listHoverProps("site", site.name)}
                         >
@@ -1466,10 +1412,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                             </TooltipTrigger>
                             <TooltipContent side="top">{site.name}</TooltipContent>
                           </Tooltip>
-                          <span className="ml-2 text-gray-500 text-sm">{site.totalCount}</span>
+                          <span className="ml-2 text-gray-600 text-sm">{site.totalCount}</span>
                         </div>
                         {activeSite === site.name && (
-                          <PrecisePlaceRows places={precisePlaces} active={activePrecise} onToggle={onTogglePrecise} padX="px-1" />
+                          <PrecisePlaceRows places={precisePlaces} active={activePrecise} onToggle={onTogglePrecise} />
                         )}
                         </Fragment>
                       ))}
@@ -1482,18 +1428,15 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             {/* ── Time Section — shown at all drill levels, above Collections (if any dated objects) ── */}
             {dateBuckets && (dateBuckets.objectDateBuckets.some((b) => b.count > 0) || (dateBuckets.objectDateSpans?.length ?? 0) > 0) && (
               <div className="pt-0 mt-1">
-                <div className="flex items-center justify-between">
+                <button type="button" className="flex items-center gap-1 h-8 -ml-1 px-1 rounded-md hover:bg-gray-200"
+                  onClick={() => setShowTime(!showTime)}
+                  aria-expanded={showTime}
+                >
                   <span className="panel-text-muted">
                     Time
                   </span>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                    onClick={() => setShowTime(!showTime)}
-                    title={showTime ? "Collapse Time" : "Expand Time"}
-                    aria-label={showTime ? "Collapse Time" : "Expand Time"}
-                  >
-                    {showTime ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                  </Button>
-                </div>
+                  {showTime ? <ChevronUp className="h-4 w-4 text-gray-600" /> : <ChevronDown className="h-4 w-4 text-gray-600" />}
+                </button>
                 {showTime && (
                   <div className="mt-1 pl-0">
                     <HeaderAccordionList>
@@ -1506,7 +1449,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                         .filter((row) => row.count > 0)
                         .map((row) => (
                           <div key={row.id}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-100" : ""}`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-300" : ""}`}
                             onClick={() => toggleEra(row.era)}
                           >
                             <Tooltip>
@@ -1515,7 +1458,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                               </TooltipTrigger>
                               <TooltipContent side="top">{row.label}</TooltipContent>
                             </Tooltip>
-                            <span className="ml-2 text-gray-500 text-sm">{row.count}</span>
+                            <span className="ml-2 text-gray-600 text-sm">{row.count}</span>
                           </div>
                         ))}
                     </HeaderAccordionList>
@@ -1527,25 +1470,22 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             {/* ── Institutions Section — shown at all drill levels (if any) ── */}
             {(drillInstitutions.length > 0 || isLoadingSubArcs) && (
               <div className="pt-0 mt-1">
-                <div className="flex items-center justify-between">
+                <button type="button" className="flex items-center gap-1 h-8 -ml-1 px-1 rounded-md hover:bg-gray-200"
+                  onClick={() => setShowCollections(!showCollections)}
+                  aria-expanded={showCollections}
+                >
                   <span className="panel-text-muted">
                     Collections
                     {isLoadingSubArcs && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </span>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center"
-                    onClick={() => setShowCollections(!showCollections)}
-                    title={showCollections ? "Collapse Collections" : "Expand Collections"}
-                    aria-label={showCollections ? "Collapse Collections" : "Expand Collections"}
-                  >
-                    {showCollections ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                  </Button>
-                </div>
+                  {showCollections ? <ChevronUp className="h-4 w-4 text-gray-600" /> : <ChevronDown className="h-4 w-4 text-gray-600" />}
+                </button>
                 {showCollections && (
                   <div className="mt-1 pl-0">
                     <HeaderAccordionList>
                       {drillInstitutions.map((inst, index) => (
                         <div key={index}
-                          className={`flex justify-between cursor-pointer hover:bg-gray-50 rounded-md px-1 py-0.5 ${activeInstitution === inst.name ? "bg-gray-100" : ""}`}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeInstitution === inst.name ? "bg-gray-300" : ""}`}
                           onClick={() => onToggleInstitution?.(inst.name)}
                           {...listHoverProps("institution", inst.name)}
                         >
@@ -1555,7 +1495,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                             </TooltipTrigger>
                             <TooltipContent side="top">{inst.name}</TooltipContent>
                           </Tooltip>
-                          <span className="ml-2 text-gray-500 text-sm">{inst.count}</span>
+                          <span className="ml-2 text-gray-600 text-sm">{inst.count}</span>
                         </div>
                       ))}
                     </HeaderAccordionList>

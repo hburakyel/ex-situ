@@ -54,7 +54,7 @@ export default function RootLayout({
 export const metadata = {
   metadataBase: new URL('https://exsitu.app'),
   title: MAP_DEFAULT_TITLE,
-  description: 'An open-source spatial index of the migration of cultural artifacts, from their place of origin to the institution that holds them today.',
+  description: 'Ex Situ is an open-source spatial index that maps cultural artifacts from their place of origin to the institution that holds them today.',
   openGraph: {
     title: MAP_DEFAULT_TITLE,
     description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',

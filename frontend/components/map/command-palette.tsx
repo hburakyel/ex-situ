@@ -624,8 +624,8 @@ export default function V3CommandPalette({
               data-flat={fi}
               id={`palette-row-${fi}`}
               aria-current={fi === selectedIdx ? "true" : undefined}
-              className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
-                fi === selectedIdx ? "bg-gray-50 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+              className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-3 px-2 py-1 text-left transition-colors ${
+                fi === selectedIdx ? "bg-gray-200 text-black" : "hover:bg-gray-200 text-black"
               }`}
               onClick={() => handleSelectObject(row)}
               onMouseEnter={() => setSelectedIdx(fi)}
@@ -666,7 +666,7 @@ export default function V3CommandPalette({
           role="dialog"
           aria-modal="true"
           aria-label="Search"
-          className="w-full max-w-lg bg-white rounded-[20px] shadow-2xl border border-gray-200 overflow-hidden pointer-events-auto"
+          className="w-full max-w-2xl bg-white rounded-[20px] shadow-2xl border border-gray-200 overflow-hidden pointer-events-auto"
           onKeyDown={handleKeyDown}
         >
           <div role="status" aria-live="polite" className="sr-only">
@@ -688,14 +688,15 @@ export default function V3CommandPalette({
               className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-gray-500 focus-visible:outline-none"
             />
             {search.isSearching && <Spinner size="1" />}
+            {/* Clearing the query is a word, so the X only ever closes the palette. */}
             {search.searchQuery && (
-              <button onClick={() => search.clearSearch()} className="p-0.5 hover:bg-gray-100 rounded-md">
-                <X className="w-3.5 h-3.5 text-gray-500" />
+              <button onClick={() => search.clearSearch()} className="px-1.5 py-0.5 text-sm text-gray-500 hover:text-black rounded-md">
+                Clear
               </button>
             )}
-            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 text-[10px] text-gray-500">
-              ESC
-            </kbd>
+            <button onClick={() => onOpenChange(false)} className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md hover:bg-gray-100" aria-label="Close search" title="Close">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
           </div>
 
           {/* Tabs */}
@@ -726,37 +727,37 @@ export default function V3CommandPalette({
           {activeFilterCount > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b border-gray-100 bg-gray-50/50">
               {facetedFilters.countries.map((c) => (
-                <span key={`fc-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px]">
+                <span key={`fc-${c}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-sm">
                   {c}
-                  <button onClick={() => removeFilter("countries", c)} className="hover:bg-blue-100 rounded-md p-0.5"><X className="w-2.5 h-2.5" /></button>
+                  <button onClick={() => removeFilter("countries", c)} className="hover:bg-blue-100 rounded-md p-0.5"><X className="w-3 h-3" /></button>
                 </span>
               ))}
               {facetedFilters.cities.map((c) => (
-                <span key={`fs-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px]">
+                <span key={`fs-${c}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-sm">
                   {c}
-                  <button onClick={() => removeFilter("cities", c)} className="hover:bg-blue-100 rounded-md p-0.5"><X className="w-2.5 h-2.5" /></button>
+                  <button onClick={() => removeFilter("cities", c)} className="hover:bg-blue-100 rounded-md p-0.5"><X className="w-3 h-3" /></button>
                 </span>
               ))}
               {facetedFilters.institutions.map((c) => (
-                <span key={`fi-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 text-[10px]">
+                <span key={`fi-${c}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-orange-50 text-orange-700 text-sm">
                   {c}
-                  <button onClick={() => removeFilter("institutions", c)} className="hover:bg-orange-100 rounded-md p-0.5"><X className="w-2.5 h-2.5" /></button>
+                  <button onClick={() => removeFilter("institutions", c)} className="hover:bg-orange-100 rounded-md p-0.5"><X className="w-3 h-3" /></button>
                 </span>
               ))}
               {facetedFilters.era && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[10px]">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-50 text-gray-600 text-sm">
                   {facetedFilters.era.label}
-                  <button onClick={() => toggleEra(facetedFilters.era!)} className="hover:opacity-70 rounded-md p-0.5"><X className="w-2.5 h-2.5 text-white" /></button>
+                  <button onClick={() => toggleEra(facetedFilters.era!)} className="hover:opacity-70 rounded-md p-0.5"><X className="w-3 h-3 text-white" /></button>
                 </span>
               )}
               {facetedFilters.migrationEra && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-[10px]">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-50 text-gray-600 text-sm">
                   {facetedFilters.migrationEra.label}
-                  <button onClick={() => toggleMigrationEra(facetedFilters.migrationEra!)} className="hover:opacity-70 rounded-md p-0.5"><X className="w-2.5 h-2.5 text-white" /></button>
+                  <button onClick={() => toggleMigrationEra(facetedFilters.migrationEra!)} className="hover:opacity-70 rounded-md p-0.5"><X className="w-3 h-3 text-white" /></button>
                 </span>
               )}
               {activeFilterCount > 1 && (
-                <button onClick={clearAllFilters} className="text-[10px] text-gray-500 hover:text-gray-700 px-1">Clear all</button>
+                <button onClick={clearAllFilters} className="text-sm text-gray-500 hover:text-gray-700 px-1">Clear all</button>
               )}
             </div>
           )}
@@ -866,19 +867,19 @@ export default function V3CommandPalette({
                         data-flat={fi}
                         id={`palette-row-${fi}`}
                         aria-current={fi === selectedIdx ? "true" : undefined}
-                        className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
+                        className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-3 px-2 py-1 text-left transition-colors ${
                           active
-                            ? "bg-blue-50 text-blue-800"
+                            ? "bg-gray-300 text-black"
                             : fi === selectedIdx
-                              ? "bg-gray-50 text-gray-900"
-                              : "hover:bg-gray-50 text-gray-700"
+                              ? "bg-gray-200 text-black"
+                              : "hover:bg-gray-200 text-black"
                         }`}
                         onClick={() => handleSelectPlace(row)}
                         onMouseEnter={() => setSelectedIdx(fi)}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-blue-500" : "bg-blue-400"}`} />
                         <span className="flex-1 text-sm truncate" title={row.name}>{placeLabels.get(row.name) ?? row.name}</span>
-                        <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
+                        <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
                         {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
@@ -899,19 +900,19 @@ export default function V3CommandPalette({
                         data-flat={fi}
                         id={`palette-row-${fi}`}
                         aria-current={fi === selectedIdx ? "true" : undefined}
-                        className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
+                        className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-3 px-2 py-1 text-left transition-colors ${
                           active
-                            ? "bg-blue-50 text-blue-800"
+                            ? "bg-gray-300 text-black"
                             : fi === selectedIdx
-                              ? "bg-gray-50 text-gray-900"
-                              : "hover:bg-gray-50 text-gray-700"
+                              ? "bg-gray-200 text-black"
+                              : "hover:bg-gray-200 text-black"
                         }`}
                         onClick={() => handleSelectSite(row)}
                         onMouseEnter={() => setSelectedIdx(fi)}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-blue-500" : "bg-blue-400"}`} />
                         <span className="flex-1 text-sm truncate" title={row.name}>{placeLabels.get(row.name) ?? row.name}</span>
-                        <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
+                        <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
                         {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
@@ -964,8 +965,8 @@ export default function V3CommandPalette({
                       return (
                         <div key={`time-${bucket.id}`}>
                           <div
-                            className={`group w-full flex items-center gap-1.5 pl-3 pr-4 py-1.5 transition-colors ${
-                              active ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+                            className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-1.5 pl-1 pr-2 py-1 transition-colors ${
+                              active ? "bg-gray-300 text-black" : "hover:bg-gray-200 text-black"
                             }`}
                           >
                             {drillable ? (
@@ -974,7 +975,7 @@ export default function V3CommandPalette({
                                 className="p-0.5 -m-0.5 flex-shrink-0"
                                 aria-label={isExpanded ? "Collapse" : "Expand"}
                               >
-                                <ChevronRight className={`w-3.5 h-3.5 text-gray-500 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                                <ChevronRight className={`w-3.5 h-3.5 text-gray-600 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                               </button>
                             ) : (
                               <span className="w-3.5 h-3.5 flex-shrink-0" />
@@ -985,7 +986,7 @@ export default function V3CommandPalette({
                             >
                               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-gray-500" : "bg-gray-400"}`} />
                               <span className="flex-1 text-sm truncate">{bucket.label}</span>
-                              <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
+                              <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
                                 {count.toLocaleString()}
                               </span>
                               {active && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
@@ -1005,14 +1006,14 @@ export default function V3CommandPalette({
                                   return (
                                     <button
                                       key={`decade-${decade.id}`}
-                                      className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
-                                        decadeActive ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+                                      className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-3 px-2 py-1 text-left transition-colors ${
+                                        decadeActive ? "bg-gray-300 text-black" : "hover:bg-gray-200 text-black"
                                       }`}
                                       onClick={() => toggleDecadeEra(decade as any)}
                                     >
                                       <span className={`w-1 h-1 rounded-full flex-shrink-0 ${decadeActive ? "bg-gray-500" : "bg-gray-400"}`} />
                                       <span className="flex-1 text-sm truncate">{decade.label}</span>
-                                      <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
+                                      <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
                                         {decade.count.toLocaleString()}
                                       </span>
                                       {decadeActive && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
@@ -1073,14 +1074,14 @@ export default function V3CommandPalette({
                             return (
                               <button
                                 key={`migration-${bucket.id}`}
-                                className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
-                                  active ? "bg-gray-200 text-gray-900" : "hover:bg-gray-50 text-gray-700"
+                                className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-3 px-2 py-1 text-left transition-colors ${
+                                  active ? "bg-gray-300 text-black" : "hover:bg-gray-200 text-black"
                                 }`}
                                 onClick={() => toggleMigrationEra(migrationBucket)}
                               >
                                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? "bg-gray-500" : "bg-gray-400"}`} />
                                 <span className="flex-1 text-sm truncate">{migrationBucket.label}</span>
-                                <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
+                                <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
                                   {bucket.count.toLocaleString()}
                                 </span>
                                 {active && <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />}
@@ -1105,12 +1106,12 @@ export default function V3CommandPalette({
                         data-flat={fi}
                         id={`palette-row-${fi}`}
                         aria-current={fi === selectedIdx ? "true" : undefined}
-                        className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
+                        className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-3 px-2 py-1 text-left transition-colors ${
                           active
-                            ? "bg-orange-50 text-orange-800"
+                            ? "bg-gray-300 text-black"
                             : fi === selectedIdx
-                              ? "bg-gray-50 text-gray-900"
-                              : "hover:bg-gray-50 text-gray-700"
+                              ? "bg-gray-200 text-black"
+                              : "hover:bg-gray-200 text-black"
                         }`}
                         onClick={() => handleSelectCollection(row)}
                         onMouseEnter={() => setSelectedIdx(fi)}
@@ -1125,7 +1126,7 @@ export default function V3CommandPalette({
                             </span>
                           )}
                         </div>
-                        <span className="text-sm text-gray-500 tabular-nums flex-shrink-0">
+                        <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
                           {row.objectCount.toLocaleString()}
                         </span>
                         {active && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />}
@@ -1147,10 +1148,10 @@ export default function V3CommandPalette({
                           data-flat={fi}
                         id={`palette-row-${fi}`}
                         aria-current={fi === selectedIdx ? "true" : undefined}
-                          className={`group w-full flex items-center gap-3 px-4 py-1.5 text-left transition-colors ${
+                          className={`group w-[calc(100%-1rem)] mx-2 rounded-md flex items-center gap-3 px-2 py-1 text-left transition-colors ${
                             fi === selectedIdx
-                              ? "bg-gray-50 text-gray-900"
-                              : "hover:bg-gray-50 text-gray-500"
+                              ? "bg-gray-200 text-black"
+                              : "hover:bg-gray-200 text-gray-500"
                           }`}
                           onClick={() => handleSelectFlyTo(row)}
                           onMouseEnter={() => setSelectedIdx(fi)}

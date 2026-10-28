@@ -7,6 +7,8 @@ import { resolveImageSrc, THUMB_WIDTH } from "@/lib/image-src"
 import { useInView } from "react-intersection-observer"
 import { Spinner } from "@radix-ui/themes"
 import { isWithdrawn } from "@/lib/withdrawn"
+import { displayObjectDate } from "@/lib/object-date"
+import { originFromLabel } from "@/lib/place-label"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 
@@ -85,6 +87,8 @@ interface ObjectGridProps {
   mobileColumns?: number
   /** Fixed column count chosen by the user; overrides the responsive layout. */
   columns?: number | null
+  /** "list": one row per object (thumbnail, inventory number, from · time · collection). */
+  view?: "grid" | "list"
   /** Rendered above the tiles inside the scroll container, so it scrolls away with the grid (mobile info block). */
   header?: React.ReactNode
   /** Extra room below the last row (mobile: clears the map card floating over the grid). */
@@ -113,6 +117,7 @@ export default function ObjectGrid({
   panelSize = 50,
   mobileColumns = 2,
   columns: columnsOverride = null,
+  view = "grid",
   onScroll,
   header,
   bottomInset,
@@ -151,8 +156,12 @@ export default function ObjectGrid({
     })
   }, [firstObjectId])
 
-  // User-chosen density: tile height scales with the column count (3 = the original 11rem).
-  const tileHeight = columnsOverride ? (columnsOverride <= 1 ? 320 : columnsOverride >= 5 ? 112 : 176) : null
+  // Square tiles: each object sits in a square cell and fills it on its longer side, so
+  // every row keeps the same rhythm. One column would make a page-wide square, so that
+  // density keeps a fixed 320px row. The cell is a size container: the image is capped
+  // at 100cqw/100cqh, which makes the blue ring hug the image, not the cell.
+  const tileHeight = columnsOverride && columnsOverride <= 1 ? 320 : null
+  const tileSizeClass = `[container-type:size] ${tileHeight ? "" : "aspect-square"}`
 
   const imageObjects = useMemo(() => {
     return objects
@@ -420,6 +429,52 @@ return (
       {header && <div className="-mx-4 -mt-4 mb-2">{header}</div>}
       {emptyState ?? (
       <>
+      {view === "list" ? (
+      <div className="flex flex-col">
+      {visibleObjects.map((object, index) => {
+        const at = object.attributes
+        const showImage = !isWithdrawn(object) && hasImageUrl(at?.img_url) && imageStatus[object.id] !== "failed" && imageStatus[object.id] !== "late"
+        // Global view: a row is an arc's sample image (map-client allObjects), with no
+        // inventory number, so it reads as the arc: origin, then collection and count.
+        const arcCount = (at as { arc_object_count?: number }).arc_object_count
+        const isArcPreview = String(object.id).startsWith("preview-")
+        const title = isArcPreview ? (originFromLabel(at) || at.institution_name) : (at.inventory_number || at.title || "—")
+        // No people names: origin, date and collection only (the source link has the rest).
+        const detail = (isArcPreview
+          ? [at.institution_name, arcCount ? `${arcCount.toLocaleString("en-US")} artifact${arcCount === 1 ? "" : "s"}` : null]
+          : [originFromLabel(at), displayObjectDate(at.object_date), at.institution_name]
+        ).filter(Boolean).join(" · ")
+        return (
+          <div
+            key={object.id}
+            className="group flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-gray-200"
+            onClick={() => handleImageClick(index)}
+            onMouseEnter={() => onObjectHover(at.place_name || null)}
+            onMouseLeave={() => onObjectHover(null)}
+          >
+            {/* Square slot so the text column lines up; empty when there's no image. */}
+            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center [container-type:size]">
+              {showImage && (
+                <ObjectImage
+                  src={at.img_url!}
+                  alt=""
+                  className="block rounded-[4px] group-hover:ring-2 group-hover:ring-blue-500"
+                  imgClassName="block w-auto h-auto bg-white"
+                  imgStyle={{ maxWidth: "100cqw", maxHeight: "100cqh" }}
+                  onError={() => markImage(object.id, "failed")}
+                  loading="eager"
+                />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 text-sm leading-normal">
+              <div className="truncate text-black">{title}</div>
+              {detail && <div className="truncate text-gray-600" title={detail}>{detail}</div>}
+            </div>
+          </div>
+        )
+      })}
+      </div>
+      ) : (
       <div
         className={`grid ${columnsOverride ? "" : gridClass} gap-3`}
         style={columnsOverride ? { gridTemplateColumns: `repeat(${columnsOverride}, minmax(0, 1fr))` } : undefined}
@@ -433,7 +488,7 @@ if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStat
   return (
     <div
       key={object.id}
-      className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileHeight ? "" : "h-44"}`}
+      className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileSizeClass}`}
       style={tileHeight ? { height: tileHeight } : undefined}
       onClick={() => handleImageClick(index)}
       onMouseEnter={() => {
@@ -463,7 +518,7 @@ if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStat
 return (
   <div
     key={object.id}
-    className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileHeight ? "" : "h-44"}`}
+    className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileSizeClass}`}
     style={tileHeight ? { height: tileHeight } : undefined}
     onClick={() => handleImageClick(index)}
     onMouseEnter={() => {
@@ -487,8 +542,8 @@ return (
         src={object.attributes.img_url!}
         alt={object.attributes?.title || "Museum artifact"}
         className="block"
-        imgClassName={`block w-auto bg-white ${tileHeight ? "max-w-full" : "max-h-44"}`}
-        imgStyle={tileHeight ? { maxHeight: tileHeight } : undefined}
+        imgClassName="block w-auto h-auto bg-white"
+        imgStyle={{ maxWidth: "100cqw", maxHeight: "100cqh" }}
         onError={() => markImage(object.id, "failed")}
         // Already preloaded into the browser cache before the tile was revealed.
         loading="eager"
@@ -498,6 +553,7 @@ return (
 )
       })}
       </div>
+      )}
 
       {/* Infinite scroll sentinel */}
       {hasMore && (
