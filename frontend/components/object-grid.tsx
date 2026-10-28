@@ -569,11 +569,6 @@ return (
         </div>
       )}
 
-      {!hasMore && !isCheckingImages && (
-        <div className="text-center py-4 text-[10px] text-gray-300">
-          {revealed.length} artifact{revealed.length !== 1 ? "s" : ""}
-        </div>
-      )}
       </>
       )}
     </div>
