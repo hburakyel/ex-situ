@@ -106,6 +106,7 @@ SKIP = {
     "Costa Rica, Burica Peninsula",  # the peninsula is shared with Panama
     "Puerto González Víquez, Costa Rica, Burica Peninsula",
     "Kailahun (Liberia)",          # Kailahun is in Sierra Leone; source and point disagree — for review
+    "Benin",                       # Weltmuseum "Nigeria/Benin": the Benin Kingdom, Benin City (2026-10-28)
 }
 SKIP_PREFIXES = (
     "Republic of the Congo or Cabinda",        # Chiloango river, on the border

@@ -13,7 +13,7 @@
 
 ---
 
-**Status:** Actively developed. Started as an MA thesis in 2022, now mapping 300,000+ artifacts from 61 collections (10 indexed directly, 51 via Europeana).
+**Status:** Actively developed. Started as an MA thesis in 2022, now mapping 350,000+ artifacts from 63 collections (12 indexed directly, 51 via Europeana).
 
 ---
 
@@ -202,7 +202,7 @@ See [COLLECTIONS.md](COLLECTIONS.md) for the full collection roadmap.
 - [GeoNames](https://www.geonames.org) — gazetteer for place and country matching (CC BY 4.0)
 - [Europeana](https://www.europeana.eu) — aggregator API used to find records of further European institutions; each record is credited to, and links to, its holding institution
 
-**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum, Art Institute of Chicago (CC0), Rijksmuseum (open data), and others — see the map for the full, current list of indexed collections. Institutions reached via Europeana are listed in [COLLECTIONS.md](COLLECTIONS.md); their image credits show each image's own licence.
+**Institutional data sources:** Staatliche Museen zu Berlin (SMB-Digital), The Metropolitan Museum of Art (CC0), Victoria and Albert Museum, Art Institute of Chicago (CC0), Rijksmuseum (open data), The Walters Art Museum (CC0), Weltmuseum Wien, and others — see the map for the full, current list of indexed collections. Institutions reached via Europeana are listed in [COLLECTIONS.md](COLLECTIONS.md); their image credits show each image's own licence.
 
 ---
 

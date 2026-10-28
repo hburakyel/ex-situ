@@ -37,7 +37,7 @@ COLUMNS = [
     "object_id", "title", "img_url", "image_rights", "latitude", "longitude",
     "institution_name", "institution_place", "institution_latitude", "institution_longitude",
     "institution_city_en", "institution_country_en", "source_link",
-    "place_name", "country_en", "origin_event_type_en", "origin_is_findspot",
+    "place_name", "place_name_normalized", "country_en", "origin_event_type_en", "origin_is_findspot",
     "geocoder_source", "geocoding_status", "geocoding_notes", "review_status",
     "object_date", "object_date_earliest", "object_date_latest", "object_date_precision", "object_date_display",
     "acquisition_year", "acquisition_year_earliest", "acquisition_year_latest",
@@ -153,7 +153,10 @@ def main():
                          None if t.get("time_end") is None else str(t["time_end"])))
             cur.execute('INSERT INTO museum_objects_components (entity_id, component_id, component_type, field, "order") '
                         "VALUES (%s, %s, 'time-name.time-info', 'time', 1)", (mid, cur.fetchone()[0]))
-        for i, link in enumerate(r.get("object_links") or [], 1):
+        # link_text is varchar(255); 7 page URLs carry longer slugs. Those rows get no link
+        # component and the panel falls back to source_link, which holds the full URL.
+        links = [l for l in r.get("object_links") or [] if len(l["link_text"]) <= 255]
+        for i, link in enumerate(links, 1):
             cur.execute("INSERT INTO components_object_links_object_link_infos (link_text, link_display) "
                         "VALUES (%s, %s) RETURNING id", (link["link_text"], link["link_display"]))
             cur.execute('INSERT INTO museum_objects_components (entity_id, component_id, component_type, field, "order") '

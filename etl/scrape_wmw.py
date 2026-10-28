@@ -82,6 +82,21 @@ UNLABELLED_EVENT = "Attributed place"
 ASIAN_BRANCHES = {"Nordasien", "Zentralasien", "Westasien", "Asien"}
 ISLAND_CODES = {"ISL", "ISLET", "ATOL", "ISLT", "ISLS"}
 SITE_CODES = {"RUIN", "ANS", "HSTS", "MSSN"}
+# Single exact matches that name another place (desk review 2026-10-28): an alternate
+# name of a village, not the place the museum means. These keep the country point.
+NOT_MATCHES = {("Vera Cruz", "Mexico"), ("Cross Village", "United States"), ("Satsuma", "Japan")}
+# GeoNames names carry scholarly macrons ("Phulbāni") and Indonesian island names
+# a "Pulau" prefix; labels drop both ("Phulbani", "Nias"). Other accents stay (Djenné).
+MACRONS = str.maketrans("āēīōūĀĒĪŌŪ", "aeiouAEIOU")
+
+
+# GeoNames spellings of sites Ex Situ already lists under another spelling, within 1 km.
+EXISTING_LABELS = {"Fes": "Fez", "Darjiling": "Darjeeling"}
+
+
+def label_of(geonames_name: str) -> str:
+    label = re.sub(r"^Pulau ", "", geonames_name.translate(MACRONS))
+    return EXISTING_LABELS.get(label, label)
 # Segments that name a place inside one country but are not country labels: they give
 # the country to search in, never a country point.
 REGION_COUNTRY = {
@@ -245,7 +260,7 @@ class Places:
         for line in open(os.path.join(gazetteer_dir, "cities500.txt"), encoding="utf-8"):
             f = line.rstrip("\n").split("\t")
             for n in {f[1], f[2], *[a for a in f[3].split(",") if a]}:
-                self.gaz.setdefault((f[8], n.lower()), set()).add((f[0], float(f[4]), float(f[5]), "P", f[7]))
+                self.gaz.setdefault((f[8], n.lower()), set()).add((f[0], float(f[4]), float(f[5]), "P", f[7], f[1]))
         self.points_path = os.path.join(ETL_DIR, "wmw_country_points.json")
         self.points = json.load(open(self.points_path, encoding="utf-8")) if os.path.exists(self.points_path) else {}
 
@@ -262,7 +277,7 @@ class Places:
                     f = raw.decode("utf-8").rstrip("\n").split("\t")
                     for n in {f[1].lower(), f[2].lower(), *[a.lower() for a in f[3].split(",") if a]}:
                         if n in wanted:
-                            self.gaz.setdefault((cc, n), set()).add((f[0], float(f[4]), float(f[5]), f[6], f[7]))
+                            self.gaz.setdefault((cc, n), set()).add((f[0], float(f[4]), float(f[5]), f[6], f[7], f[1]))
 
     def is_european(self, country_en: str) -> bool:
         return self.continent.get(self.iso.get(country_en, "")) == "EU"
@@ -292,19 +307,19 @@ class Places:
         return self.points[country_en]
 
     def resolve(self, label: str, country_en: str):
-        """-> (lat, lon, source) for a single exact match in the country, else None."""
+        """-> (lat, lon, source, GeoNames name) for a single exact match in the country, else None."""
         cc = self.iso.get(country_en)
         # two names in one level ("Alwar / Sariska"): a match on one would misplace the other
         if not cc or " / " in label or any((cc, v.lower()) in self.admin1 for v in name_variants(label)):
             return None
         hits = {}
         for v in name_variants(label):
-            for gid, lat, lon, fclass, fcode in self.gaz.get((cc, v.lower()), set()):
+            for gid, lat, lon, fclass, fcode, name in self.gaz.get((cc, v.lower()), set()):
                 if fclass == "P" or (fclass == "T" and fcode in ISLAND_CODES) or (fclass == "S" and fcode in SITE_CODES):
-                    hits[gid] = (lat, lon, fcode)
+                    hits[gid] = (lat, lon, fcode, name)
         if len(hits) == 1:
-            gid, (lat, lon, fcode) = next(iter(hits.items()))
-            return round(lat, 5), round(lon, 5), f"GeoNames {gid} {fcode} (single exact match in {cc})"
+            gid, (lat, lon, fcode, name) = next(iter(hits.items()))
+            return round(lat, 5), round(lon, 5), f"GeoNames {gid} {fcode} (single exact match in {cc})", name
         return None
 
 
@@ -386,11 +401,15 @@ def cmd_map(args) -> None:
             stats["left out: Europa branch"] += 1
             continue
         notes = [f"origin from Weltmuseum Wien Geography \"{d.get('thesaurus')}\""] if d.get("thesaurus") else []
-        place_name, lat, lon, country_en, level = None, None, None, o.get("country_en"), None
+        place_name, label, lat, lon, country_en, level = None, None, None, None, o.get("country_en"), None
         if o["kind"] == "ok":
             loc = places.resolve(o["deepest"], country_en) if o["deepest"] else None
+            if (o["deepest"], country_en) in NOT_MATCHES:
+                loc = None
             if loc:
-                place_name, (lat, lon, source), level = o["deepest"], loc, "place"
+                # label: the GeoNames name of the matched place ("Kairo" -> Cairo, "Sansibar" -> Zanzibar)
+                place_name, (lat, lon, source, label), level = o["deepest"], loc, "place"
+                label = label_of(label)
                 notes.append(f"coordinates: {source}")
             else:
                 if o["deepest"]:
@@ -398,7 +417,7 @@ def cmd_map(args) -> None:
                     notes.append(f"specific place not resolved: {o['deepest']}")
                 point = places.country_point(country_en) if o["country_label"] else None
                 if point:
-                    place_name, (lat, lon), level = o["country_label"], point, "country"
+                    place_name, label, (lat, lon), level = o["country_label"], country_en, point, "country"
                     notes.append("coordinates: Ex Situ country point")
                 else:
                     o = {**o, "kind": "flag", "why": "no country point" if o["country_label"] else "region without country label"}
@@ -421,6 +440,7 @@ def cmd_map(args) -> None:
             **INSTITUTION,
             "inventory_number": inv,
             "place_name": place_name,
+            "place_name_normalized": label,
             "latitude": lat,
             "longitude": lon,
             "country_en": country_en,

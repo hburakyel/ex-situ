@@ -15,6 +15,8 @@ etl/
 ├── scrape_europeana.py        # Europeana resolver — institutions via Europeana, non-European origins only
 ├── scrape_si.py               # Smithsonian Open Access resolver — Asian Art, American Indian, NMNH Anthropology
 ├── si_points.py               # Smithsonian: county, state and place points from GeoNames allCountries
+├── scrape_wmw.py              # Weltmuseum Wien resolver — object pages from the sitemap
+├── import_wmw.py              # Weltmuseum Wien: wmw_objects.json → museum_objects (upsert)
 ├── check_europeana_images.py  # Finds Europeana image URLs that do not load (objects are left out)
 ├── backfill_europeana_fields.py # After import: country/city, museum locality, licence, inventory number
 ├── postgis_geocoder.py        # Geocoding pipeline (local PostGIS gazetteer)
@@ -131,6 +133,25 @@ every record by exact name in GeoNames allCountries (`data/gazetteer/allcountrie
 download from download.geonames.org): town or site inside the record's state and county, else the
 county, else the state; the label is the matched GeoNames name, with the state added for names that
 occur in several states ("Bethel, Alaska"). Country-only records get no point here.
+
+### Weltmuseum Wien
+
+No API or data dump: `scrape_wmw.py` lists the object pages from the museum's sitemap (robots.txt
+allows them) and reads each page once, at about one request per second (~50,700 pages, ~14 h,
+resumable). Origin is the page's "Geography" path (place of production): paths in Europe are left
+out; the last level is placed on a single exact GeoNames match in the path's country (label: the
+GeoNames name, "Kairo" → Cairo), otherwise the record keeps the country and the point existing
+records use for it. Records without a country or a point go to `wmw_flagged.json` for review.
+`wmw_countries.json` maps the museum's German country names. Images are the pages' own `/pics/`
+files (CC BY-NC-SA 4.0), resized through `/api/proxy/img`.
+
+```bash
+python scrape_wmw.py enumerate                # object page URLs from the sitemap
+python scrape_wmw.py fetch                    # cache → wmw_details.jsonl (resumable)
+python scrape_wmw.py map --dry-run            # counts + sample records
+python scrape_wmw.py map                      # → wmw_objects.json (+ wmw_flagged.json)
+python import_wmw.py                          # dry run; --apply to write, then the place pipeline
+```
 
 Common flags available on all resolvers:
 

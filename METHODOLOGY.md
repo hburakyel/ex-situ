@@ -26,7 +26,7 @@ Limited to institutions with open, programmatic access to their collections — 
 
 Object dates come from source institutions, shown at whatever precision they provide — exact year, range, century, or unknown. Undated objects remain visible; date filters never hide them silently.
 
-"Migration" is the year an object entered the holding institution, as a year only; how it got there (purchase, gift, collecting) is on the institution's own page. Sources: the V&A, the Met (`accessionYear`) and the Art Institute of Chicago (`fiscal_year`, used only where the accession number gives the same calendar year) state it in their records; for the Rijksmuseum and the Etnografiska museet / Världskulturmuseet it is the year in the object number ("NG-1994-65": acquired 1994; "1907.57.0012": collection registered in 1907, for the oldest collections by a predecessor institution). Other collections have no such year in their open data yet.
+"Migration" is the year an object entered the holding institution, as a year only; how it got there (purchase, gift, collecting) is on the institution's own page. Sources: the V&A, the Met (`accessionYear`) and the Art Institute of Chicago (`fiscal_year`, used only where the accession number gives the same calendar year) state it in their records; for the Rijksmuseum and the Etnografiska museet / Världskulturmuseet it is the year in the object number ("NG-1994-65": acquired 1994; "1907.57.0012": collection registered in 1907, for the oldest collections by a predecessor institution); the Weltmuseum Wien gives it as the entry date on its object pages. Other collections have no such year in their open data yet.
 
 ## Geocoding
 
@@ -51,6 +51,7 @@ Places are labelled with their present-day names; the name in the source record 
 | Art Institute of Chicago | `place_of_origin`. |
 | Victoria and Albert Museum | `_primaryPlace`. Where that is a country and the record's `placesOfOrigin` also names exactly one place inside that country with the same association ("Palestine (made)" and "Bethlehem (made)"), that place. |
 | Rijksmuseum | `dcterms:spatial`, the place of production. Depicted places (`dc:subject`) are not used. |
+| Weltmuseum Wien | The object page's "Geography", the place of production, from continent down to place. Its last level is used where it names exactly one town, island or site in that country (GeoNames); otherwise the country. |
 | Other institutions, through Europeana | The provider's own `dcterms:spatial` and `dc:coverage`. Only where a provider gives none is Europeana's enrichment (`edmPlace`) used, and those records are marked as such. |
 
 Swedish National Museums of World Culture records (Carlotta) name the role of each place — origin, made, findspot, used, acquired from. Europeana's `dcterms:spatial` merges these roles into one list.
