@@ -84,7 +84,19 @@ ISLAND_CODES = {"ISL", "ISLET", "ATOL", "ISLT", "ISLS"}
 SITE_CODES = {"RUIN", "ANS", "HSTS", "MSSN"}
 # Single exact matches that name another place (desk review 2026-10-28): an alternate
 # name of a village, not the place the museum means. These keep the country point.
-NOT_MATCHES = {("Vera Cruz", "Mexico"), ("Cross Village", "United States"), ("Satsuma", "Japan")}
+NOT_MATCHES = {("Vera Cruz", "Mexico"), ("Cross Village", "United States"), ("Satsuma", "Japan"),
+               ("Chi", "India"),                  # an alternate name of Chittoor district
+               ("Niger, Oberlauf", "Nigeria"),    # the upper Niger river, not Niger State
+               ("Para", "Brazil"), ("Johor", "Malaysia"),  # states, matched to their capitals
+               ("Bumthang", "Bhutan")}            # the district, matched to a hamlet
+# Regions (ADM1/ADM2) keep the museum's own name, not GeoNames' formal one ("State of
+# Nagaland", "Provinsi Bali"); German names in English (desk review 2026-10-28).
+REGION_LABELS = {
+    "Kalmükien": "Kalmykia", "Kilimandscharo": "Kilimanjaro", "Blauer Nil": "Blue Nile",
+    "Nordossetien-Alanien": "North Ossetia–Alania", "Sud-Kivu": "South Kivu", "Sukothai": "Sukhothai",
+    "West-Sumatra (Barat-Padang)": "West Sumatra", "Süd-Nigeria (Cross River)": "Cross River",
+    "Maniema (Mitumba)": "Maniema", "Mato Grosso do sul": "Mato Grosso do Sul", "Rondonia": "Rondônia",
+}
 # GeoNames names carry scholarly macrons ("Phulbāni") and Indonesian island names
 # a "Pulau" prefix; labels drop both ("Phulbani", "Nias"). Other accents stay (Djenné).
 MACRONS = str.maketrans("āēīōūĀĒĪŌŪ", "aeiouAEIOU")
@@ -94,8 +106,12 @@ MACRONS = str.maketrans("āēīōūĀĒĪŌŪ", "aeiouAEIOU")
 EXISTING_LABELS = {"Fes": "Fez", "Darjiling": "Darjeeling"}
 
 
-def label_of(geonames_name: str) -> str:
+def label_of(geonames_name: str, source_name: str) -> str:
     label = re.sub(r"^Pulau ", "", geonames_name.translate(MACRONS))
+    try:
+        label.encode("latin-1")
+    except UnicodeEncodeError:
+        label = source_name                  # "Dhadiṅ Besi̇̄", "Laḩij": the museum's "Dhading", "Lahij"
     return EXISTING_LABELS.get(label, label)
 # Segments that name a place inside one country but are not country labels: they give
 # the country to search in, never a country point.
@@ -105,7 +121,7 @@ REGION_COUNTRY = {
     "Austral Inseln": "French Polynesia",
 }
 # Country labels that name a territory and may follow their state in the path.
-TERRITORIES = {"Grönland"}
+TERRITORIES = {"Grönland", "Ost-Grönland", "West-Grönland", "St. Helena"}
 FIELDS = ("object_name", "time", "entry_date", "culture", "medium", "department", "thesaurus", "object_number")
 
 
@@ -246,7 +262,7 @@ class Places:
                 self.iso[f[4]] = f[0]
                 self.continent[f[0]] = f[8]
         self.iso.update({"United States": "US", "Côte d'Ivoire": "CI", "Palestine": "PS", "Czechia": "CZ",
-                         "Timor-Leste": "TL", "Gambia": "GM", "Cabo Verde": "CV", "Reunion": "RE",
+                         "Timor-Leste": "TL", "Gambia": "GM", "The Gambia": "GM", "Cabo Verde": "CV", "Reunion": "RE",
                          "Federated States of Micronesia": "FM", "Republic of the Congo": "CG",
                          "Democratic Republic of the Congo": "CD", "South Korea": "KR", "North Korea": "KP",
                          "Eswatini": "SZ", "Myanmar": "MM", "United Kingdom": "GB"})
@@ -261,30 +277,40 @@ class Places:
             f = line.rstrip("\n").split("\t")
             for n in {f[1], f[2], *[a for a in f[3].split(",") if a]}:
                 self.gaz.setdefault((f[8], n.lower()), set()).add((f[0], float(f[4]), float(f[5]), "P", f[7], f[1]))
+        self.label_point = {}                     # country_en (lower) -> the map's country label point
+        labels = os.path.join(ETL_DIR, "..", "frontend", "public", "country-labels.geojson")
+        for ft in json.load(open(labels, encoding="utf-8"))["features"]:
+            lon, lat = ft["geometry"]["coordinates"]
+            for k in ft["properties"].get("keys", "").split("|"):
+                self.label_point[k] = [round(lat, 4), round(lon, 4)]
         self.points_path = os.path.join(ETL_DIR, "wmw_country_points.json")
         self.points = json.load(open(self.points_path, encoding="utf-8")) if os.path.exists(self.points_path) else {}
 
-    def add_country_files(self, folder: str, wanted: set[str]) -> None:
-        """GeoNames country dumps (<CC>.zip): villages and islands cities500 lacks; only the names asked for."""
-        if not os.path.isdir(folder):
-            return
-        for fn in sorted(os.listdir(folder)):
-            if not fn.endswith(".zip"):
-                continue
-            cc = fn[:-4]
-            with zipfile.ZipFile(os.path.join(folder, fn)) as z, z.open(f"{cc}.txt") as fh:
+    def add_country_files(self, gazetteer_dir: str, wanted: set[str]) -> None:
+        """GeoNames allCountries (allcountries/allCountries.zip), else the per-country dumps
+        (countries/<CC>.zip): villages, islands and first/second-level regions cities500
+        lacks; only the names asked for."""
+        dumps = [(os.path.join(gazetteer_dir, "allcountries", "allCountries.zip"), "allCountries.txt")]
+        if not os.path.exists(dumps[0][0]):
+            folder = os.path.join(gazetteer_dir, "countries")
+            dumps = [(os.path.join(folder, fn), fn[:-4] + ".txt")
+                     for fn in sorted(os.listdir(folder) if os.path.isdir(folder) else []) if fn.endswith(".zip")]
+        for path, member in dumps:
+            with zipfile.ZipFile(path) as z, z.open(member) as fh:
                 for raw in fh:
                     f = raw.decode("utf-8").rstrip("\n").split("\t")
                     for n in {f[1].lower(), f[2].lower(), *[a.lower() for a in f[3].split(",") if a]}:
                         if n in wanted:
-                            self.gaz.setdefault((cc, n), set()).add((f[0], float(f[4]), float(f[5]), f[6], f[7], f[1]))
+                            self.gaz.setdefault((f[8], n), set()).add((f[0], float(f[4]), float(f[5]), f[6], f[7], f[1]))
 
     def is_european(self, country_en: str) -> bool:
         return self.continent.get(self.iso.get(country_en, "")) == "EU"
 
     def country_point(self, country_en: str):
         """Ex Situ's own point for rows whose place is just this country: >= 3 such rows, >= 60 % on or
-        within 50 km of the most used point (collections put Vietnam at 16,108 and 15.927,107.965)."""
+        within 50 km of the most used point (collections put Vietnam at 16,108 and 15.927,107.965).
+        Where collections disagree (Ghana: 8,-0.5 and 8.03,-1.08), the existing point nearest the
+        map's country label; where no row has a country point yet, the label point itself."""
         if country_en not in self.points:
             # site=<country> lists the rows on the country's own site (not its cities)
             q = urllib.parse.urlencode({"country": country_en, "site": country_en, "pageSize": 100})
@@ -301,22 +327,38 @@ class Places:
                 n = sum(v for p, v in votes.items() if km((lat, lon), p) <= 50)
                 if top >= 3 and n / sum(votes.values()) >= 0.6:
                     point = [lat, lon]
+            label = self.label_point.get(country_en.lower())
+            if point is None and label and votes:
+                near = min(votes, key=lambda p: km(p, label))
+                point = list(near) if km(near, label) <= 100 else None
+            elif point is None and label:
+                point = label
             self.points[country_en] = point
             json.dump(self.points, open(self.points_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
             pause(0.3)
         return self.points[country_en]
 
     def resolve(self, label: str, country_en: str):
-        """-> (lat, lon, source, GeoNames name) for a single exact match in the country, else None."""
+        """-> (lat, lon, source, GeoNames name) for a single exact match in the country, else None.
+        A first-level region's name ("Gujarat", "Mato Grosso") is never matched to a town of the
+        same name, only to its capital of that name (Istanbul, Delhi: PPLC/PPLA) or to the region
+        itself. A first- or second-level region (ADM1/ADM2) is placed on its GeoNames point when
+        no town or island has the name."""
         cc = self.iso.get(country_en)
         # two names in one level ("Alwar / Sariska"): a match on one would misplace the other
-        if not cc or " / " in label or any((cc, v.lower()) in self.admin1 for v in name_variants(label)):
+        if not cc or " / " in label:
             return None
-        hits = {}
-        for v in name_variants(label):
+        variants = name_variants(label)
+        is_admin1 = any((cc, v.lower()) in self.admin1 for v in variants)
+        towns, regions = {}, {}
+        for v in variants:
             for gid, lat, lon, fclass, fcode, name in self.gaz.get((cc, v.lower()), set()):
                 if fclass == "P" or (fclass == "T" and fcode in ISLAND_CODES) or (fclass == "S" and fcode in SITE_CODES):
-                    hits[gid] = (lat, lon, fcode, name)
+                    if not is_admin1 or fcode in ("PPLC", "PPLA"):
+                        towns[gid] = (lat, lon, fcode, name)
+                elif fclass == "A" and fcode in ("ADM1", "ADM2"):
+                    regions[gid] = (lat, lon, fcode, name)
+        hits = towns or regions
         if len(hits) == 1:
             gid, (lat, lon, fcode, name) = next(iter(hits.items()))
             return round(lat, 5), round(lon, 5), f"GeoNames {gid} {fcode} (single exact match in {cc})", name
@@ -346,7 +388,7 @@ def choose_origin(path: str | None, places: Places) -> dict:
             return {"kind": "flag", "why": "no country in path", "segs": segs}
     country_en = places.country_of[country_label] if country_label else REGION_COUNTRY[segs[idx]]
     if places.is_european(country_en) and not (country_en == "Russia" and segs[0] in ASIAN_BRANCHES):
-        return {"kind": "flag", "why": f"European country under {segs[0]}", "segs": segs, "country_en": country_en}
+        return {"kind": "europe", "why": f"European country under {segs[0]}"}
     return {"kind": "ok", "segs": segs, "country_en": country_en, "country_label": country_label,
             "deepest": segs[-1] if len(segs) - 1 > idx or not country_label else None}
 
@@ -388,7 +430,7 @@ def cmd_map(args) -> None:
         rows[r["url"]] = r                       # last line wins (re-fetched errors)
     wanted = {v.lower() for r in rows.values() for s in (r.get("thesaurus") or "").split("/")[-1:]
               for v in name_variants(s)}
-    places.add_country_files(os.path.join(args.gazetteer, "countries"), wanted)
+    places.add_country_files(args.gazetteer, wanted)
 
     stats, unresolved = collections.Counter(), collections.Counter()
     kept, flagged, today = [], [], time.strftime("%Y-%m-%d")
@@ -398,7 +440,7 @@ def cmd_map(args) -> None:
             continue
         o = choose_origin(d.get("thesaurus"), places)
         if o["kind"] == "europe":
-            stats["left out: Europa branch"] += 1
+            stats[f"left out: {o['why']}"] += 1
             continue
         notes = [f"origin from Weltmuseum Wien Geography \"{d.get('thesaurus')}\""] if d.get("thesaurus") else []
         place_name, label, lat, lon, country_en, level = None, None, None, None, o.get("country_en"), None
@@ -409,7 +451,8 @@ def cmd_map(args) -> None:
             if loc:
                 # label: the GeoNames name of the matched place ("Kairo" -> Cairo, "Sansibar" -> Zanzibar)
                 place_name, (lat, lon, source, label), level = o["deepest"], loc, "place"
-                label = label_of(label)
+                label = (REGION_LABELS.get(o["deepest"], o["deepest"]) if " ADM" in source
+                         else label_of(label, o["deepest"]))
                 notes.append(f"coordinates: {source}")
             else:
                 if o["deepest"]:
@@ -421,7 +464,11 @@ def cmd_map(args) -> None:
                     notes.append("coordinates: Ex Situ country point")
                 else:
                     o = {**o, "kind": "flag", "why": "no country point" if o["country_label"] else "region without country label"}
-        stats[f"kept: {level}" if o["kind"] == "ok" else f"flagged: {o['why']}"] += 1
+        stats[f"kept: {level}" if o["kind"] == "ok" else f"unlocated: {o['why']}"] += 1
+        if o["kind"] != "ok" and o.get("segs"):
+            # No point: the record keeps the museum's own deepest place ("West-Afrika", "Tibet")
+            # and is indexed without coordinates, so search finds it (as for the Walters).
+            place_name = o["segs"][-1]
         start, end = parse_years(d.get("time"))
         inv = d.get("object_number")
         # Photo and picture pages show no "Invs."; their image files are named after the
@@ -454,10 +501,12 @@ def cmd_map(args) -> None:
             "geocoder_source": "wmw",
             "geocoding_status": "ok" if o["kind"] == "ok" else "ambiguous",
             "geocoding_notes": f"{NOTE_TAG} {today} " + "; ".join(notes) + "; desk review, not verified"
-                               + ("" if o["kind"] == "ok" else f"; flagged: {o['why']}"),
-            "review_status": None if o["kind"] == "ok" else "pending",
+                               + ("" if o["kind"] == "ok" else f"; no point: {o['why']}, indexed without a point"),
+            "review_status": None,
         }
-        (kept if o["kind"] == "ok" else flagged).append(rec)
+        kept.append(rec)
+        if o["kind"] != "ok":
+            flagged.append(rec)                  # also listed for review
 
     print(f"{len(rows)} cached pages")
     for k, v in sorted(stats.items(), key=lambda kv: -kv[1]):

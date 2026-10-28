@@ -168,7 +168,7 @@
     "Gabun",
     "Gabon"
   ],
-  "Gambia": [
+  "The Gambia": [
     "Gambia"
   ],
   "Georgia": [
@@ -184,7 +184,9 @@
     "Griechenland"
   ],
   "Greenland": [
-    "Grönland"
+    "Grönland",
+    "Ost-Grönland",
+    "West-Grönland"
   ],
   "Guatemala": [
     "Guatemala"
@@ -525,5 +527,11 @@
   "Zimbabwe": [
     "Simbabwe",
     "Zimbabwe"
+  ],
+  "French Polynesia": [
+    "Französisch-Polynesien"
+  ],
+  "Saint Helena": [
+    "St. Helena"
   ]
 }

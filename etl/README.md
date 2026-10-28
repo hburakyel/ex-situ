@@ -139,9 +139,12 @@ occur in several states ("Bethel, Alaska"). Country-only records get no point he
 No API or data dump: `scrape_wmw.py` lists the object pages from the museum's sitemap (robots.txt
 allows them) and reads each page once, at about one request per second (~50,700 pages, ~14 h,
 resumable). Origin is the page's "Geography" path (place of production): paths in Europe are left
-out; the last level is placed on a single exact GeoNames match in the path's country (label: the
-GeoNames name, "Kairo" → Cairo), otherwise the record keeps the country and the point existing
-records use for it. Records without a country or a point go to `wmw_flagged.json` for review.
+out; the last level is placed on a single exact GeoNames match in the path's country (town, island
+or site, label: the GeoNames name, "Kairo" → Cairo; else a first/second-level region, label: the
+museum's name), searched in GeoNames allCountries (`data/gazetteer/allcountries/allCountries.zip`).
+Otherwise the record keeps the country and the point existing records use for it (where they
+disagree, the one nearest the map's country label; where there is none, the label point). Records
+without a country or a point are indexed without one and also listed in `wmw_flagged.json`.
 `wmw_countries.json` maps the museum's German country names. Images are the pages' own `/pics/`
 files (CC BY-NC-SA 4.0), resized through `/api/proxy/img`.
 

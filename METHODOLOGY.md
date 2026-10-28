@@ -51,7 +51,7 @@ Places are labelled with their present-day names; the name in the source record 
 | Art Institute of Chicago | `place_of_origin`. |
 | Victoria and Albert Museum | `_primaryPlace`. Where that is a country and the record's `placesOfOrigin` also names exactly one place inside that country with the same association ("Palestine (made)" and "Bethlehem (made)"), that place. |
 | Rijksmuseum | `dcterms:spatial`, the place of production. Depicted places (`dc:subject`) are not used. |
-| Weltmuseum Wien | The object page's "Geography", the place of production, from continent down to place. Its last level is used where it names exactly one town, island or site in that country (GeoNames); otherwise the country. |
+| Weltmuseum Wien | The object page's "Geography", the place of production, from continent down to place. Its last level is used where it names exactly one town, island, site or first/second-level region in that country (GeoNames); otherwise the country. |
 | Other institutions, through Europeana | The provider's own `dcterms:spatial` and `dc:coverage`. Only where a provider gives none is Europeana's enrichment (`edmPlace`) used, and those records are marked as such. |
 
 Swedish National Museums of World Culture records (Carlotta) name the role of each place — origin, made, findspot, used, acquired from. Europeana's `dcterms:spatial` merges these roles into one list.

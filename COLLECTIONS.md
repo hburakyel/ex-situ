@@ -1,8 +1,8 @@
 # Ex Situ — Collection Roadmap
 
-Current (28 October 2026, from the public API): **359,893 artifacts on the map · 63 collections · 204 territories**
+Current (28 October 2026, from the public API): **360,326 artifacts on the map · 63 collections · 206 territories**
 
-395,804 records are indexed. The others have no located origin in their institution's record yet, have a point but no territory that can be assigned without guessing (regions such as Polynesia, or a place name that does not match its point), or are parts of one object that share an inventory number and are counted once. 12 collections are indexed directly, 51 via Europeana.
+400,820 records are indexed. The others have no located origin in their institution's record yet, have a point but no territory that can be assigned without guessing (regions such as Polynesia, or a place name that does not match its point), or are parts of one object that share an inventory number and are counted once. 12 collections are indexed directly, 51 via Europeana.
 
 This document tracks indexed collections, planned integrations, and contribution priorities.
 
@@ -23,12 +23,13 @@ This document tracks indexed collections, planned integrations, and contribution
 | 9 | Art Institute of Chicago | Chicago | 33,890 | REST API (CC0) | ✅ Live |
 | 10 | Rijksmuseum | Amsterdam | 54,719 | OAI-PMH (EDM, open data) | ✅ Live |
 | 11 | The Walters Art Museum | Baltimore | 9,329 | Open data (CC0), Wikimedia Commons | ✅ Live |
-| 12 | Weltmuseum Wien | Vienna | 45,272 | Online collection pages (sitemap) | ✅ Live |
+| 12 | Weltmuseum Wien | Vienna | 50,288 | Online collection pages (sitemap) | ✅ Live |
 
 Weltmuseum Wien (October 2026): the origin is the object page's "Geography", the place of production;
-objects it places in Europe are left out. 5,135 records are held back for review: no country in the
-path (Tibet, Korea, "Afrika südlich der Sahara"), no geography, no point for the country yet, or a
-European country under a non-European branch (`etl/wmw_flagged.json`).
+objects it places in Europe are left out (458, with the Canary Islands and Ceuta). 45,705 records are
+on the map; 4,583 are indexed without a point, so search finds them: no country in the path (Tibet,
+Korea, "Afrika südlich der Sahara"), no geography, or no point for the country yet
+(`etl/wmw_flagged.json`).
 
 ---
 
