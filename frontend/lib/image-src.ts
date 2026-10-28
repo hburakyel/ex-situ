@@ -11,11 +11,13 @@
 //   (It must live under /api/proxy/: production nginx sends every other
 //   /api/* path to Strapi, not Next.)
 // - id.smb.museum: hotlink-blocks headerless requests; proxied for the same reason.
+// - www.weltmuseumwien.at: /pics/ files are the full-size scans (often 300 KB+) and
+//   the page's own thumbnails have hashed names; proxied so tiles are resized.
 // - recherche.smb.museum: dead (301 to the homepage). Rows not yet remapped by
 //   etl/refetch_smb_image_urls.py point there; the same asset lives on
 //   search.smb.museum (see smbSearchUrl).
 
-const PROXIED_HOSTS = new Set(["id.smb.museum", "www.artic.edu"])
+const PROXIED_HOSTS = new Set(["id.smb.museum", "www.artic.edu", "www.weltmuseumwien.at"])
 
 export const THUMB_WIDTH = 300
 export const LARGE_WIDTH = 800

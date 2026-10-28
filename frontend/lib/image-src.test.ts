@@ -36,3 +36,10 @@ describe("resolveImageSrc — Met renditions", () => {
     expect(resolveImageSrc(original, LARGE_WIDTH)).toBe("https://images.metmuseum.org/CRDImages/is/web-large/DT8104.jpg")
   })
 })
+
+describe("resolveImageSrc — Weltmuseum Wien", () => {
+  const pic = "https://www.weltmuseumwien.at/pics/1001874/VO_190359_201412_1.jpg"
+  it("resizes the full-size scan through the image proxy", () => {
+    expect(resolveImageSrc(pic)).toBe(`/api/proxy/img?url=${encodeURIComponent(pic)}&w=300`)
+  })
+})

@@ -17,6 +17,7 @@ const ALLOWED_IMAGE_DOMAINS = new Set([
   "asset.museum-digital.org",
   "search.smb.museum",
   "www.artic.edu",
+  "www.weltmuseumwien.at",
 ])
 
 const PRIVATE_IP_PATTERNS = [
