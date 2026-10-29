@@ -23,6 +23,19 @@ export default function RootLayout({
   return (
     <html lang="en" className={notoSansMono.variable} suppressHydrationWarning>
       <head>
+        {/* Tells Google the site's name; without it the result header falls back to the domain ("exsitu.app"). */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "Ex Situ",
+              alternateName: ["Ex Situ Map", "exsitu.app"],
+              url: "https://exsitu.app/",
+            }),
+          }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -54,7 +67,7 @@ export default function RootLayout({
 export const metadata = {
   metadataBase: new URL('https://exsitu.app'),
   title: MAP_DEFAULT_TITLE,
-  description: 'Ex Situ is an open-source spatial index that maps cultural artifacts from their place of origin to the institution that holds them today.',
+  description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',
   openGraph: {
     title: MAP_DEFAULT_TITLE,
     description: 'Explore the global spatial index of cultural artifacts. Browse provenance arcs by place, time, and collection on an interactive map.',
