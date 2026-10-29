@@ -31,7 +31,6 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebSite",
               name: "Ex Situ",
-              alternateName: ["Ex Situ Map", "exsitu.app"],
               url: "https://exsitu.app/",
             }),
           }}
