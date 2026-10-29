@@ -511,6 +511,9 @@ export default function ImageGallery({
             //   the museum's own Wikimedia Commons upload
             // - Smithsonian (National Museum of Asian Art): only images whose media record says
             //   CC0 are linked; image_rights holds the CC0 URI, so the per-object credit applies
+            // - Weltmuseum Wien: KHM-Museumsverband image database terms (AGB_Bilddatenbank.pdf,
+            //   checked 2026-10-29): non-commercial use under CC BY-NC-SA 4.0, and the notice
+            //   must read "©KHM-Museumsverband" directly at each image
             const SMB_COLLECTIONS = new Set([
               "Ethnologisches Museum",
               "Antikensammlung",
@@ -524,6 +527,7 @@ export default function ImageGallery({
               "Art Institute of Chicago": "© Art Institute of Chicago",
               "Victoria and Albert Museum": "© Victoria and Albert Museum, London",
               "The Walters Art Museum": "The Walters Art Museum · CC0",
+              "Weltmuseum Wien": "©KHM-Museumsverband, Weltmuseum Wien · CC BY-NC-SA 4.0",
             }
             const institution = currentObject.attributes.institution_name || ""
             const sourceUrl = getLinkUrl()
