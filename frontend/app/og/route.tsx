@@ -11,7 +11,8 @@ import { fetchAllowedImage, isAllowedImageUrl } from "@/lib/remote-image-url"
 // the view's objects as a grid, like the object grid, with where they come from and the
 // image credit underneath. Only images whose licence allows showing them outside the
 // museum's own credit (openImageCredit). Fewer images → a smaller grid or one image;
-// none, or the API down → the site's arcs image.
+// none, or the API down → the world map with its arcs (public/og-arcs.jpg; the site's own
+// preview is an object grid from other places, which would read as this place's objects).
 
 export const runtime = "nodejs"
 
@@ -46,7 +47,7 @@ const jpeg = (body: Buffer) =>
   })
 
 async function fallback() {
-  return jpeg(await readFile(path.join(process.cwd(), "public/og-image.jpg")))
+  return jpeg(await readFile(path.join(process.cwd(), "public/og-arcs.jpg")))
 }
 
 async function fetchPage(q: Record<string, string>, page: number) {

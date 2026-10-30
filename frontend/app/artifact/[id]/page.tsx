@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 
 import type { MuseumObject } from "@/types"
 import { LARGE_WIDTH, resolveImageSrc } from "@/lib/image-src"
-import { SITE_PREVIEW_IMAGE, withSiteName } from "@/lib/map-title"
+import { ARCS_PREVIEW_IMAGE, withSiteName } from "@/lib/map-title"
 
 import ArtifactRedirect from "./artifact-redirect"
 
@@ -135,13 +135,13 @@ export async function generateMetadata({
 			type: "website",
 			images: imageUrl
 				? [{ url: imageUrl, alt: artifactLabel(artifact, id) }]
-				: [SITE_PREVIEW_IMAGE],
+				: [ARCS_PREVIEW_IMAGE],
 		},
 		twitter: {
 			card: "summary_large_image",
 			title,
 			description,
-			images: [imageUrl ?? SITE_PREVIEW_IMAGE.url],
+			images: [imageUrl ?? ARCS_PREVIEW_IMAGE.url],
 		},
 	}
 }

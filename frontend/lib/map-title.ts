@@ -4,11 +4,21 @@ export const MAP_DEFAULT_TITLE = "Ex Situ"
 // A picked view's title in tabs, search results and link previews: "Palestine — Ex Situ".
 export const withSiteName = (title: string) => `${title} — Ex Situ`
 
-// Link-preview image for pages without one of their own: the world map with its arcs
-// (public/og-image.jpg, a screenshot of /map with the panels hidden). Resolved against
-// metadataBase in app/layout.tsx.
+// Link-preview image for pages without one of their own: a grid of 24 objects from 11 countries,
+// laid out like the place previews (app/og/route.tsx). Only Met (CC0) and Rijksmuseum (Public
+// Domain) images, so it carries no credit line. Resolved against metadataBase in app/layout.tsx.
 export const SITE_PREVIEW_IMAGE = {
   url: "/og-image.jpg",
+  width: 1200,
+  height: 630,
+  alt: "Artifacts from China, Egypt, India, Indonesia, Iran, Iraq, Japan, Mexico, Nigeria, Peru and the United States",
+}
+
+// For a link to one artifact with no image of its own, where a grid of other objects would read
+// as that artifact's: the world map with its arcs (public/og-arcs.jpg, a screenshot of /map with
+// the panels hidden).
+export const ARCS_PREVIEW_IMAGE = {
+  url: "/og-arcs.jpg",
   width: 1200,
   height: 630,
   alt: "Arcs from places of origin to the institutions that hold the artifacts today",

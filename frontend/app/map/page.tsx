@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import MapClient from "./map-client"
 import { fetchArcTotals, findGroup, groupByInstitution, groupByPlace } from "@/lib/arc-index"
-import { SITE_PREVIEW_IMAGE, mapPreviewImage, mapTitle, withSiteName } from "@/lib/map-title"
+import { ARCS_PREVIEW_IMAGE, mapPreviewImage, mapTitle, withSiteName } from "@/lib/map-title"
 
 // Place and museum views live on /map (?place=, ?institution=); give each its own title,
 // description and canonical so search engines can index them. Labels and counts only.
@@ -22,7 +22,12 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   // Narrower views (a site, an object) aren't indexed separately. lat/lng/zoom are only the
   // viewport the map writes back into the URL, so the place keeps its title.
   const narrowed = ["site", "artifactId"].some((k) => params[k] !== undefined)
-  if (!place && !institution) return {}
+  // An object link previews with the arcs, not the site's grid of other objects.
+  if (!place && !institution) {
+    return params.artifactId !== undefined
+      ? { openGraph: { images: [ARCS_PREVIEW_IMAGE] }, twitter: { card: "summary_large_image", images: [ARCS_PREVIEW_IMAGE.url] } }
+      : {}
+  }
   if (narrowed || (place && institution)) {
     // Not indexed separately, but the tab still names the view: Next re-applies this
     // title on client navigations, so an empty one would reset it to "Ex Situ".
@@ -30,7 +35,7 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
     const view = { place, site: first(params.site), precise: first(params.precise), institution }
     const title = withSiteName(mapTitle(view)!)
     // An object link keeps the arcs image; a site or place-and-museum view previews its objects.
-    const image = params.artifactId !== undefined ? SITE_PREVIEW_IMAGE : mapPreviewImage(view)
+    const image = params.artifactId !== undefined ? ARCS_PREVIEW_IMAGE : mapPreviewImage(view)
     return {
       title,
       openGraph: { title, siteName: "Ex Situ", type: "website", images: [image] },
