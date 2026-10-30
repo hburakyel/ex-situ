@@ -14,6 +14,14 @@ export const SITE_PREVIEW_IMAGE = {
   alt: "Arcs from places of origin to the institutions that hold the artifacts today",
 }
 
+// Link-preview image for a place or museum view: its objects as a grid (app/og/route.tsx).
+export function mapPreviewImage(view: { place?: string; site?: string; precise?: string; institution?: string }) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(view)) if (value) params.set(key, value)
+  const title = mapTitle(view)
+  return { url: `/og?${params}`, width: 1200, height: 630, alt: title ? `Artifacts from ${title}` : SITE_PREVIEW_IMAGE.alt }
+}
+
 // Browser tab / share title for a map view. Used for the server-rendered metadata
 // (app/map/page.tsx) and kept in sync on the client as the visitor drills in.
 export function mapTitle({ place, site, precise, institution }: {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import MapClient from "./map-client"
 import { fetchArcTotals, findGroup, groupByInstitution, groupByPlace } from "@/lib/arc-index"
-import { SITE_PREVIEW_IMAGE, mapTitle, withSiteName } from "@/lib/map-title"
+import { SITE_PREVIEW_IMAGE, mapPreviewImage, mapTitle, withSiteName } from "@/lib/map-title"
 
 // Place and museum views live on /map (?place=, ?institution=); give each its own title,
 // description and canonical so search engines can index them. Labels and counts only.
@@ -27,11 +27,14 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
     // Not indexed separately, but the tab still names the view: Next re-applies this
     // title on client navigations, so an empty one would reset it to "Ex Situ".
     // A shared link previews with the same name ("Sanctuary of Athena (Pergamon) — Ex Situ").
-    const title = withSiteName(mapTitle({ place, site: first(params.site), precise: first(params.precise), institution })!)
+    const view = { place, site: first(params.site), precise: first(params.precise), institution }
+    const title = withSiteName(mapTitle(view)!)
+    // An object link keeps the arcs image; a site or place-and-museum view previews its objects.
+    const image = params.artifactId !== undefined ? SITE_PREVIEW_IMAGE : mapPreviewImage(view)
     return {
       title,
-      openGraph: { title, siteName: "Ex Situ", type: "website", images: [SITE_PREVIEW_IMAGE] },
-      twitter: { card: "summary_large_image", title, images: [SITE_PREVIEW_IMAGE.url] },
+      openGraph: { title, siteName: "Ex Situ", type: "website", images: [image] },
+      twitter: { card: "summary_large_image", title, images: [image.url] },
     }
   }
 
@@ -43,13 +46,14 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const canonical = `/map?${param}=${encodeURIComponent(group.name)}`
   const title = place ? mapTitle({ place: group.name })! : mapTitle({ institution: group.name })!
   const description = `${group.count.toLocaleString("en-US")} artifacts · ${names(group.related)}`
+  const image = mapPreviewImage(place ? { place: group.name } : { institution: group.name })
 
   return {
     title: withSiteName(title),
     description,
     alternates: { canonical },
-    openGraph: { title: withSiteName(title), description, url: canonical, siteName: "Ex Situ", type: "website", images: [SITE_PREVIEW_IMAGE] },
-    twitter: { card: "summary_large_image", title: withSiteName(title), description, images: [SITE_PREVIEW_IMAGE.url] },
+    openGraph: { title: withSiteName(title), description, url: canonical, siteName: "Ex Situ", type: "website", images: [image] },
+    twitter: { card: "summary_large_image", title: withSiteName(title), description, images: [image.url] },
   }
 }
 

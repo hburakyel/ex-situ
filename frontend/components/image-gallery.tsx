@@ -12,7 +12,7 @@ import { Check, Link2, Quote } from "lucide-react"
 import { INSTITUTION_CITIES } from "@/hooks/use-unified-search"
 import { LARGE_WIDTH, THUMB_WIDTH, resolveImageSrc } from "@/lib/image-src"
 import { isWithdrawn, withdrawnSourceUrl } from "@/lib/withdrawn"
-import { isPublicDomain, rightsLabel } from "@/lib/image-rights"
+import { SMB_COLLECTIONS, isPublicDomain, rightsLabel } from "@/lib/image-rights"
 import { artifactCorrectionUrl } from "@/lib/correction-link"
 import { citationText } from "@/lib/cite"
 import { copyText } from "@/lib/clipboard"
@@ -508,14 +508,6 @@ export default function ImageGallery({
             // - Weltmuseum Wien: KHM-Museumsverband image database terms (AGB_Bilddatenbank.pdf,
             //   checked 2026-10-29): non-commercial use under CC BY-NC-SA 4.0, and the notice
             //   must read "©KHM-Museumsverband" directly at each image
-            const SMB_COLLECTIONS = new Set([
-              "Ethnologisches Museum",
-              "Antikensammlung",
-              "Museum für Islamische Kunst",
-              "Vorderasiatisches Museum",
-              "Ägyptisches Museum und Papyrussammlung",
-              "Museum für Asiatische Kunst",
-            ])
             const CREDITS: Record<string, string> = {
               "The Metropolitan Museum of Art": "The Metropolitan Museum of Art · CC0",
               "Art Institute of Chicago": "© Art Institute of Chicago",

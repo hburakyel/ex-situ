@@ -3,6 +3,8 @@
 // hosts, private/loopback addresses, non-http(s) schemes — is rejected so the
 // routes can't be used to reach internal services (SSRF).
 
+import europeanaImageHosts from "./europeana-image-hosts.json"
+
 // NO localhost/127.0.0.1 here
 const ALLOWED_IMAGE_DOMAINS = new Set([
   "images.metmuseum.org",
@@ -18,6 +20,10 @@ const ALLOWED_IMAGE_DOMAINS = new Set([
   "search.smb.museum",
   "www.artic.edu",
   "www.weltmuseumwien.at",
+  // Rijksmuseum IIIF and the Europeana institutions' hosts: fetched by the link-preview
+  // grid (app/og), which reads the images server side.
+  "iiif.micr.io",
+  ...europeanaImageHosts,
 ])
 
 const PRIVATE_IP_PATTERNS = [

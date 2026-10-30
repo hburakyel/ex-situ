@@ -24,3 +24,31 @@ export function isPublicDomain(uri: string | null | undefined): boolean {
   const label = rightsLabel(uri)
   return label === "CC0" || label === "Public Domain"
 }
+
+// The six Staatliche Museen zu Berlin collections: museum-digital states CC BY-NC-SA
+// for their images (audited 2026-10-07).
+export const SMB_COLLECTIONS = new Set([
+  "Ethnologisches Museum",
+  "Antikensammlung",
+  "Museum für Islamische Kunst",
+  "Vorderasiatisches Museum",
+  "Ägyptisches Museum und Papyrussammlung",
+  "Museum für Asiatische Kunst",
+])
+
+const CC0_INSTITUTIONS = new Set(["The Metropolitan Museum of Art", "The Walters Art Museum"])
+
+// Credit for an image Ex Situ may show outside the museum's own credit line (the
+// link-preview grid): public domain or an open CC licence that allows adaptation.
+// Returns null for everything else: V&A (©), AIC (licence not stored per object),
+// Weltmuseum (the KHM terms want "©KHM-Museumsverband" at each image), CC BY-ND.
+const NOT_OPEN = new Set(["Victoria and Albert Museum", "Art Institute of Chicago", "Weltmuseum Wien"])
+
+export function openImageCredit(institution: string, rights: string | null | undefined): { name: string; licence: string } | null {
+  if (NOT_OPEN.has(institution)) return null
+  if (CC0_INSTITUTIONS.has(institution)) return { name: institution, licence: "CC0" }
+  if (SMB_COLLECTIONS.has(institution)) return { name: "Staatliche Museen zu Berlin", licence: "CC BY-NC-SA" }
+  const label = rightsLabel(rights)
+  if (!label || label.includes("ND")) return null
+  return { name: institution, licence: label }
+}
