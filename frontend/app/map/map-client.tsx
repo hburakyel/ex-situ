@@ -83,6 +83,12 @@ function matchesAnyFilter(value: string | null | undefined, filters: Set<string>
 // Opening view, and where "Ex Situ" / the globe control return to. Both frame the
 // Eastern Mediterranean / Near East, where arcs from Africa, Asia and Europe cross — the
 // whole world is unreadable at either size. Mobile sits a little further south and wider.
+// Zoom for an artifact or precise place picked in the panels, or an artifact link: city level,
+// closer for an artifact located to a building or spot of its own (precise_place).
+const CITY_ZOOM = 11
+const PRECISE_ZOOM = 15
+const artifactZoom = (o?: MuseumObject | null) => (o?.attributes.precise_place?.trim() ? PRECISE_ZOOM : CITY_ZOOM)
+
 const MOBILE_HOME_VIEW = { lng: 33.5, lat: 29.3, zoom: 3.5 }
 const DESKTOP_HOME_VIEW = { lng: 35.2, lat: 31.8, zoom: 4.25 }
 
@@ -241,8 +247,9 @@ function MapContent() {
         setArcObjectsPage(1)
 
         if (targetLat !== null && targetLng !== null) {
-          setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 14 }))
-          mapRef.current?.flyToLocation(targetLng, targetLat, 14, 1400)
+          const zoom = artifactZoom(artifact)
+          setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom }))
+          mapRef.current?.flyToLocation(targetLng, targetLat, zoom, 1400)
         }
       })
       .catch(() => {})
@@ -838,10 +845,10 @@ function MapContent() {
     // Leaving the precise place brings its site's arcs back into view.
     if (activePrecise === place.name) { setPrecisePick(null); centerOnPlaceArcs(activeSite, "site", activeInstitution); return }
     setPrecisePick({ site: activeSite, name: place.name })
-    // A precise place is a spot inside its city: the map flies to it, like to an artifact.
+    // A precise place is a spot inside its city: the map flies to it at city level, like to an artifact.
     if (mapRef.current && hasValidCoordinates(place.latitude, place.longitude)) {
-      mapRef.current.flyToLocation(place.longitude as number, place.latitude as number, 16, 1200)
-      setViewState((prev) => ({ ...prev, longitude: place.longitude as number, latitude: place.latitude as number, zoom: 16 }))
+      mapRef.current.flyToLocation(place.longitude as number, place.latitude as number, CITY_ZOOM, 1200)
+      setViewState((prev) => ({ ...prev, longitude: place.longitude as number, latitude: place.latitude as number, zoom: CITY_ZOOM }))
     }
   }, [activeSite, activePrecise, activeInstitution, centerOnPlaceArcs])
 
@@ -1237,9 +1244,6 @@ function MapContent() {
     }
   }, [])
 
-  // The objects shown in the panel, for the image-click zoom (filled below, where
-  // containerObjects is built).
-  const containerObjectsRef = useRef<MuseumObject[]>([])
   const handleObjectClick = useCallback((longitude: number, latitude: number, object?: MuseumObject) => {
     const drill = drillLevelRef.current
 
@@ -1331,20 +1335,9 @@ function MapContent() {
     }
 
     // ── Step 2: fly to the object ──
-    // An object with its own precise point (Dolmabahçe Mosque, within Istanbul) gets
-    // building-level zoom; one that only sits on its site's centre (located to
-    // "Istanbul") stays at city level instead of landing on an arbitrary street.
-    let targetZoom = 14
-    if (object && hasValidCoordinates(latitude, longitude)) {
-      // A point shared by several of the place's objects is the place's own point
-      // (a city centre); a point of its own is a precise location.
-      const key = (lat: number, lng: number) => `${lat.toFixed(3)},${lng.toFixed(3)}`
-      const here = key(latitude, longitude)
-      const sharing = containerObjectsRef.current.filter((o) =>
-        hasValidCoordinates(o.attributes.latitude, o.attributes.longitude) &&
-        key(o.attributes.latitude, o.attributes.longitude) === here).length
-      targetZoom = sharing >= 3 ? 11 : 16
-    }
+    // City level; an object located to a building or spot (Dolmabahçe Palace,
+    // within Istanbul) gets closer.
+    const targetZoom = artifactZoom(object)
     mapRef.current.flyToLocation(longitude, latitude, targetZoom, 1200)
     setViewState(prev => ({ ...prev, longitude, latitude, zoom: targetZoom }))
     debouncedGeocode(longitude, latitude)
@@ -1422,7 +1415,6 @@ function MapContent() {
     })
     return combined
   }, [drillLevel, isGlobalInstitutionDrill, arcObjects, objects, filteredGlobalPreviewObjects, allObjects, isWikipediaActive, wikiObjects])
-  useEffect(() => { containerObjectsRef.current = containerObjects }, [containerObjects])
 
   // Effective location name: derived from drill state, with manual fallback
   // This ensures the object panel header ALWAYS reflects the current drill-down
