@@ -22,8 +22,9 @@ const TOP = 26
 const BOTTOM = 70
 const SIDE = 24
 const RADIUS = 6
-// Link-preview crawlers give up after a few seconds: images not loaded by then are left out.
-const IMAGE_BUDGET_MS = 4000
+// Link-preview crawlers give up after a few seconds (X shows no card at all, and keeps that
+// for the link): images not loaded by then are left out.
+const IMAGE_BUDGET_MS = 2000
 const PARAMS = ["place", "site", "precise", "institution"] as const
 
 type Obj = {
@@ -37,6 +38,7 @@ type Obj = {
 const cache = new Map<string, { body: Buffer; at: number }>()
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_CACHE_ENTRIES = 100
+const rendering = new Map<string, Promise<Buffer | null>>()
 
 const jpeg = (body: Buffer) =>
   new Response(new Uint8Array(body), {
@@ -55,7 +57,7 @@ async function fetchPage(q: Record<string, string>, page: number) {
   if (q.institution) params.set("institution", q.institution)
   const res = await fetch(`${API_BASE}/museum-objects/by-country?${params}`, {
     headers: { "User-Agent": "ExSitu/1.0" },
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(3000),
     cache: "no-store",
   })
   if (!res.ok) return { objects: [] as Obj[], pageCount: 0 }
@@ -130,14 +132,16 @@ async function render(q: Record<string, string>): Promise<Buffer | null> {
   const cw = (W - 2 * SIDE) / cols
   const ch = (H - TOP - BOTTOM) / rows
   const pad = cols === 1 ? 0 : 10
+  // The grid is put together with sharp; satori only draws the text strip (images passed to
+  // satori as data URIs made the render seconds slower).
   const tiles = await Promise.all(shown.map(async (c, i) => {
     const w = Math.round(cw - 2 * pad), h = Math.round(ch - 2 * pad)
-    const buf = await sharp(c.img!).resize(w * 2, h * 2, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer()
-    const meta = await sharp(buf).metadata()
-    const scale = Math.min(w / (meta.width ?? w), h / (meta.height ?? h))
-    const tw = Math.round((meta.width ?? w) * scale), th = Math.round((meta.height ?? h) * scale)
+    const raw = await sharp(c.img!).resize(w, h, { fit: "inside" }).toBuffer()
+    const { width = w, height = h } = await sharp(raw).metadata()
+    const mask = Buffer.from(`<svg width="${width}" height="${height}"><rect width="${width}" height="${height}" rx="${RADIUS}" ry="${RADIUS}"/></svg>`)
+    const input = await sharp(raw).ensureAlpha().composite([{ input: mask, blend: "dest-in" }]).png().toBuffer()
     const x = SIDE + (i % cols) * cw, y = TOP + Math.floor(i / cols) * ch
-    return { src: `data:image/jpeg;base64,${buf.toString("base64")}`, left: x + (cw - tw) / 2, top: y + pad + (h - th) / 2, width: tw, height: th }
+    return { input, left: Math.round(x + (cw - width) / 2), top: Math.round(y + pad + (h - height) / 2) }
   }))
 
   // Like the image gallery's caption: "Luxor, Egypt → Amsterdam, Baltimore".
@@ -151,13 +155,9 @@ async function render(q: Record<string, string>): Promise<Buffer | null> {
   const lineStyle = { display: "flex", alignItems: "center", whiteSpace: "nowrap", overflow: "hidden", maxWidth: "100%" } as const
 
   const font = await readFile(path.join(process.cwd(), "app/og/NotoSansMono-Regular.ttf"))
-  const image = new ImageResponse(
+  const text = new ImageResponse(
     (
-      <div style={{ display: "flex", width: W, height: H, background: "#fff", position: "relative" }}>
-        {tiles.map((t, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={i} src={t.src} width={t.width} height={t.height} style={{ position: "absolute", left: t.left, top: t.top, borderRadius: RADIUS }} />
-        ))}
+      <div style={{ display: "flex", width: W, height: BOTTOM, position: "relative" }}>
         <div style={{ position: "absolute", right: SIDE + 10, left: SIDE + 10, bottom: 14, display: "flex", flexDirection: "column", alignItems: "flex-end", fontSize: 13, lineHeight: 1.5, color: "#8c8c8c", fontFamily: "Noto Sans Mono" }}>
           <div style={lineStyle}>
             {from}
@@ -174,9 +174,13 @@ async function render(q: Record<string, string>): Promise<Buffer | null> {
         </div>
       </div>
     ),
-    { width: W, height: H, fonts: [{ name: "Noto Sans Mono", data: font, weight: 400, style: "normal" }] },
+    { width: W, height: BOTTOM, fonts: [{ name: "Noto Sans Mono", data: font, weight: 400, style: "normal" }] },
   )
-  return sharp(Buffer.from(await image.arrayBuffer())).jpeg({ quality: 88 }).toBuffer()
+  const strip = Buffer.from(await text.arrayBuffer())
+  return sharp({ create: { width: W, height: H, channels: 3, background: "#ffffff" } })
+    .composite([...tiles, { input: strip, left: 0, top: H - BOTTOM }])
+    .jpeg({ quality: 88 })
+    .toBuffer()
 }
 
 export async function GET(request: NextRequest) {
@@ -191,12 +195,24 @@ export async function GET(request: NextRequest) {
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return jpeg(hit.body)
 
-  const body = await render(q).catch((err) => {
-    console.error("[og] render failed", err)
-    return null
-  })
-  if (!body) return fallback()
-  if (cache.size >= MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value!)
-  cache.set(key, { body, at: Date.now() })
-  return jpeg(body)
+  // Crawlers often ask for the same image several times at once: render it once.
+  let pending = rendering.get(key)
+  if (!pending) {
+    pending = render(q)
+      .catch((err) => {
+        console.error("[og] render failed", err)
+        return null
+      })
+      .then((body) => {
+        rendering.delete(key)
+        if (body) {
+          if (cache.size >= MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value!)
+          cache.set(key, { body, at: Date.now() })
+        }
+        return body
+      })
+    rendering.set(key, pending)
+  }
+  const body = await pending
+  return body ? jpeg(body) : fallback()
 }
