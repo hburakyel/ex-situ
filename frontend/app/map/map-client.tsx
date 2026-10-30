@@ -83,10 +83,11 @@ function matchesAnyFilter(value: string | null | undefined, filters: Set<string>
 // Opening view, and where "Ex Situ" / the globe control return to. Both frame the
 // Eastern Mediterranean / Near East, where arcs from Africa, Asia and Europe cross — the
 // whole world is unreadable at either size. Mobile sits a little further south and wider.
-// Zoom for an artifact or precise place picked in the panels, or an artifact link: city level,
-// closer for an artifact located to a building or spot of its own (precise_place).
+// Zoom for an artifact picked in the panels or opened from a link: city level, closer for a
+// precise place (a building or spot inside the city), so its own arc stands apart from the
+// city's other arcs.
 const CITY_ZOOM = 11
-const PRECISE_ZOOM = 15
+const PRECISE_ZOOM = 14
 const artifactZoom = (o?: MuseumObject | null) => (o?.attributes.precise_place?.trim() ? PRECISE_ZOOM : CITY_ZOOM)
 
 const MOBILE_HOME_VIEW = { lng: 33.5, lat: 29.3, zoom: 3.5 }
@@ -845,10 +846,10 @@ function MapContent() {
     // Leaving the precise place brings its site's arcs back into view.
     if (activePrecise === place.name) { setPrecisePick(null); centerOnPlaceArcs(activeSite, "site", activeInstitution); return }
     setPrecisePick({ site: activeSite, name: place.name })
-    // A precise place is a spot inside its city: the map flies to it at city level, like to an artifact.
+    // A precise place is a spot inside its city: the map flies close enough to tell its arc apart.
     if (mapRef.current && hasValidCoordinates(place.latitude, place.longitude)) {
-      mapRef.current.flyToLocation(place.longitude as number, place.latitude as number, CITY_ZOOM, 1200)
-      setViewState((prev) => ({ ...prev, longitude: place.longitude as number, latitude: place.latitude as number, zoom: CITY_ZOOM }))
+      mapRef.current.flyToLocation(place.longitude as number, place.latitude as number, PRECISE_ZOOM, 1200)
+      setViewState((prev) => ({ ...prev, longitude: place.longitude as number, latitude: place.latitude as number, zoom: PRECISE_ZOOM }))
     }
   }, [activeSite, activePrecise, activeInstitution, centerOnPlaceArcs])
 
