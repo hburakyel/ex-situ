@@ -185,10 +185,8 @@ function MapContent() {
   const [wikiDocs, setWikiDocs] = useState<any[]>([])
   const [initialGalleryArtifact, setInitialGalleryArtifact] = useState<MuseumObject | null>(null)
   const initialZoom = clamp(urlZoom ? parseFloat(urlZoom) : defaultView.zoom, 0, 22, defaultView.zoom)
-  // Only the "below global threshold" bucket is state: the map fires a zoom event
-  // every animation frame, and storing the raw value re-rendered the whole page
-  // (object grid included) ~60×/s while zooming. The exact value lives in the ref.
-  const [isZoomedOutToGlobal, setIsZoomedOutToGlobal] = useState(initialZoom < 3)
+  // A ref, not state: the map fires a zoom event every animation frame, and storing
+  // the value re-rendered the whole page (object grid included) ~60×/s while zooming.
   const currentZoomRef = useRef(initialZoom)
 
   // ── Unified search for global arc data (fastest initial data) ──
@@ -384,11 +382,7 @@ function MapContent() {
 
   const handleZoomChange = useCallback((zoom: number) => {
     currentZoomRef.current = zoom
-    setIsZoomedOutToGlobal(zoom < 3)
   }, [])
-
-  // Track previous zoom bucket to detect zooming out past the global threshold
-  const prevZoomedOutRef = useRef(initialZoom < 3)
 
   // Arc cards from map-view
   const [mapArcCards, setMapArcCards] = useState<any[]>([])
@@ -819,15 +813,37 @@ function MapContent() {
   }, [activeCountry, activeSite, activePrecise, activeInstitution, facetedFilters.institutions, facetedFilters.era?.id, facetedFilters.migrationEra?.id, fetchDrillObjects, drillLevel])
 
   // Picking a precise place filters the objects to it and flies to building level.
+  // A chosen place's arcs, origins and museums, are brought into view by zooming
+  // out and centring; zooming in to the place hid where its arcs go.
+  // With a collection chosen, only the arcs into it count; with no place, all of them.
+  const centerOnPlaceArcs = useCallback((place: string | null, kind: "country" | "site", institution?: string | null) => {
+    const key = normalizePlaceKey(place)
+    const inst = normalizePlaceKey(institution)
+    const matches = (a: { place_name: string; place_name_normalized?: string; country?: string | null; institution_name: string }) =>
+      (!inst || normalizePlaceKey(a.institution_name) === inst) && (!key ||
+        normalizePlaceKey(a.place_name) === key || normalizePlaceKey(a.place_name_normalized) === key ||
+        (kind === "country" && normalizePlaceKey(a.country) === key))
+    const arcs = !key ? arcData : kind === "country" ? [...arcData, ...cityArcData] : [...subArcs, ...cityArcData]
+    const points: [number, number][] = []
+    arcs.filter(matches).forEach((a) => {
+      if (hasValidCoordinates(a.latitude, a.longitude)) points.push([a.longitude, a.latitude])
+      if (hasValidCoordinates(a.institution_latitude, a.institution_longitude)) points.push([a.institution_longitude as number, a.institution_latitude as number])
+    })
+    const view = mapRef.current?.centerOnPoints(points)
+    if (view) setViewState((prev) => ({ ...prev, ...view }))
+  }, [arcData, cityArcData, subArcs])
+
   const handleTogglePrecise = useCallback((place: PrecisePlace) => {
     if (!activeSite) return
-    if (activePrecise === place.name) { setPrecisePick(null); return }
+    // Leaving the precise place brings its site's arcs back into view.
+    if (activePrecise === place.name) { setPrecisePick(null); centerOnPlaceArcs(activeSite, "site", activeInstitution); return }
     setPrecisePick({ site: activeSite, name: place.name })
+    // A precise place is a spot inside its city: the map flies to it, like to an artifact.
     if (mapRef.current && hasValidCoordinates(place.latitude, place.longitude)) {
       mapRef.current.flyToLocation(place.longitude as number, place.latitude as number, 16, 1200)
       setViewState((prev) => ({ ...prev, longitude: place.longitude as number, latitude: place.latitude as number, zoom: 16 }))
     }
-  }, [activeSite, activePrecise])
+  }, [activeSite, activePrecise, activeInstitution, centerOnPlaceArcs])
 
   const handleDrillLoadMore = useCallback(() => {
     if (!arcObjectsHasMore || arcObjectsLoading) return
@@ -878,15 +894,8 @@ function MapContent() {
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setLocationName(country)
-    // Fly to origin
-    if (hasValidCoordinates(lat, lng) && mapRef.current) {
-      const targetLat = lat as number
-      const targetLng = lng as number
-      mapRef.current.flyToLocation(targetLng, targetLat, 5, 1600)
-      setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 5 }))
-      debouncedGeocode(targetLng, targetLat)
-    }
-  }, [debouncedGeocode, facetedFilters.institutions])
+    centerOnPlaceArcs(country, "country")
+  }, [debouncedGeocode, facetedFilters.institutions, centerOnPlaceArcs])
 
   const handleToggleSite = useCallback((site: string, lat?: number, lng?: number) => {
     const next = normalizePlaceKey(activeSite) === normalizePlaceKey(site) ? null : site
@@ -910,21 +919,26 @@ function MapContent() {
         if (facetedFilters.institutions.length > 0) setFacetedFilters({ ...facetedFilters, institutions: [] })
       }
     }
-    // Fly to site location
-    if (next && hasValidCoordinates(lat, lng) && mapRef.current) {
-      const targetLat = lat as number
-      const targetLng = lng as number
-      mapRef.current.flyToLocation(targetLng, targetLat, 10, 1400)
-      setViewState(prev => ({ ...prev, longitude: targetLng, latitude: targetLat, zoom: 10 }))
-      debouncedGeocode(targetLng, targetLat)
-    }
+    if (next) centerOnPlaceArcs(next, "site")
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setArcObjectsPage(1)
-  }, [activeSite, activeInstitution, groupedSites, activeCountry, debouncedGeocode, facetedFilters])
+  }, [activeSite, activeInstitution, groupedSites, activeCountry, debouncedGeocode, facetedFilters, centerOnPlaceArcs])
+
+  // A pick in the Places/Sites lists shows its chip, like the same pick in the search palette.
+  const pickOrigin = useCallback((country: string, lat?: number, lng?: number) => {
+    handleOriginClick(country, lat, lng)
+    setFacetedFilters((f) => ({ ...f, countries: [country], cities: [] }))
+  }, [handleOriginClick])
+  const pickSite = useCallback((site: string, lat?: number, lng?: number) => {
+    const off = normalizePlaceKey(activeSite) === normalizePlaceKey(site)
+    handleToggleSite(site, lat, lng)
+    setFacetedFilters((f) => ({ ...f, cities: off ? [] : [site] }))
+  }, [activeSite, handleToggleSite])
 
   const handleToggleInstitution = useCallback((inst: string) => {
     const next = activeInstitution === inst ? null : inst
+    if (activeSite || activeCountry || next) centerOnPlaceArcs(activeSite || activeCountry, activeSite ? "site" : "country", next)
     // Only a genuinely new institution selection reopens the panel —
     // toggling the same one off (next === null) respects a deliberate close.
     if (next) setIsObjectContainerVisible(true)
@@ -980,7 +994,52 @@ function MapContent() {
         setActiveSite(null)
       }
     }
-  }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode, facetedFilters, setFacetedFilters])
+  }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode, facetedFilters, setFacetedFilters, centerOnPlaceArcs])
+
+  const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
+    if (level === "global") {
+      setSelectedArc(null)
+      setActiveCountry(null)
+      setActiveSite(null)
+      setActiveInstitution(null)
+      setDrillLevel("global")
+      drillLevelRef.current = "global"
+      debouncedGeocode.cancel()
+      geocodeAbort.current?.abort()
+      setGeocodedName("")
+      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
+      setArcObjects([])
+      setArcObjectsTotal(0)
+      setArcObjectsHasMore(false)
+      setArcObjectsPage(1)
+      setSubArcs([])
+      setLocationName("")
+      setFacetedFilters((f) => ({ ...f, countries: [], cities: [] }))
+      // Back to the opening view (same as the globe control) — further out, the
+      // arcs pile up into a mass.
+      if (mapRef.current) {
+        const home = isMobile ? MOBILE_HOME_VIEW : DESKTOP_HOME_VIEW
+        mapRef.current.flyToLocation(home.lng, home.lat, home.zoom, 1800)
+        setViewState({ longitude: home.lng, latitude: home.lat, zoom: home.zoom, name: "" })
+        debouncedGeocode(home.lng, home.lat)
+      }
+    } else if (level === "country") {
+      setSelectedArc(null)
+      setActiveSite(null)
+      setActiveInstitution(null)
+      setDrillLevel("country")
+      drillLevelRef.current = "country"
+      debouncedGeocode.cancel()
+      geocodeAbort.current?.abort()
+      setGeocodedName("")
+      setLocationName(activeCountry || "")
+      setFacetedFilters((f) => ({ ...f, cities: [] }))
+      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
+      setArcObjects([])
+      setArcObjectsPage(1)
+      if (activeCountry) centerOnPlaceArcs(activeCountry, "country")
+    }
+  }, [activeCountry, debouncedGeocode, isMobile, centerOnPlaceArcs])
 
   // Faceted filter chips (places/collections/time from the search palette or
   // filter chip UI) — reopen the panel only when a filter is newly added,
@@ -1001,60 +1060,17 @@ function MapContent() {
     if (activeInstitution && !next.institutions.some((i) => normalizePlaceKey(i) === normalizePlaceKey(activeInstitution))
         && facetedFilters.institutions.some((i) => normalizePlaceKey(i) === normalizePlaceKey(activeInstitution))) {
       setActiveInstitution(null)
+      if (activeSite || activeCountry) centerOnPlaceArcs(activeSite || activeCountry, activeSite ? "site" : "country")
     }
     setFacetedFilters(next)
-  }, [facetedFilters, activeInstitution])
-
-  const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
-    if (level === "global") {
-      setSelectedArc(null)
-      setActiveCountry(null)
-      setActiveSite(null)
-      setActiveInstitution(null)
-      setDrillLevel("global")
-      drillLevelRef.current = "global"
-      debouncedGeocode.cancel()
-      geocodeAbort.current?.abort()
-      setGeocodedName("")
-      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
-      setArcObjects([])
-      setArcObjectsTotal(0)
-      setArcObjectsHasMore(false)
-      setArcObjectsPage(1)
-      setSubArcs([])
-      setLocationName("")
-      // Back to the opening view (same as the globe control) — further out, the
-      // arcs pile up into a mass.
-      if (mapRef.current) {
-        const home = isMobile ? MOBILE_HOME_VIEW : DESKTOP_HOME_VIEW
-        mapRef.current.flyToLocation(home.lng, home.lat, home.zoom, 1800)
-        setViewState({ longitude: home.lng, latitude: home.lat, zoom: home.zoom, name: "" })
-        debouncedGeocode(home.lng, home.lat)
-      }
-    } else if (level === "country") {
-      setSelectedArc(null)
-      setActiveSite(null)
-      setActiveInstitution(null)
-      setDrillLevel("country")
-      drillLevelRef.current = "country"
-      debouncedGeocode.cancel()
-      geocodeAbort.current?.abort()
-      setGeocodedName("")
-      setLocationName(activeCountry || "")
-      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
-      setArcObjects([])
-      setArcObjectsPage(1)
-      // Fly back to country center at zoom 5
-      if (activeCountry && mapRef.current) {
-        const origin = groupedOrigins.find(o => normalizePlaceKey(o.country) === normalizePlaceKey(activeCountry))
-        if (origin) {
-          mapRef.current.flyToLocation(origin.lng, origin.lat, 5, 1400)
-          setViewState(prev => ({ ...prev, longitude: origin.lng, latitude: origin.lat, zoom: 5 }))
-          debouncedGeocode(origin.lng, origin.lat)
-        }
-      }
-    }
-  }, [activeCountry, groupedOrigins, debouncedGeocode, isMobile])
+    // Closing a place or site chip leaves that place, like the breadcrumb, so all
+    // arcs come back.
+    const dropped = (values: string[], prev: string[], name: string | null) => !!name &&
+      prev.some((v) => normalizePlaceKey(v) === normalizePlaceKey(name)) &&
+      !values.some((v) => normalizePlaceKey(v) === normalizePlaceKey(name))
+    if (dropped(next.countries, facetedFilters.countries, activeCountry)) handleBreadcrumbClick("global")
+    else if (dropped(next.cities, facetedFilters.cities, activeSite)) handleBreadcrumbClick("country")
+  }, [facetedFilters, activeInstitution, activeCountry, activeSite, handleBreadcrumbClick, centerOnPlaceArcs])
 
   // ── Command palette navigation handlers ──
   const commandPaletteHandlers: CommandPaletteHandlers = useMemo(() => ({
@@ -1097,17 +1113,13 @@ function MapContent() {
       drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setArcObjectsPage(1)
-      if (mapRef.current && hasValidCoordinates(lat, lng)) {
-        mapRef.current.flyToLocation(lng, lat, 10, 1400)
-        setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom: 10 }))
-        debouncedGeocode(lng, lat)
-      }
+      centerOnPlaceArcs(site, "site")
     },
     onOriginClick: handleOriginClick,
     onToggleSite: handleToggleSite,
     onToggleInstitution: handleToggleInstitution,
     onOpenArtifact: (id: number) => openArtifactById(id),
-  }), [handleOriginClick, handleToggleSite, handleToggleInstitution, cityArcData, debouncedGeocode, openArtifactById])
+  }), [handleOriginClick, handleToggleSite, handleToggleInstitution, cityArcData, debouncedGeocode, openArtifactById, centerOnPlaceArcs])
 
   // Bbox fetch for zoomed-in objects
   const fetchObjects = useCallback(async (bounds: MapBounds, page: number, reset = false) => {
@@ -1206,6 +1218,8 @@ function MapContent() {
       setGeocodedName("")                   // clear stale geocoded name immediately
       setIsObjectContainerVisible(true)
       setLocationName(site || country)
+      // An arc pick shows its chips, like the same pick in the lists.
+      setFacetedFilters((f) => ({ ...f, countries: [country], cities: site ? [site] : [], institutions: institution ? [institution] : f.institutions }))
       // Note: do NOT call flyToLocation here — the arc onClick handler
       // in map-view.tsx already runs animateToZoomLevel for a smooth
       // single animation. Calling flyTo + setViewState here caused a
@@ -1219,6 +1233,7 @@ function MapContent() {
       drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setGeocodedName("")
+      setFacetedFilters((f) => ({ ...f, countries: [], cities: [], institutions: [] }))
     }
   }, [])
 
@@ -1355,31 +1370,8 @@ function MapContent() {
     }
   }, [debouncedGeocode])
 
-  // Auto-clear drill-down when user zooms out to global (not during fly-to)
-  // Guard: skip during initial restore period (first 3s after mount with URL params)
-  const mountTimeRef = useRef(Date.now())
-  useEffect(() => {
-    const wasAbove = !prevZoomedOutRef.current
-    prevZoomedOutRef.current = isZoomedOutToGlobal
-    // Skip auto-clear during initial restore (map may animate through low zoom levels)
-    if (urlCountry && Date.now() - mountTimeRef.current < 3000) return
-    // Only a zoom-out by the user goes back to the world. A flight started by code
-    // can dip below the threshold on its way (flyTo zooms out, then in) — e.g. from
-    // the mobile opening view at zoom 3.1 to a country at 5.
-    if (mapRef.current?.isProgrammaticMove?.()) return
-    if (isZoomedOutToGlobal && wasAbove && drillLevel !== "global") {
-      setActiveCountry(null)
-      setActiveSite(null)
-      setActiveInstitution(null)
-      setDrillLevel("global")
-      drillLevelRef.current = "global"
-      setSelectedArc(null)
-      drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
-      setArcObjects([])
-      setLocationName("")
-      setGeocodedName("")
-    }
-  }, [isZoomedOutToGlobal, drillLevel, urlCountry])
+  // Zooming out keeps the selection: a country's arcs are seen whole only from the
+  // world view. The breadcrumb root (or deselecting) goes back to all arcs.
 
   // Handle wikipedia documents from map view
   const handleWikiDocumentsChange = useCallback((docs: any[]) => {
@@ -1543,7 +1535,7 @@ function MapContent() {
           groupedOrigins={groupedOrigins}
           sitesByCountry={sitesByCountry}
           isLoadingOrigins={isLoadingArcData}
-          onOriginClick={handleOriginClick}
+          onOriginClick={pickOrigin}
           groupedSites={groupedSites}
           drillInstitutions={institutions}
           activeCountry={activeCountry}
@@ -1552,7 +1544,7 @@ function MapContent() {
           activePrecise={activePrecise}
           onTogglePrecise={handleTogglePrecise}
           activeInstitution={activeInstitution}
-          onToggleSite={handleToggleSite}
+          onToggleSite={pickSite}
           onToggleInstitution={handleToggleInstitution}
           isLoadingSubArcs={isLoadingSubArcs}
           drillArcs={filteredSubArcs}
@@ -1665,7 +1657,7 @@ function MapContent() {
             groupedOrigins={groupedOrigins}
             sitesByCountry={sitesByCountry}
             isLoadingOrigins={isLoadingArcData}
-            onOriginClick={(...args: Parameters<typeof handleOriginClick>) => { if (isMobile) showMapCard(); handleOriginClick(...args) }}
+            onOriginClick={(...args: Parameters<typeof handleOriginClick>) => { if (isMobile) showMapCard(); pickOrigin(...args) }}
             groupedSites={groupedSites}
             drillInstitutions={institutions}
             activeSite={activeSite}
@@ -1674,7 +1666,7 @@ function MapContent() {
             onTogglePrecise={handleTogglePrecise}
             activeCountry={activeCountry}
             activeInstitution={activeInstitution}
-            onToggleSite={(...args: Parameters<typeof handleToggleSite>) => { if (isMobile) showMapCard(); handleToggleSite(...args) }}
+            onToggleSite={(...args: Parameters<typeof handleToggleSite>) => { if (isMobile) showMapCard(); pickSite(...args) }}
             onToggleInstitution={handleToggleInstitution}
             isLoadingSubArcs={isLoadingSubArcs}
             locationName={effectiveLocationName}

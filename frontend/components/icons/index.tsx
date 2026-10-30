@@ -373,6 +373,40 @@ export const IconSource: React.FC<IconProps> = ({
 )
 IconSource.displayName = "IconSource"
 
+/* ── Arrow right (origin → museum; head as in IconSource) ───────────────── */
+export const IconArrowRight: React.FC<IconProps> = ({
+  width = 24,
+  height = 24,
+  className,
+  ...props
+}) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    {...props}
+  >
+    <path
+      d="M4 12H20"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M15.75 7.75L20 12L15.75 16.25"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+IconArrowRight.displayName = "IconArrowRight"
+
 /* ── Grid size (density of the object grid: 1 / 3 / 5 columns) ───────────── */
 export const IconGridSize: React.FC<IconProps & { columns?: number }> = ({
   width = 24,

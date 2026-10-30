@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { originFromLabel, placeBaseName, placeDisplayLabel, placeDisplayLabels } from "./place-label"
+import { originFromLabel, placeBaseName, placeDisplayLabel, placeDisplayLabels, siteRowLabel } from "./place-label"
 
 describe("placeBaseName", () => {
   it("drops generic tags written by the ETL", () => {
@@ -64,5 +64,16 @@ describe("originFromLabel", () => {
       .toBe("Bergama (Pergamon)")
     expect(originFromLabel({ place_name: "Pergamon", historical_name: "Pergamon", precise_place: " " })).toBe("Pergamon")
     expect(originFromLabel({})).toBeNull()
+  })
+})
+
+describe("siteRowLabel", () => {
+  const labels = placeDisplayLabels(["China", "Kano (City)"])
+  it("names the country's own row 'No site'", () => {
+    expect(siteRowLabel("China", "China", labels)).toBe("No site")
+  })
+  it("keeps other sites' labels", () => {
+    expect(siteRowLabel("Kano (City)", "Nigeria", labels)).toBe("Kano")
+    expect(siteRowLabel("China", null, labels)).toBe("China")
   })
 })

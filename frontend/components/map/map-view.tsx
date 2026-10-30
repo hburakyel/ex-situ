@@ -29,7 +29,7 @@ import { ARC_ANCHOR_LAYER, protomapsDarkStyle } from "@/lib/protomaps-dark-style
 import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
-import { placeDisplayLabels } from "@/lib/place-label"
+import { placeDisplayLabels, siteRowLabel } from "@/lib/place-label"
 import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
 import { track } from "@/lib/analytics"
@@ -65,6 +65,14 @@ export type FacetedFilters = {
 // https://protomaps.com/downloads and served as a static file from
 // /public/basemap.pmtiles — this eliminates all external tile dependencies.
 const DARK_STYLE = protomapsDarkStyle()
+// With nothing chosen, arcs are a faint orange. A chosen place's or collection's
+// arcs, and a highlighted arc (clicked, or hovered on the map or in a panel), run
+// from blue at the origin to orange at the museum, so their direction reads.
+const ARC_ORIGIN_COLOR: [number, number, number] = [59, 130, 246]
+const ARC_MUSEUM_COLOR: [number, number, number] = [239, 95, 0]
+const ARC_QUIET_COLOR = ARC_MUSEUM_COLOR
+// Width in pixels by the route's artifact count, on a log scale.
+const arcWidth = (count: number) => Math.max(1.5, Math.min(4, 1.5 + Math.log(count + 1) * 0.5))
 
 interface ViewState {
   longitude: number
@@ -431,8 +439,6 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     useImperativeHandle(ref, () => ({
       map: map.current,
-      // True while a flight started by code (flyToLocation, arc click) is still running.
-      isProgrammaticMove: (): boolean => isProgrammaticMove.current,
       // Returns false while the map isn't created yet (the call did nothing).
       flyToLocation: (lng: number, lat: number, zoom: number = 10, duration: number = 800): boolean => {
         if (!map.current) return false
@@ -442,6 +448,39 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         prevViewStateRef.current = { longitude: lng, latitude: lat, zoom } as any
         map.current.flyTo({ center: [lng, lat], zoom, essential: true, duration })
         return true
+      },
+      // Centres the points in the map area the panels leave free, zoomed to fit
+      // them (at most zoom 6, where arcs still keep their curve).
+      // Returns the view it flies to, for the page's URL.
+      centerOnPoints: (points: [number, number][]): { longitude: number; latitude: number; zoom: number } | null => {
+        const m = map.current
+        const box = mapContainer.current?.getBoundingClientRect()
+        if (!m || !box || points.length === 0) return null
+        // Routes across the Pacific: shift western longitudes by 360° when that
+        // makes the span shorter.
+        const span = (lngs: number[]) => Math.max(...lngs) - Math.min(...lngs)
+        let lngs = points.map(([lng]) => lng)
+        const shifted = lngs.map((lng) => (lng < 0 ? lng + 360 : lng))
+        if (span(shifted) < span(lngs)) lngs = shifted
+        const lats = points.map(([, lat]) => lat)
+        const padding = { top: 40, bottom: 40, left: 40, right: 40 }
+        document.querySelectorAll("[data-map-cover]").forEach((el) => {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 || r.width > box.width / 2) return
+          if (r.left + r.width / 2 < box.left + box.width / 2) padding.left = Math.max(padding.left, r.right - box.left + 48)
+          else padding.right = Math.max(padding.right, box.right - r.left + 48)
+        })
+        if (box.width - padding.left - padding.right < 200) { padding.left = 40; padding.right = 40 }
+        const camera = m.cameraForBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding })
+        if (!camera?.center) return null
+        const center = maplibregl.LngLat.convert(camera.center)
+        const zoom = Math.min(camera.zoom ?? m.getZoom(), 6)
+        isProgrammaticMove.current = true
+        setViewportState({ longitude: center.lng, latitude: center.lat, zoom })
+        lastViewRef.current = { lng: center.lng, lat: center.lat, zoom }
+        prevViewStateRef.current = { longitude: center.lng, latitude: center.lat, zoom } as any
+        m.flyTo({ center, zoom, essential: true, duration: 1400 })
+        return { longitude: center.lng, latitude: center.lat, zoom }
       },
       jumpToLocation: (lng: number, lat: number, zoom: number = 10) => {
         if (map.current) {
@@ -653,6 +692,29 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       }
     }, [showControls])
 
+    // The chosen site's row, also when an arc click chose it: highlighted and
+    // scrolled into view in its list.
+    const isActiveSiteRow = (name: string) => !!activeSite && normalizePlaceKey(activeSite) === normalizePlaceKey(name)
+    useEffect(() => {
+      if (!activeSite) return
+      const id = requestAnimationFrame(() =>
+        document.querySelectorAll("[data-active-site]").forEach((el) => el.scrollIntoView({ block: "center" })))
+      return () => cancelAnimationFrame(id)
+    }, [activeSite, groupedSites.length])
+
+    // The panels lie over the map: entering one from an arc must end the arc's
+    // hover, or the arc stays highlighted.
+    useEffect(() => {
+      const onOver = (e: PointerEvent) => {
+        const into = (e.target as Element | null)?.closest?.("[data-map-cover]")
+        if (!into || (e.relatedTarget as Element | null)?.closest?.("[data-map-cover]") === into) return
+        map.current?.getCanvasContainer().dispatchEvent(new MouseEvent("mouseout"))
+        setHoveredArc(null)
+      }
+      document.addEventListener("pointerover", onOver)
+      return () => document.removeEventListener("pointerover", onOver)
+    }, [])
+
     // Sync prevViewStateRef when initialViewState changes (for URL restore bookkeeping)
     // Actual map flyTo is handled directly by handlers via flyToLocation — no duplicate animation
     useEffect(() => {
@@ -743,7 +805,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Only the identity of the hovered arc matters for the layer (mobile width boost);
     // the tooltip's x/y change on every mouse move and must not rebuild the layer.
-    const hoveredArcKey = isMobile && hoveredArc ? `${hoveredArc.fromName}-${hoveredArc.toName}` : null
+    const hoveredArcKey = hoveredArc ? `${hoveredArc.fromName}-${hoveredArc.toName}` : null
+
+    // A place or collection chosen as a search filter focuses the arcs like a click.
+    const hasPlaceFilter = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length > 0
 
     // Focus: once a country, site, collection or arc is selected, only its arcs
     // are drawn. Unrelated arcs used to stay on the map — a hairball at world
@@ -786,7 +851,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // is near the viewport. Routes merely crossing the screen drew as wide bands
     // (arcs rise toward the camera), and in Europe nearly every route ends in
     // view. With a collection selected, routes into it count too. The rest come
-    // back on pan (moveend).
+    // back on pan (moveend). A chosen place keeps all its arcs: choosing it no
+    // longer moves the camera there.
     const isNearViewport = useMemo(() => {
       const mapInstance = map.current
       if (!isMapReady || isLowZoomArcView || !mapInstance) return () => true
@@ -825,8 +891,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const visibleArcData = useMemo(() => processedArcs.arcLayerData.filter((arc) =>
       hasValidCoordinatePair(arc.sourcePosition) && hasValidCoordinatePair(arc.targetPosition) &&
       matchesArcFocus(arc.fromName, arc.fromCountry, arc.toName) &&
-      (!!selectedArc || isNearViewport(arc.sourcePosition, arc.targetPosition))
-    ), [processedArcs, matchesArcFocus, isNearViewport, selectedArc?.key])
+      (!!selectedArc || !!activeCountry || isNearViewport(arc.sourcePosition, arc.targetPosition))
+    ), [processedArcs, matchesArcFocus, isNearViewport, selectedArc?.key, activeCountry])
 
     // ── Labels (lib/country-labels.ts, lib/protomaps-dark-style.ts) ──
     // The country labels' names, to leave origins that are countries to them.
@@ -838,6 +904,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         .catch((err) => console.error("Failed to load country labels:", err))
       return () => { cancelled = true }
     }, [])
+
+    // A chosen country or site keeps its site-level arcs (one per site and museum)
+    // at every zoom; zoomed in, the per-artifact arcs of the area in view would
+    // swap in and change with each pan. A chosen precise place draws its own.
+    const keepPlaceArcs = drillLevel !== "global" && !activePrecise && drillArcs.length > 0
 
     // Below the world view the arcs start at sites, which no country label names:
     // label each drawn arc's origin, as the source records give it. Origins that
@@ -853,7 +924,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         if (existing) existing.count += count
         else origins.set(key, { name, count, position })
       }
-      if (processedArcs.dataSource !== "geospatial-country") {
+      if (processedArcs.dataSource !== "geospatial-country" && !(keepPlaceArcs && processedArcs.dataSource === "geospatial-objects")) {
         visibleArcData.forEach((arc) => add(arc.fromName, arc.count, arc.sourcePosition))
       }
       drillArcs.forEach((arc) => {
@@ -871,14 +942,14 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           properties: { name: labels.get(o.name) ?? o.name, population_rank: 10, sort_key: -o.count },
         })),
       })
-    }, [isMapReady, visibleArcData, processedArcs.dataSource, drillArcs, matchesArcFocus, activeCountry, countryIndex])
+    }, [isMapReady, visibleArcData, processedArcs.dataSource, drillArcs, matchesArcFocus, activeCountry, countryIndex, keepPlaceArcs])
 
     // ArcLayer: görsel ve etkileşim bir arada, mobilde hover/tıklama sırasında geçici olarak genişler
     const arcLayer = useMemo(() => {
       if (!isMapReady || visibleArcData.length === 0) return null
-      const { dataSource, layerStyle } = processedArcs
+      const { dataSource } = processedArcs
+      if (keepPlaceArcs && dataSource === 'geospatial-objects') return null
       const arcLayerData = visibleArcData
-      const { sourceColor, targetColor } = layerStyle
       const layerId = dataSource === 'geospatial-country' || dataSource === 'geospatial-city' ? 'arc-layer-geospatial'
         : dataSource === 'geospatial-objects' ? 'arc-layer-objects' : 'arc-layer-fallback'
       const isAggregated = dataSource === 'geospatial-country' || dataSource === 'geospatial-city'
@@ -888,18 +959,25 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       const logMaxCount = Math.log(arcLayerData.reduce((m, d) => Math.max(m, d.count), 1) + 1)
       // Until a country, site, collection or arc is chosen the arcs are a quiet
       // texture at every zoom; a selection is what makes them read clearly.
-      const isQuiet = !selectedArc && !activeCountry && !activeSite && !activeInstitution
-      const [minAlpha, maxAlpha] = isQuiet ? [40, 220] : [100, 255]
+      const isQuiet = !selectedArc && !activeCountry && !activeSite && !activeInstitution && !hasPlaceFilter
+      // A selection with many arcs (a whole collection) is drawn thinner and more
+      // transparent, so it reads as routes rather than a solid fan.
+      const isDense = !isQuiet && arcLayerData.length > 150
+      // Even a chosen place's arcs stay translucent, so the land shows through.
+      const [minAlpha, maxAlpha] = isQuiet ? [25, 90] : isDense ? [40, 130] : [70, 190]
+      // Hovering a row whose arcs are not drawn (another site while one is chosen)
+      // must not fade the arcs that are.
+      const listHoverShown = !!listHover && arcLayerData.some((d) => matchesListHover(d.fromName, d.fromCountry, d.toName))
       const restingAlpha = (d: ArcDatum) => {
-        let alpha = isQuiet ? 130 : 255
+        let alpha = isQuiet ? 50 : isDense ? 90 : 170
         if (isAggregated && logMaxCount > 0) alpha = minAlpha + (maxAlpha - minAlpha) * (Math.log(d.count + 1) / logMaxCount)
         // Hovering a row in the left panel: everything else steps back.
-        if (listHover && !matchesListHover(d.fromName, d.fromCountry, d.toName)) alpha *= 0.25
+        if (listHoverShown && !matchesListHover(d.fromName, d.fromCountry, d.toName)) alpha *= 0.25
         return Math.round(alpha)
       }
 
-      // Selection / drill-down state: gets the emphasized blue→purple gradient + thicker width.
-      const isSelectedOrActiveArc = (d: ArcDatum) => {
+      // A clicked arc.
+      const isSelectedArc = (d: ArcDatum) => {
         const selectedFrom = normalizePlaceKey(selectedArcRef.current?.from)
         const selectedTo = normalizePlaceKey(selectedArcRef.current?.to)
         const datumFrom = normalizePlaceKey(d.fromName)
@@ -910,51 +988,42 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           (selectedFrom.length > 0 && selectedTo.length > 0 && selectedFrom === datumFrom && selectedTo === datumTo)
         )
 
-        return matchesSelectedArc || (
-          normalizePlaceKey(activeSite).length > 0 && normalizePlaceKey(activeSite) === datumFrom
-        )
+        return matchesSelectedArc
       }
 
-      // Hovering an image in the panel: match the same flat-tint style deck.gl's
-      // autoHighlight uses when hovering an arc directly on the map (no gradient, no width boost).
+      // Hovered on the map, or through an image or a list row in a panel.
       const isPanelHoveredArc = (d: ArcDatum) =>
         (normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.fromName)) ||
         (!!listHover && matchesListHover(d.fromName, d.fromCountry, d.toName))
+      const isHighlighted = (d: ArcDatum) =>
+        isSelectedArc(d) || hoveredArcKey === `${d.fromName}-${d.toName}` || isPanelHoveredArc(d)
 
       const mainLayer = new ArcLayer<ArcDatum>({
         id: layerId,
         data: arcLayerData,
         getSourcePosition: (d) => d.sourcePosition,
         getTargetPosition: (d) => d.targetPosition,
-        getSourceColor: (d): [number, number, number, number] => {
-          if (isSelectedOrActiveArc(d) || isPanelHoveredArc(d)) return [59, 130, 246, 255]
-          return [...sourceColor, restingAlpha(d)] as [number, number, number, number]
-        },
-        getTargetColor: (d): [number, number, number, number] => {
-          if (isSelectedOrActiveArc(d)) return [147, 51, 234, 255]
-          if (isPanelHoveredArc(d)) return [59, 130, 246, 255]
-          return [...targetColor, restingAlpha(d)] as [number, number, number, number]
-        },
+        getSourceColor: (d): [number, number, number, number] =>
+          isHighlighted(d) ? [...ARC_ORIGIN_COLOR, 255] : [...(isQuiet ? ARC_QUIET_COLOR : ARC_ORIGIN_COLOR), restingAlpha(d)],
+        getTargetColor: (d): [number, number, number, number] =>
+          isHighlighted(d) ? [...ARC_MUSEUM_COLOR, 255] : [...(isQuiet ? ARC_QUIET_COLOR : ARC_MUSEUM_COLOR), restingAlpha(d)],
         getWidth: (d) => {
-          const selectedOrActive = isSelectedOrActiveArc(d)
           const isHovered = hoveredArcKey === `${d.fromName}-${d.toName}`
-          const baseWidth = dataSource === 'geospatial-country' || dataSource === 'geospatial-city'
-            ? Math.max(0.5, Math.min(3, 0.5 + Math.log(d.count + 1) * 0.45))
-            : Math.max(2, Math.min(6, 2 + Math.log(d.count + 1) * 0.9))
-          // Mobilde ve hover/seçili ise geçici olarak genişlet
-          if (isMobile && (isHovered || selectedOrActive || isPanelHoveredArc(d))) return Math.max(baseWidth, 16)
-          if (selectedOrActive) return baseWidth * 2.5
+          // Chosen arcs keep this width too: with a selection, only its arcs are drawn.
+          const baseWidth = arcWidth(d.count)
+          // On a phone a tapped or hovered arc widens for a moment.
+          if (isMobile && (isHovered || isPanelHoveredArc(d))) return Math.max(baseWidth, 16)
+          // A highlighted arc stands out from the thinned, translucent rest.
+          if (isHighlighted(d)) return baseWidth * 1.25
           // Thin unhighlighted arcs further while nothing is selected so overlap
           // reads as density rather than a solid overplotted mass.
-          return isQuiet ? baseWidth * 0.7 : baseWidth
+          return isQuiet || isDense ? baseWidth * 0.5 : baseWidth * 0.75
         },
-        widthMinPixels: isMobile ? 2.5 : 1.5,
+        widthMinPixels: isQuiet || isDense ? 1.5 : 2,
         pickable: true,
-        autoHighlight: true,
-        highlightColor: [59, 130, 246],
         transitions: { getSourceColor: { duration: 300 }, getTargetColor: { duration: 300 }, getWidth: { duration: 300 } },
         updateTriggers: {
-          getSourceColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hoveredObjectPlace, isLowZoomArcView, listHoverKey], getTargetColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hoveredObjectPlace, isLowZoomArcView, listHoverKey], getWidth: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hoveredObjectPlace, hoveredArcKey, isMobile, isLowZoomArcView, listHoverKey],
+          getSourceColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, listHoverKey], getTargetColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, listHoverKey], getWidth: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isMobile, isLowZoomArcView, listHoverKey],
         },
         onHover: (info: any) => {
           if (info.object) {
@@ -989,8 +1058,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           }
         },
       })
-      return withEmphasis(mainLayer, arcLayerData.filter((d) => isSelectedOrActiveArc(d) || isPanelHoveredArc(d)))
-    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, visibleArcData, listHoverKey, matchesListHover, activeCountry, activeInstitution])
+      return withEmphasis(mainLayer, arcLayerData.filter(isHighlighted))
+    }, [processedArcs, isMapReady, selectedArc?.key, isMobile, activeSite, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, visibleArcData, listHoverKey, matchesListHover, activeCountry, activeInstitution, hasPlaceFilter, keepPlaceArcs])
 
     // ── Drill arc layer: persistent city-cluster arcs ──
     // Shown at city zoom (< 7) always. At zoom 7+, shown only when arcLayer has
@@ -1001,43 +1070,41 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       if (!isMapReady || drillLevel === "global" || drillArcs.length === 0) return null
       // At zoom 7+, only hide when the active arc layer is already rendering
       // individual object routes for the current viewport.
-      if (isStreetZoom && processedArcs.dataSource === 'geospatial-objects' && processedArcs.arcLayerData.length > 0) return null
+      if (!keepPlaceArcs && isStreetZoom && processedArcs.dataSource === 'geospatial-objects' && processedArcs.arcLayerData.length > 0) return null
       // Drill arcs already belong to the active country; site/collection/arc
       // selections narrow them further (the country check is skipped here).
       const validArcs = drillArcs.filter(a =>
         hasValidCoordinates(a.latitude, a.longitude) &&
         a.institution_latitude != null && a.institution_longitude != null &&
         hasValidCoordinates(a.institution_latitude, a.institution_longitude) &&
-        matchesArcFocus(a.place_name, activeCountry ?? "", a.institution_name) &&
-        isNearViewport([a.longitude, a.latitude], [a.institution_longitude, a.institution_latitude])
+        matchesArcFocus(a.place_name, activeCountry ?? "", a.institution_name)
       )
       if (validArcs.length === 0) return null
-      // Drill-down selection: emphasized blue→purple gradient + thicker width.
-      const isActiveSiteDrillArc = (d: any) => normalizePlaceKey(activeSite) === normalizePlaceKey(d.place_name)
-      // Hovering an image in the panel: match the flat-tint style used when hovering an arc directly on the map.
-      const isPanelHoveredDrillArc = (d: any) =>
+      // Hovered on the map, or through an image or a list row in a panel.
+      const isHighlightedDrillArc = (d: any) =>
+        hoveredArcKey === `${d.place_name}-${d.institution_name}` ||
         (normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.place_name)) ||
         (!!listHover && matchesListHover(d.place_name, activeCountry ?? "", d.institution_name))
-      const drillAlpha = (d: any) => listHover && !matchesListHover(d.place_name, activeCountry ?? "", d.institution_name) ? 50 : 200
+      // Many arcs (a large country's sites) are drawn thinner and more transparent.
+      const isDense = validArcs.length > 150
+      const listHoverShown = !!listHover && validArcs.some((d) => matchesListHover(d.place_name, activeCountry ?? "", d.institution_name))
+      const drillAlpha = (d: any) => listHoverShown && !matchesListHover(d.place_name, activeCountry ?? "", d.institution_name) ? 50 : isDense ? 90 : 150
       const drillLayer = new ArcLayer({
         id: "arc-layer-drill",
         data: validArcs,
         getSourcePosition: (d: any) => [d.longitude, d.latitude],
         getTargetPosition: (d: any) => [d.institution_longitude, d.institution_latitude],
         getSourceColor: (d: any): [number, number, number, number] =>
-          (isActiveSiteDrillArc(d) || isPanelHoveredDrillArc(d)) ? [59, 130, 246, 255] : [239, 95, 0, drillAlpha(d)],
+          [...ARC_ORIGIN_COLOR, isHighlightedDrillArc(d) ? 255 : drillAlpha(d)],
         getTargetColor: (d: any): [number, number, number, number] =>
-          isActiveSiteDrillArc(d) ? [147, 51, 234, 255] : (isPanelHoveredDrillArc(d) ? [59, 130, 246, 255] : [239, 95, 0, drillAlpha(d)]),
-        getWidth: (d: any) =>
-          isActiveSiteDrillArc(d) ? 3 : Math.max(0.5, Math.min(3, 0.5 + Math.log((d.object_count || 1) + 1) * 0.45)),
-        widthMinPixels: isMobile ? 2.5 : 1.5,
+          [...ARC_MUSEUM_COLOR, isHighlightedDrillArc(d) ? 255 : drillAlpha(d)],
+        getWidth: (d: any) => arcWidth(d.object_count || 1) * (isHighlightedDrillArc(d) ? 1.25 : isDense ? 0.5 : 0.75),
+        widthMinPixels: isDense ? 1.5 : 2,
         pickable: true,
-        autoHighlight: true,
-        highlightColor: [59, 130, 246],
         updateTriggers: {
-          getSourceColor: [activeSite, hoveredObjectPlace, listHoverKey],
-          getTargetColor: [activeSite, hoveredObjectPlace, listHoverKey],
-          getWidth: [activeSite, hoveredObjectPlace],
+          getSourceColor: [activeSite, hoveredObjectPlace, hoveredArcKey, listHoverKey],
+          getTargetColor: [activeSite, hoveredObjectPlace, hoveredArcKey, listHoverKey],
+          getWidth: [activeSite, hoveredObjectPlace, hoveredArcKey, listHoverKey],
         },
         onHover: (info: any) => {
           if (info.object) {
@@ -1069,8 +1136,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           animateToZoomLevel([d.longitude, d.latitude], 6, { mode: 'level-shift', duration: 1800 })
         },
       })
-      return withEmphasis(drillLayer, validArcs.filter((d) => isActiveSiteDrillArc(d) || isPanelHoveredDrillArc(d)))
-    }, [isMapReady, drillLevel, drillArcs, activeSite, activeCountry, hoveredObjectPlace, isMobile, isStreetZoom, processedArcs.dataSource, processedArcs.arcLayerData.length, matchesArcFocus, isNearViewport, isLowZoomArcView, listHoverKey, matchesListHover])
+      return withEmphasis(drillLayer, validArcs.filter(isHighlightedDrillArc))
+    }, [isMapReady, drillLevel, drillArcs, activeSite, activeCountry, hoveredObjectPlace, hoveredArcKey, isMobile, isStreetZoom, processedArcs.dataSource, processedArcs.arcLayerData.length, matchesArcFocus, isLowZoomArcView, listHoverKey, matchesListHover, keepPlaceArcs])
 
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({
@@ -1084,11 +1151,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       if (drillArcLayer) result.push(...drillArcLayer)
       if (arcLayer) result.push(...arcLayer)
       if (wikiLayer) result.push(wikiLayer)
-      // Arcs go beneath every label, so all names stay legible. At street zoom a raised
-      // arc only shows its lift-off (a widening wedge), so it lies flat there.
-      const getHeight = isStreetZoom ? 0 : 1
+      // Arcs go beneath every label, so all names stay legible. On a phone at street
+      // zoom a raised arc only shows its lift-off (a widening wedge), so it lies flat
+      // there; desktop keeps the curve at every zoom.
+      const getHeight = isMobile && isStreetZoom ? 0 : 1
       return result.map((layer) => layer instanceof ArcLayer ? layer.clone({ beforeId: ARC_ANCHOR_LAYER, getHeight }) : layer)
-    }, [isMapReady, arcLayer, drillArcLayer, wikiLayer, isStreetZoom])
+    }, [isMapReady, arcLayer, drillArcLayer, wikiLayer, isMobile, isStreetZoom])
 
     // Push layers to MapboxOverlay
     useEffect(() => {
@@ -1278,7 +1346,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
         {!isMobile && (
-        <div className="absolute top-8 left-8 sm:w-80 z-20">
+        <div className="absolute top-8 left-8 sm:w-80 z-20" data-map-cover>
         <div className="bg-white rounded-2xl shadow-lg flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto">
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
@@ -1402,13 +1470,14 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                       {groupedSites.map((site, index) => (
                         <Fragment key={index}>
                         <div
-                          className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeSite === site.name ? "bg-gray-300" : ""}`}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${isActiveSiteRow(site.name) ? "bg-gray-300" : ""}`}
+                          data-active-site={isActiveSiteRow(site.name) || undefined}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           {...listHoverProps("site", site.name)}
                         >
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="truncate max-w-[70%]">{siteLabels.get(site.name) ?? site.name}</span>
+                              <span className="truncate max-w-[70%]">{siteRowLabel(site.name, activeCountry, siteLabels)}</span>
                             </TooltipTrigger>
                             <TooltipContent side="top">{site.name}</TooltipContent>
                           </Tooltip>

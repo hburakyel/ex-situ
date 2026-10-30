@@ -1750,6 +1750,7 @@ export default function ObjectPanel({
       ref={containerRef}
       role={isMobile ? "complementary" : undefined}
       aria-label={isMobile ? "Object panel" : undefined}
+      data-map-cover={isMobile ? undefined : ""}
       className={`fixed ${
         isMobile
           ? "" // all positioning/sizing handled by inline style

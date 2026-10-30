@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons"
-import { IconSource, IconClose } from "@/components/icons"
+import { IconSource, IconClose, IconArrowRight } from "@/components/icons"
 import { displayObjectDate } from "@/lib/object-date"
 import { originFromLabel } from "@/lib/place-label"
 import { Button } from "@/components/ui/button"
@@ -359,7 +359,8 @@ export default function ImageGallery({
           </div>
         </div>
 
-        {/* From / To / Time / Collection — right under the header */}
+        {/* One line under the header: origin → museum city · time. The collection is
+            named in the image credit below. */}
         <div
           style={{
             padding: "0 16px 8px",
@@ -367,7 +368,7 @@ export default function ImageGallery({
             textAlign: "left",
           }}
         >
-          <span className="text-black" style={{ fontSize: "0.875rem" }}>
+          <span className="text-black break-words" style={{ fontSize: "0.875rem" }}>
             {(() => {
               const at = currentObject.attributes
               // Precise place, then the present-day site and its former name:
@@ -375,24 +376,17 @@ export default function ImageGallery({
               const from = originFromLabel(at)
               const to = at.institution_city_en || INSTITUTION_CITIES[at.institution_name || ""] || at.institution_place
               const time = displayObjectDate(at.object_date)
-              const items: [string, string][] = []
-              if (from) items.push(["From", from])
-              if (to) items.push(["To", to])
-              if (time) items.push(["Time", time])
-              if (at.institution_name) items.push(["Collection", at.institution_name])
-              // Pairs are separated by a real space (a break point) and each label is held
-              // to its value; short pairs ("To: Berlin", "Time: 1–600 CE") never split.
-              return items.map(([label, value], i) => (
-                <React.Fragment key={label}>
-                  {i > 0 && " "}
-                  {/* Short To/Time values stay on one line; long ones ("Qajar dynasty (1796–1925),
-                      dated …") wrap inside the frame instead of running off it. */}
-                  <span className={(label === "To" || label === "Time") && value.length <= 24 ? "whitespace-nowrap" : "break-words"}>
-                    <span className="text-[#666]">{label}:{"\u00a0"}</span>
-                    {value}
-                  </span>
-                </React.Fragment>
-              ))
+              const route = from || to
+              return (
+                <>
+                  {from}
+                  {from && to && <IconArrowRight className="inline-block h-3.5 w-3.5 mx-1.5 align-[-2px]" aria-label="to" />}
+                  {to}
+                  {/* A short time stays on one line; a long one ("Qajar dynasty (1796–1925),
+                      dated …") wraps inside the frame. */}
+                  {time && <>{route && <span className="text-[#666]"> · </span>}<span className={time.length <= 24 ? "whitespace-nowrap" : undefined}>{time}</span></>}
+                </>
+              )
             })()}
           </span>
         </div>

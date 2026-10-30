@@ -19,7 +19,7 @@ import type {
   InstitutionItem,
   FacetedFilters
 } from "./object-panel"
-import { placeDisplayLabels } from "@/lib/place-label"
+import { placeDisplayLabels, siteRowLabel } from "@/lib/place-label"
 import type { PrecisePlace } from "@/lib/api"
 import PrecisePlaceRows from "@/components/map/precise-place-rows"
 
@@ -224,6 +224,11 @@ export default function InfoPanel({
     : (activeSite && activeSite !== activeCountry)
       ? activeSite
       : (activeCountry || '')
+  // A place or site with its own chip is named by the chip alone, like a collection.
+  // A precise place has no filter of its own; its chip clears it.
+  const precisePlace = activePrecise ? precisePlaces.find((p) => p.name === activePrecise) : undefined
+  const nameIsChip = !!precisePlace || [...facetedFilters.countries, ...facetedFilters.cities]
+    .some((v) => v.toLowerCase() === displayName.toLowerCase())
 
   // Breadcrumb segments; `offset` keeps the original index when the trail is split.
   const renderTrail = (segs: typeof breadcrumb, offset: number) => segs.map((seg, k) => {
@@ -360,7 +365,7 @@ export default function InfoPanel({
                   </>
                 )}
               </div>
-              {displayName && !isMobile && (
+              {displayName && !isMobile && !nameIsChip && (
                 <div className="truncate text-sm text-black leading-normal mt-0.5">
                   {displayName}
                 </div>
@@ -419,9 +424,10 @@ export default function InfoPanel({
                           <React.Fragment key={index}>
                           <div
                             className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeSite === site.name ? "bg-gray-300" : ""}`}
+                            data-active-site={activeSite === site.name || undefined}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
                           >
-                            <span className="truncate max-w-[70%]" title={site.name}>{siteLabels.get(site.name) ?? site.name}</span>
+                            <span className="truncate max-w-[70%]" title={site.name}>{siteRowLabel(site.name, activeCountry, siteLabels)}</span>
                             <span className="ml-2 text-gray-500 text-sm">{formatCount(site.totalCount)}</span>
                           </div>
                           {activeSite === site.name && (
@@ -487,7 +493,7 @@ export default function InfoPanel({
           )}
 
           {/* Filter chips */}
-          {activeFilterCount > 0 && mobileVariant !== "summary" && (
+          {(activeFilterCount > 0 || precisePlace) && mobileVariant !== "summary" && (
             <div className="flex flex-wrap items-center gap-1 pt-1">
               {facetedFilters.countries.map(c => (
                 <span key={`c-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-sm">
@@ -505,6 +511,14 @@ export default function InfoPanel({
                   </button>
                 </span>
               ))}
+              {precisePlace && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-sm">
+                  {precisePlace.name}
+                  <button onClick={() => onTogglePrecise?.(precisePlace)} className="hover:bg-blue-100 rounded-md p-0.5">
+                    <IconClose className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )}
               {facetedFilters.institutions.map(c => (
                 <span key={`i-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 text-sm">
                   {c}

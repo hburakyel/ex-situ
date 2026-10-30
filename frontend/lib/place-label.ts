@@ -71,3 +71,12 @@ export function originFromLabel(o: OriginFields): string | null {
   if (!precise || [from, former, site].some((n) => n && n.toLowerCase() === precise!.toLowerCase())) return site
   return `${precise}, ${site}`
 }
+
+/**
+ * A row of a country's Sites list. Records located only to the country itself
+ * are a row of that list too; it reads "No site", not the country again.
+ */
+export function siteRowLabel(name: string, country: string | null | undefined, labels: Map<string, string>): string {
+  if (country && name.trim().toLowerCase() === country.trim().toLowerCase()) return "No site"
+  return labels.get(name) ?? name
+}
