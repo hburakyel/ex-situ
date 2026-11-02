@@ -9,9 +9,13 @@ follow a fixed rule (METHODOLOGY.md, "Origins"):
            one; geocoding_status 'ambiguous' for review.
   country  the coordinates lie inside the named country but country_en is empty
            or another country → country_en = the named country.
-  area     a cultural area spanning several countries stored as a point
-           ("Middle East", "Polynesien", "Caucasus") → no coordinates, no
-           country, origin_type 'cultural_area', geocoding_status 'ambiguous'.
+  region   a region spanning several countries ("Middle East", "Polynesien",
+           "Caucasus"), stored as a point or unlocated → the region's point and
+           English label from region_points.py, no country, origin_type
+           'cultural_area' (one site per region in every collection).
+  area     any other cultural area stored as a point (continents, empires, "Egypt
+           or Syria") → no coordinates, no country, origin_type 'cultural_area',
+           geocoding_status 'ambiguous'.
 
 Reported by the audit but not changed here: no_country (a country inferred from
 the nearest town would carry a wrong geocode further) and present_day names.
@@ -34,6 +38,7 @@ from datetime import date
 
 from audit_data_quality import SOURCE_PLACE_SQL, Classifier, effective
 from audit_places import get_conn
+from region_points import WHOLE, region_of
 
 NOTE_TAG = "[origin-audit]"
 
@@ -142,8 +147,23 @@ def plan(cur, classifier):
     actions = defaultdict(list)
     examples = defaultdict(Counter)
     cache = {}
+
+    def region(oid, raw, label, country, lat, lon, area=False):
+        """A row naming a region gets its point. A row the collection filed under a country
+        moves only when the region is a cultural area (area), lies in that country, or is WHOLE."""
+        r = region_of(label) if (label or "").strip() else region_of(raw)
+        if r and (country or "").strip() and not (area or r[4] == country or r[0].rstrip("?") in WHOLE):
+            return None
+        at = lat is not None and abs(float(lat) - r[1]) < 1e-3 and abs(float(lon) - r[2]) < 1e-3 if r else False
+        if r and not ((label, country) == (r[0], r[4]) and at):
+            actions[("region", r)].append(oid)
+            examples["region"][f"{raw} → {r[0]}"] += 1
+        return r
+
     for oid, raw, label, country, lat, lon, source in cur.fetchall():
         raw = raw or ""
+        if region(oid, raw, label, country, lat, lon):
+            continue
         un = un_country(lat, lon, country, label or raw)
         if un:
             if un[0] != "keep":
@@ -153,6 +173,8 @@ def plan(cur, classifier):
         if raw in SKIP or raw.startswith(SKIP_PREFIXES):
             continue
         if raw in AREA:
+            if region(oid, raw, label, country, lat, lon, area=True):
+                continue
             actions[("area", None)].append(oid)
             examples["area"][raw] += 1
             continue
@@ -166,6 +188,8 @@ def plan(cur, classifier):
             cache[k] = classifier.classify(raw, label, country, effective(*k[3:5]), source)
         found = {check: (finding, named) for check, finding, named in cache[k]}
         if "supranational" in found:
+            if region(oid, raw, label, country, lat, lon, area=True):
+                continue
             actions[("area", None)].append(oid)
             examples["area"][raw] += 1
         elif "named_country" in found:
@@ -177,6 +201,16 @@ def plan(cur, classifier):
             elif only:
                 actions[("country", only)].append(oid)
                 examples["country"][raw] += 1
+
+    # Unlocated rows that name a region.
+    cur.execute(
+        """SELECT id, place_name, place_name_normalized, country_en FROM museum_objects
+           WHERE published_at IS NOT NULL AND COALESCE(review_status, '') <> 'verified'
+             AND manual_latitude IS NULL AND manual_longitude IS NULL
+             AND (latitude IS NULL OR longitude IS NULL)"""
+    )
+    for oid, raw, label, country in cur.fetchall():
+        region(oid, raw or "", label, country, None, None)
     return actions, examples
 
 
@@ -194,6 +228,15 @@ def apply(cur, actions):
             cur.execute(
                 f"UPDATE museum_objects SET {note('country_en')}, country_en = %s WHERE id = ANY(%s)",
                 (value, ids),
+            )
+        elif action == "region":
+            label, lat, lon, source, country = value
+            cur.execute(
+                f"""UPDATE museum_objects SET {note('latitude', 'longitude', 'country_en', 'place_name_normalized')},
+                      latitude = %s, longitude = %s, country_en = %s, place_name_normalized = %s,
+                      origin_type = 'cultural_area', geocoding_status = 'ok', geocoder_source = %s
+                    WHERE id = ANY(%s)""",
+                (lat, lon, country, label, source, ids),
             )
         elif action == "area":
             cur.execute(
@@ -223,7 +266,8 @@ def main():
             totals = Counter()
             for (action, _), ids in actions.items():
                 totals[action] += len(ids)
-            for action, title in (("outside", "coordinates outside the named country → removed"),
+            for action, title in (("region", "region → the region's point"),
+                                  ("outside", "coordinates outside the named country → removed"),
                                   ("country", "country_en from the named country"),
                                   ("area", "cultural area → unlocated")):
                 print(f"== {title}: {totals[action]} artifacts")

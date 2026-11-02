@@ -34,7 +34,7 @@ Place names are resolved to coordinates through a lookup table of known variants
 
 ## Origin checks
 
-Each origin is checked against its own source record and the GeoNames gazetteer (`etl/audit_data_quality.py`). Where the stored point contradicts the source — a record naming "Peru, North Coast" placed in Canada, "Gallipoli, Turkey" placed at Gallipoli in Italy — the point is removed and the record is flagged for review; the artifact stays in the index as unlocated rather than shown in the wrong place. Where the source names a country and the point lies in it, that country is recorded. Cultural areas that span several present-day countries ("Middle East", "Polynesia", "Ottoman Empire") are not given a point at all. Exceptions are checked by hand and listed in `etl/normalize_origin_points.py`.
+Each origin is checked against its own source record and the GeoNames gazetteer (`etl/audit_data_quality.py`). Where the stored point contradicts the source — a record naming "Peru, North Coast" placed in Canada, "Gallipoli, Turkey" placed at Gallipoli in Italy — the point is removed and the record is flagged for review; the artifact stays in the index as unlocated rather than shown in the wrong place. Where the source names a country and the point lies in it, that country is recorded. A region that spans several present-day countries ("Middle East", "Polynesia", "Caucasus") is drawn at one point for the region, from GeoNames or Wikidata, shared by every collection that names it and matched to no country (`etl/region_points.py`). Continents, empires and records that name two places ("Egypt or Syria") are not given a point. Exceptions are checked by hand and listed in `etl/normalize_origin_points.py`.
 
 ## Place names
 
