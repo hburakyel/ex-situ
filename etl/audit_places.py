@@ -15,9 +15,14 @@ Names (fixable):
   fill_place_name_normalized.py). place_name is never changed.
   Also reported: the source hedges the place ("possibly", "probably", "(?)",
   "vermutlich", "wohl") but the label dropped it. Fix: the label keeps the
-  source's doubt as a trailing "?" (METHODOLOGY), e.g. "Akhmim" -> "Akhmim?".
+  source's doubt as a trailing "?" (METHODOLOGY), e.g. "Akhmim" -> "Akhmim?". Doubts about
+  something else ("[ort?]", "probably based on …", a lost apostrophe) don't count.
+  A raw tag that marks an area ("(provincie)", "(Division)") accepts a label naming that area.
+  A proposal whose tag is in the source's language ("(Zuid-Afrika)") is left blank: the
+  English label is written by hand, and apply skips it.
 
 Coordinates (flag only — never invented or moved):
+  out_of_range     |latitude| > 90 or |longitude| > 180 (checked with or without country_en)
   outside_country  outside the country's extent (GeoNames towns + MARGIN_DEG)
   swapped          lat/lon swapped would fall inside the country
   null_island      exactly 0, 0
@@ -63,6 +68,8 @@ COUNTRY_ALIASES = {
     "bolivia": "BO", "venezuela": "VE", "tanzania": "TZ", "moldova": "MD", "brunei": "BN",
     "netherlands": "NL", "the gambia": "GM", "czech republic": "CZ",
     "people's republic of china": "CN", "palestinian territories": "PS",
+    "federated states of micronesia": "FM", "the bahamas": "BS", "bahamas": "BS", "macau": "MO", "macao": "MO",
+    "somaliland": "SO", "swaziland": "SZ", "türkiye": "TR",
 }
 # Territories GeoNames files separately that country_en records under the parent state.
 EXTRA_CODES = {
@@ -72,6 +79,27 @@ EXTRA_CODES = {
 }
 # The source's own doubt about a place; a label must keep it (as a trailing "?").
 SOURCE_HEDGE = re.compile(r"possibl|probabl|\?|said to be|attributed to|vermutlich|\bwohl\b|fraglich", re.IGNORECASE)
+# Doubts in place_name that are not about the place, removed before SOURCE_HEDGE is tested:
+# "Abemama [ort?]" / "Gheleb [region?]" doubt the kind of place (Museum of Ethnography),
+# "Dra abu?l Naga" is a lost apostrophe, "Gujarat, probably based on an Egyptian original"
+# doubts the design's model. "(Swaziland ?)" after "Swasiland" is handled in audit_hedges.
+NON_PLACE_DOUBT = re.compile(r"\[\s*\w[^\]]*\?\s*\]|(?<=\w)\?(?=\w)|,?\s*(?:probably|possibly)\s+based on\b.*", re.IGNORECASE)
+SPELLING_DOUBT = re.compile(r"\(\s*(?P<name>[^()?]+?)\s*\?\s*\)")
+# A tag in place_name that says the place is an area or polity, not a town ("Caïro (provincie)",
+# "Chittagong (Division)", "Kandy (voormalige natie)"): a label naming that area is right.
+AREA_TAG = re.compile(r"\((?:provincie|provinz|province|division|distrikt|district|regio|region|gouvernement|governorate|"
+                      r"departement|department|county|state|staat|bundesstaat|gemeente|municipality|voormalige natie|"
+                      r"königreich|kingdom)\)", re.IGNORECASE)
+AREA_LABEL = re.compile(r"\b(?:province|division|district|region|governorate|department|county|state|municipality|"
+                        r"kingdom|upazila|borough|prefecture|oblast)\b", re.IGNORECASE)
+# English words a label tag may contain; any other tag word copied from place_name (Dutch/German)
+# is not proposed as a label ("Dordrecht (Zuid-Afrika)").
+ENGLISH_TAG_WORDS = {"city", "state", "province", "district", "region", "county", "island", "islands", "river",
+                     "lake", "mountain", "mountains", "valley", "coast", "area", "department", "governorate",
+                     "division", "kingdom", "village", "oasis", "peninsula", "of", "the", "new", "north", "south",
+                     "east", "west", "upper", "lower"}
+# Points that cannot be on the map: |latitude| > 90 or |longitude| > 180 ("Nore fou" at -199°).
+MAX_LAT, MAX_LON = 90, 180
 GENERIC_WORDS = {"region", "state", "province", "district", "city", "area", "island", "islands", "river"}
 CLEAN_COUNTRIES = None
 
@@ -98,7 +126,8 @@ def load_gazetteer():
     country_code = {}  # key(name) -> ISO2
     for f in tsv("countryInfo.txt"):
         country_code[key(f[4])] = f[0]
-    country_code.update(COUNTRY_ALIASES)
+    # Looked up by key(), which drops accents: "côte d'ivoire" must be stored as "cote d'ivoire".
+    country_code.update({key(k): v for k, v in COUNTRY_ALIASES.items()})
     country_names = set(country_code)
 
     towns = defaultdict(list)  # (key(name), cc) -> [(lat, lon)]
@@ -199,7 +228,17 @@ def audit_names(cur, gaz):
             continue  # both are real places here (e.g. an English exonym) — not an error
         if not reasons or (not raw_is_place and not reasons[0].startswith("label is the country")):
             continue
+        if AREA_TAG.search(raw) and AREA_LABEL.search(label):
+            continue  # the source says it is an area and the label names that area ("Cairo Governorate")
         proposed, *_ = classify(raw_clean, country, CLEAN_COUNTRIES)  # same tag rules as normalize_place_labels.py
+        tag = re.search(r"\(([^()]*)\)\s*\??$", proposed)
+        if tag:
+            t = key(tag.group(1))
+            english = (t in CLEAN_COUNTRIES or t in country_names or (cc and ((t, cc) in regions or (t, cc) in towns))
+                       or all(w in ENGLISH_TAG_WORDS for w in t.split()))
+            if not english:
+                reasons.append(f"tag '({tag.group(1)})' is the source's language — write the English label by hand")
+                proposed = ""
         out.append({
             "place_name": raw, "current_label": label, "proposed_label": proposed, "country_en": country or "",
             "objects": n, "lat": round(lat, 4) if lat is not None else "", "lon": round(lon, 4) if lon is not None else "",
@@ -208,8 +247,19 @@ def audit_names(cur, gaz):
     return sorted(out, key=lambda r: -r["objects"])
 
 
-def audit_hedges(cur):
+def place_doubt(raw, country, country_code):
+    """place_name without the doubts that are not about the place (NON_PLACE_DOUBT, and a
+    "Swasiland (Swaziland ?)" that only queries the spelling of the row's own country)."""
+    text = NON_PLACE_DOUBT.sub("", raw)
+    m = SPELLING_DOUBT.search(text)
+    if m and country and country_code.get(key(m.group("name"))) == country_code.get(key(country)) is not None:
+        text = text[:m.start()] + text[m.end():]
+    return text
+
+
+def audit_hedges(cur, gaz):
     """Labels that dropped the doubt the source states ("Court of Benin (?)" -> "Benin City")."""
+    country_code = gaz[0]
     cur.execute(
         """
         SELECT place_name, place_name_normalized, country_en, COUNT(*),
@@ -222,7 +272,7 @@ def audit_hedges(cur):
     )
     out = []
     for raw, label, country, n, lat, lon in cur.fetchall():
-        if not SOURCE_HEDGE.search(raw) or SOURCE_HEDGE.search(label):
+        if not SOURCE_HEDGE.search(place_doubt(raw, country, country_code)) or SOURCE_HEDGE.search(label):
             continue
         base = label.strip()
         # A trailing ", <country>" only repeats country_en (same rule as the "(<country>)" tag).
@@ -254,7 +304,9 @@ def audit_coords(cur, gaz):
     for country, lat, lon, ilat, ilon, inst, raw, n in cur.fetchall():
         lat, lon = float(lat), float(lon)
         issue, cc = None, None
-        if lat == 0 and lon == 0:
+        if abs(lat) > MAX_LAT or abs(lon) > MAX_LON:
+            issue = "out_of_range"
+        elif lat == 0 and lon == 0:
             issue = "null_island"
         elif ilat is not None and lat == float(ilat) and lon == float(ilon):
             issue = "at_museum"
@@ -307,7 +359,7 @@ def run(args):
     try:
         with conn.cursor() as cur:
             names = audit_names(cur, gaz)
-            hedges = audit_hedges(cur)
+            hedges = audit_hedges(cur, gaz)
             print(f"Labels without the source's doubt: {len(hedges)} ({sum(r['objects'] for r in hedges)} objects) "
                   f"→ {write_csv('place_audit_hedges.csv', hedges)}")
             names += hedges
@@ -330,6 +382,8 @@ def run(args):
 
             fixed = flagged = moved = cleared = 0
             for r in names:
+                if not r["proposed_label"]:
+                    continue  # needs an English label written by hand
                 cur.execute(
                     f"""
                     UPDATE museum_objects SET place_name_normalized = %s,
