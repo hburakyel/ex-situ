@@ -13,7 +13,7 @@
 
 ---
 
-**Status:** Actively developed. Started as an MA thesis in 2022, now mapping 350,000+ artifacts from 63 collections (12 indexed directly, 51 via Europeana).
+**Status:** Actively developed. Started as an MA thesis in 2022, now indexing 400,000+ artifacts from 63 collections (12 indexed directly, 51 via Europeana), 377,000+ of them on the map.
 
 ---
 
@@ -40,6 +40,8 @@ The map renders arcs at three zoom levels:
 | 0–4 | Global | Territory → Institution |
 | 5–9 | Regional | City/Site → Institution |
 | 10+ | Artifact | Precise coordinates |
+
+**Places.** Origins carry their present-day names; colonial names are not shown. A region that spans several present-day countries is a place of its own, named by geography rather than as seen from Europe (Southwest Asia and North Africa, not "Middle East"). Countries follow UN usage, so Palestine and Kashmir are places of their own. A record that names two possible origins ("Egypt or Syria") appears on the arc from each, and counts once. Places are found from the record's own context and never guessed. The rules and their sources are in [METHODOLOGY.md](METHODOLOGY.md).
 
 ---
 
