@@ -149,6 +149,7 @@ function MapContent() {
   const [isRateLimited, setIsRateLimited] = useState(false)
   const mapRef = useRef<any>(null)
   const isMobile = useMediaQuery("(max-width: 768px)")
+  const canHover = useMediaQuery("(hover: hover)")
   // The server renders the desktop layout (it can't know the screen). Until the
   // client takes over, phones get a white page instead of that layout flashing by.
   const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false)
@@ -893,7 +894,8 @@ function MapContent() {
     setActiveSite(null)
     // Keep a collection chosen in the left panel: it stays in facetedFilters (arcs,
     // chip, results), so it must stay in activeInstitution (URL, breadcrumb) too.
-    setActiveInstitution(facetedFilters.institutions.length === 1 ? facetedFilters.institutions[0] : null)
+    const keptInstitution = facetedFilters.institutions.length === 1 ? facetedFilters.institutions[0] : null
+    setActiveInstitution(keptInstitution)
     setDrillLevel("country")
     drillLevelRef.current = "country"  // sync ref immediately
     debouncedGeocode.cancel()           // cancel any pending reverse-geocode
@@ -902,7 +904,8 @@ function MapContent() {
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setLocationName(country)
-    centerOnPlaceArcs(country, "country")
+    // Frame the arcs that are drawn: with a collection kept, only those into it.
+    centerOnPlaceArcs(country, "country", keptInstitution)
   }, [debouncedGeocode, facetedFilters.institutions, centerOnPlaceArcs])
 
   const handleToggleSite = useCallback((site: string, lat?: number, lng?: number) => {
@@ -920,14 +923,18 @@ function MapContent() {
     setGeocodedName("")
     setLocationName(next || activeCountry || "")
     // Clear institution if the site doesn't have it
+    let keptInstitution = activeInstitution || (facetedFilters.institutions.length === 1 ? facetedFilters.institutions[0] : null)
     if (next && activeInstitution) {
       const siteData = groupedSites.find(s => normalizePlaceKey(s.name) === normalizePlaceKey(next))
       if (siteData && !siteData.institutions.includes(activeInstitution)) {
         setActiveInstitution(null)
+        keptInstitution = null
         if (facetedFilters.institutions.length > 0) setFacetedFilters({ ...facetedFilters, institutions: [] })
       }
     }
-    if (next) centerOnPlaceArcs(next, "site")
+    // Frame the arcs that are drawn: with a collection kept, only those into it
+    // (Efes with the Rijksmuseum chosen: Amsterdam, not Chicago and Baltimore too).
+    if (next) centerOnPlaceArcs(next, "site", keptInstitution)
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setArcObjectsPage(1)
@@ -1219,6 +1226,9 @@ function MapContent() {
       setActiveCountry(country)
       setActiveSite(site)
       setActiveInstitution(institution)
+      // An arc from a precise place shows that place's artifacts; any other arc
+      // clears a precise place picked before (it would filter this route to zero).
+      setPrecisePick(site && arc.precise ? { site, name: arc.precise } : null)
       setDrillLevel(site ? "objects" : "country")
       drillLevelRef.current = site ? "objects" : "country"  // sync ref immediately to prevent stale closure geocode
       debouncedGeocode.cancel()           // cancel any pending reverse-geocode
@@ -1446,7 +1456,7 @@ function MapContent() {
   // An arc reads place → place (as in the tooltip); the collection goes on the count line.
   const institutionPlace = useInstitutionPlaces()
   const mapPreviewTitle = selectedArc
-    ? `${placeDisplayLabel(selectedArc.from, [])} → ${institutionPlace(selectedArc.to)?.city || selectedArc.to}`
+    ? `${activePrecise || placeDisplayLabel(selectedArc.from, [])} → ${institutionPlace(selectedArc.to)?.city || selectedArc.to}`
     : (activeSite ? placeDisplayLabel(activeSite, groupedSites.map((s) => s.name)) : activeCountry || "")
   const mapPreviewCollection = selectedArc && institutionPlace(selectedArc.to) ? selectedArc.to : null
   const mapPreviewObjects = useMemo(
@@ -1540,8 +1550,10 @@ function MapContent() {
           onToggleSite={pickSite}
           onToggleInstitution={handleToggleInstitution}
           isLoadingSubArcs={isLoadingSubArcs}
-          drillArcs={filteredSubArcs}
-          hoveredObjectPlace={hoveredObjectPlace}
+          // A picked arc stays among its place's arcs to the other museums (drawn faint).
+          drillArcs={selectedArc ? subArcs : filteredSubArcs}
+          // A tap on a touch screen fires mouseenter and no mouseleave: the hover would stick.
+          hoveredObjectPlace={canHover ? hoveredObjectPlace : null}
           dateBuckets={dateBuckets}
         />
         {isMobile && (

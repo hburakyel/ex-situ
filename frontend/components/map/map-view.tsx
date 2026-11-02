@@ -299,7 +299,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const [showCollections, setShowCollections] = useState(true)
     const [showTime, setShowTime] = useState(true)
     type HoveredArc = {
-      fromName: string; toName: string; count: number
+      key: string; fromName: string; toName: string; count: number
+      // A street-zoom arc from a precise place inside its site ("Tiled Kiosk" in Istanbul)
+      precise?: string
       fromCity?: string; fromCountry?: string; fromHistorical?: string
       toCity?: string; toCountry?: string
     }
@@ -314,7 +316,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       const el = arcTooltipRef.current
       if (el) { el.style.left = `${x + 10}px`; el.style.top = `${y + 10}px` }
       setHoveredArc((prev) =>
-        prev && prev.fromName === arc.fromName && prev.toName === arc.toName && prev.count === arc.count ? prev : arc)
+        prev && prev.key === arc.key && prev.count === arc.count ? prev : arc)
     }, [])
 
     // Touch screens have no "mouse leaves the arc", so a tapped arc would stay
@@ -392,13 +394,18 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       }
     }, [onFacetedFiltersChange])
 
+    // A picked arc's museum is not a filter for the map: the arcs from its place to
+    // the other museums stay drawn, faint, around it.
+    const arcPickInstitution = !!selectedArc && facetedFilters.institutions.length === 1 &&
+      normalizePlaceKey(facetedFilters.institutions[0]) === normalizePlaceKey(selectedArc.to)
     const geospatialFilters: FilterState = useMemo(() => ({
-      institutions: facetedFilters.institutions.length > 0 ? facetedFilters.institutions : undefined,
+      institutions: facetedFilters.institutions.length > 0 && !arcPickInstitution ? facetedFilters.institutions : undefined,
       countries: facetedFilters.countries.length > 0 ? facetedFilters.countries : undefined,
       cities: facetedFilters.cities.length > 0 ? facetedFilters.cities : undefined,
       ...eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra),
     }), [
       facetedFilters.institutions.join(','),
+      arcPickInstitution,
       facetedFilters.countries.join(','),
       facetedFilters.cities.join(','),
       facetedFilters.era?.id,
@@ -805,7 +812,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Only the identity of the hovered arc matters for the layer (mobile width boost);
     // the tooltip's x/y change on every mouse move and must not rebuild the layer.
-    const hoveredArcKey = hoveredArc ? `${hoveredArc.fromName}-${hoveredArc.toName}` : null
+    const hoveredArcKey = hoveredArc?.key ?? null
 
     // A place or collection chosen as a search filter focuses the arcs like a click.
     const hasPlaceFilter = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length > 0
@@ -813,12 +820,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // Focus: once a country, site, collection or arc is selected, only its arcs
     // are drawn. Unrelated arcs used to stay on the map — a hairball at world
     // zoom, and when zoomed in, long arcs passing the camera as wide bands.
+    // A picked arc keeps its place's other arcs (faint), so it reads as one of them.
     const matchesArcFocus = useCallback((fromName: string, fromCountry: string, toName: string) => {
       const from = normalizePlaceKey(fromName)
       const to = normalizePlaceKey(toName)
-      if (selectedArc) {
-        return normalizePlaceKey(selectedArc.from) === from && normalizePlaceKey(selectedArc.to) === to
-      }
+      if (selectedArc) return normalizePlaceKey(selectedArc.from) === from
       if (activeCountry) {
         const country = normalizePlaceKey(activeCountry)
         if (normalizePlaceKey(fromCountry) !== country && from !== country) return false
@@ -907,8 +913,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // A chosen country or site keeps its site-level arcs (one per site and museum)
     // at every zoom; zoomed in, the per-artifact arcs of the area in view would
-    // swap in and change with each pan. A chosen precise place draws its own.
-    const keepPlaceArcs = drillLevel !== "global" && !activePrecise && drillArcs.length > 0
+    // swap in and change with each pan. A chosen precise place draws its own, and
+    // so does an arc picked at one point: the site's arc starts somewhere else.
+    const keepPlaceArcs = drillLevel !== "global" && !activePrecise && !selectedArc?.atPoint && drillArcs.length > 0
 
     // Below the world view the arcs start at sites, which no country label names:
     // label each drawn arc's origin, as the source records give it. Origins that
@@ -964,39 +971,48 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       // transparent, so it reads as routes rather than a solid fan.
       const isDense = !isQuiet && arcLayerData.length > 150
       // Even a chosen place's arcs stay translucent, so the land shows through.
-      const [minAlpha, maxAlpha] = isQuiet ? [25, 90] : isDense ? [40, 130] : [70, 190]
+      // On a phone's small, bright screen the quiet arcs need more to be seen at all.
+      const [minAlpha, maxAlpha] = isQuiet ? (isMobile ? [50, 140] : [25, 90]) : isDense ? [40, 130] : [70, 190]
       // Hovering a row whose arcs are not drawn (another site while one is chosen)
       // must not fade the arcs that are.
       const listHoverShown = !!listHover && arcLayerData.some((d) => matchesListHover(d.fromName, d.fromCountry, d.toName))
       const restingAlpha = (d: ArcDatum) => {
-        let alpha = isQuiet ? 50 : isDense ? 90 : 170
+        let alpha = isQuiet ? (isMobile ? 90 : 50) : isDense ? 90 : 170
         if (isAggregated && logMaxCount > 0) alpha = minAlpha + (maxAlpha - minAlpha) * (Math.log(d.count + 1) / logMaxCount)
         // Hovering a row in the left panel: everything else steps back.
         if (listHoverShown && !matchesListHover(d.fromName, d.fromCountry, d.toName)) alpha *= 0.25
         return Math.round(alpha)
       }
 
-      // A clicked arc.
-      const isSelectedArc = (d: ArcDatum) => {
-        const selectedFrom = normalizePlaceKey(selectedArcRef.current?.from)
-        const selectedTo = normalizePlaceKey(selectedArcRef.current?.to)
-        const datumFrom = normalizePlaceKey(d.fromName)
-        const datumTo = normalizePlaceKey(d.toName)
-
-        const matchesSelectedArc = !!selectedArcRef.current && (
-          selectedArcRef.current.key === `${d.fromName}-${d.toName}` ||
-          (selectedFrom.length > 0 && selectedTo.length > 0 && selectedFrom === datumFrom && selectedTo === datumTo)
-        )
-
-        return matchesSelectedArc
-      }
+      // Street-zoom arcs are one per point, and several points share a site label:
+      // hover and click go by the point, so one arc lights up, not all of the route's.
+      const byPointKey = dataSource === 'geospatial-objects'
+      const arcKeyOf = (d: ArcDatum) => byPointKey
+        ? `${d.fromName}-${d.toName}@${d.sourcePosition[0].toFixed(3)},${d.sourcePosition[1].toFixed(3)}`
+        : `${d.fromName}-${d.toName}`
+      // A clicked arc; picked at street zoom, the arc from the clicked point.
+      const selected = selectedArcRef.current
+      const selectedFrom = normalizePlaceKey(selected?.from)
+      const selectedTo = normalizePlaceKey(selected?.to)
+      const matchesSelectedRoute = (d: ArcDatum) => !!selected && (
+        selected.key === `${d.fromName}-${d.toName}` ||
+        (selectedFrom.length > 0 && selectedTo.length > 0 && selectedFrom === normalizePlaceKey(d.fromName) && selectedTo === normalizePlaceKey(d.toName))
+      )
+      const isSelectedArc = (d: ArcDatum) =>
+        selected?.atPoint && byPointKey ? selected.key === arcKeyOf(d) : matchesSelectedRoute(d)
+      const hasSelection = arcLayerData.some(isSelectedArc)
 
       // Hovered on the map, or through an image or a list row in a panel.
       const isPanelHoveredArc = (d: ArcDatum) =>
         (normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.fromName)) ||
         (!!listHover && matchesListHover(d.fromName, d.fromCountry, d.toName))
-      const isHighlighted = (d: ArcDatum) =>
-        isSelectedArc(d) || hoveredArcKey === `${d.fromName}-${d.toName}` || isPanelHoveredArc(d)
+      // Hovers are for pointers: a tap fires one and never ends it, and it would
+      // light up the tapped arc and its neighbours like a selection.
+      const isHovered = (d: ArcDatum) => !isMobile && hoveredArcKey === arcKeyOf(d)
+      const isHighlighted = (d: ArcDatum) => isSelectedArc(d) || isHovered(d) || isPanelHoveredArc(d)
+      // Around a picked arc the rest are a faint context, like the quiet arcs.
+      const isContext = (d: ArcDatum) => hasSelection && !isSelectedArc(d)
+      const contextAlpha = isMobile ? 90 : 60
 
       const mainLayer = new ArcLayer<ArcDatum>({
         id: layerId,
@@ -1004,31 +1020,32 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         getSourcePosition: (d) => d.sourcePosition,
         getTargetPosition: (d) => d.targetPosition,
         getSourceColor: (d): [number, number, number, number] =>
-          isHighlighted(d) ? [...ARC_ORIGIN_COLOR, 255] : [...(isQuiet ? ARC_QUIET_COLOR : ARC_ORIGIN_COLOR), restingAlpha(d)],
+          isHighlighted(d) ? [...ARC_ORIGIN_COLOR, 255]
+            : isContext(d) ? [...ARC_QUIET_COLOR, contextAlpha]
+            : [...(isQuiet ? ARC_QUIET_COLOR : ARC_ORIGIN_COLOR), restingAlpha(d)],
         getTargetColor: (d): [number, number, number, number] =>
-          isHighlighted(d) ? [...ARC_MUSEUM_COLOR, 255] : [...(isQuiet ? ARC_QUIET_COLOR : ARC_MUSEUM_COLOR), restingAlpha(d)],
+          isHighlighted(d) ? [...ARC_MUSEUM_COLOR, 255]
+            : isContext(d) ? [...ARC_QUIET_COLOR, contextAlpha]
+            : [...(isQuiet ? ARC_QUIET_COLOR : ARC_MUSEUM_COLOR), restingAlpha(d)],
         getWidth: (d) => {
-          const isHovered = hoveredArcKey === `${d.fromName}-${d.toName}`
-          // Chosen arcs keep this width too: with a selection, only its arcs are drawn.
           const baseWidth = arcWidth(d.count)
-          // On a phone a tapped or hovered arc widens for a moment.
-          if (isMobile && (isHovered || isPanelHoveredArc(d))) return Math.max(baseWidth, 16)
-          // A highlighted arc stands out from the thinned, translucent rest.
+          // The picked arc is clearly the widest; a hovered one stands out less.
+          if (isSelectedArc(d)) return Math.max(baseWidth * 1.5, isMobile ? 6 : 4)
           if (isHighlighted(d)) return baseWidth * 1.25
           // Thin unhighlighted arcs further while nothing is selected so overlap
           // reads as density rather than a solid overplotted mass.
-          return isQuiet || isDense ? baseWidth * 0.5 : baseWidth * 0.75
+          return isQuiet || isDense || isContext(d) ? baseWidth * 0.5 : baseWidth * 0.75
         },
-        widthMinPixels: isQuiet || isDense ? 1.5 : 2,
+        widthMinPixels: isMobile ? 2 : isQuiet || isDense ? 1.5 : 2,
         pickable: true,
         transitions: { getSourceColor: { duration: 300 }, getTargetColor: { duration: 300 }, getWidth: { duration: 300 } },
         updateTriggers: {
-          getSourceColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, listHoverKey], getTargetColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isLowZoomArcView, listHoverKey], getWidth: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isMobile, isLowZoomArcView, listHoverKey],
+          getSourceColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isMobile, isLowZoomArcView, listHoverKey], getTargetColor: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isMobile, isLowZoomArcView, listHoverKey], getWidth: [selectedArc?.key, activeSite, activeCountry, activeInstitution, hasPlaceFilter, hoveredObjectPlace, hoveredArcKey, isMobile, isLowZoomArcView, listHoverKey],
         },
         onHover: (info: any) => {
           if (info.object) {
             const d = info.object
-            showArcTooltip({ fromName: d.fromName, toName: d.toName, count: d.count, fromCity: d.fromCity, fromCountry: d.fromCountry, fromHistorical: d.fromHistorical, toCity: d.toCity, toCountry: d.toCountry }, info.x, info.y)
+            showArcTooltip({ key: arcKeyOf(d), precise: d.precisePlace, fromName: d.fromName, toName: d.toName, count: d.count, fromCity: d.fromCity, fromCountry: d.fromCountry, fromHistorical: d.fromHistorical, toCity: d.toCity, toCountry: d.toCountry }, info.x, info.y)
           } else {
             setHoveredArc(null)
           }
@@ -1037,12 +1054,14 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           if (!info.object) return
           const d = info.object
           const [lng, lat] = d.sourcePosition
-          const arcKey = `${d.fromName}-${d.toName}`
+          const atPoint = byPointKey
+          const arcKey = arcKeyOf(d)
           if (selectedArcRef.current?.key === arcKey) { onSelectArcRef.current?.(null); return }
           track("arc_click", { from: d.fromName, to: d.toName, artifacts: d.count })
           onSelectArcRef.current?.({
             key: arcKey, from: d.fromName, to: d.toName, fromLat: lat, fromLng: lng,
             fromCity: d.fromCity, fromCountry: d.fromCountry, toCity: d.toCity, toCountry: d.toCountry, objectCount: d.count,
+            ...(atPoint ? { atPoint, precise: d.precisePlace ?? null } : {}),
           })
           isProgrammaticMove.current = true
           const mapRef = map.current
@@ -1080,36 +1099,47 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         matchesArcFocus(a.place_name, activeCountry ?? "", a.institution_name)
       )
       if (validArcs.length === 0) return null
+      // The picked arc, among its place's arcs to the other museums (faint).
+      const isSelectedDrillArc = (d: any) => !!selectedArc &&
+        normalizePlaceKey(selectedArc.from) === normalizePlaceKey(d.place_name) && normalizePlaceKey(selectedArc.to) === normalizePlaceKey(d.institution_name)
+      const hasSelection = validArcs.some(isSelectedDrillArc)
       // Hovered on the map, or through an image or a list row in a panel.
       const isHighlightedDrillArc = (d: any) =>
-        hoveredArcKey === `${d.place_name}-${d.institution_name}` ||
+        isSelectedDrillArc(d) ||
+        (!isMobile && hoveredArcKey === `${d.place_name}-${d.institution_name}`) ||
         (normalizePlaceKey(hoveredObjectPlace).length > 0 && normalizePlaceKey(hoveredObjectPlace) === normalizePlaceKey(d.place_name)) ||
         (!!listHover && matchesListHover(d.place_name, activeCountry ?? "", d.institution_name))
+      const isContext = (d: any) => hasSelection && !isHighlightedDrillArc(d)
       // Many arcs (a large country's sites) are drawn thinner and more transparent.
       const isDense = validArcs.length > 150
       const listHoverShown = !!listHover && validArcs.some((d) => matchesListHover(d.place_name, activeCountry ?? "", d.institution_name))
       const drillAlpha = (d: any) => listHoverShown && !matchesListHover(d.place_name, activeCountry ?? "", d.institution_name) ? 50 : isDense ? 90 : 150
+      const contextAlpha = isMobile ? 90 : 60
       const drillLayer = new ArcLayer({
         id: "arc-layer-drill",
         data: validArcs,
         getSourcePosition: (d: any) => [d.longitude, d.latitude],
         getTargetPosition: (d: any) => [d.institution_longitude, d.institution_latitude],
         getSourceColor: (d: any): [number, number, number, number] =>
-          [...ARC_ORIGIN_COLOR, isHighlightedDrillArc(d) ? 255 : drillAlpha(d)],
+          isContext(d) ? [...ARC_QUIET_COLOR, contextAlpha] : [...ARC_ORIGIN_COLOR, isHighlightedDrillArc(d) ? 255 : drillAlpha(d)],
         getTargetColor: (d: any): [number, number, number, number] =>
-          [...ARC_MUSEUM_COLOR, isHighlightedDrillArc(d) ? 255 : drillAlpha(d)],
-        getWidth: (d: any) => arcWidth(d.object_count || 1) * (isHighlightedDrillArc(d) ? 1.25 : isDense ? 0.5 : 0.75),
+          isContext(d) ? [...ARC_QUIET_COLOR, contextAlpha] : [...ARC_MUSEUM_COLOR, isHighlightedDrillArc(d) ? 255 : drillAlpha(d)],
+        getWidth: (d: any) => {
+          const baseWidth = arcWidth(d.object_count || 1)
+          if (isSelectedDrillArc(d)) return Math.max(baseWidth * 1.5, isMobile ? 6 : 4)
+          return baseWidth * (isHighlightedDrillArc(d) ? 1.25 : isDense || isContext(d) ? 0.5 : 0.75)
+        },
         widthMinPixels: isDense ? 1.5 : 2,
         pickable: true,
         updateTriggers: {
-          getSourceColor: [activeSite, hoveredObjectPlace, hoveredArcKey, listHoverKey],
-          getTargetColor: [activeSite, hoveredObjectPlace, hoveredArcKey, listHoverKey],
-          getWidth: [activeSite, hoveredObjectPlace, hoveredArcKey, listHoverKey],
+          getSourceColor: [activeSite, selectedArc?.key, hoveredObjectPlace, hoveredArcKey, isMobile, listHoverKey],
+          getTargetColor: [activeSite, selectedArc?.key, hoveredObjectPlace, hoveredArcKey, isMobile, listHoverKey],
+          getWidth: [activeSite, selectedArc?.key, hoveredObjectPlace, hoveredArcKey, isMobile, listHoverKey],
         },
         onHover: (info: any) => {
           if (info.object) {
             const d = info.object
-            showArcTooltip({ fromName: d.place_name, toName: d.institution_name, count: d.object_count, fromHistorical: d.historical_names?.length ? d.historical_names.join(", ") : undefined }, info.x, info.y)
+            showArcTooltip({ key: `${d.place_name}-${d.institution_name}`, fromName: d.place_name, toName: d.institution_name, count: d.object_count, fromHistorical: d.historical_names?.length ? d.historical_names.join(", ") : undefined }, info.x, info.y)
           } else {
             setHoveredArc(null)
           }
@@ -1119,6 +1149,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           const d = info.object
           // Use onSelectArc (same path as main arcLayer) so handleSelectArc sets
           // both activeSite and activeInstitution, filtering the object panel correctly
+          if (isSelectedDrillArc(d)) { onSelectArcRef.current?.(null); return }
           track("arc_click", { from: d.place_name, to: d.institution_name, artifacts: d.object_count })
           onSelectArcRef.current?.({
             key: `${d.place_name}-${d.institution_name}`,
@@ -1137,7 +1168,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         },
       })
       return withEmphasis(drillLayer, validArcs.filter(isHighlightedDrillArc))
-    }, [isMapReady, drillLevel, drillArcs, activeSite, activeCountry, hoveredObjectPlace, hoveredArcKey, isMobile, isStreetZoom, processedArcs.dataSource, processedArcs.arcLayerData.length, matchesArcFocus, isLowZoomArcView, listHoverKey, matchesListHover, keepPlaceArcs])
+    }, [isMapReady, drillLevel, drillArcs, activeSite, activeCountry, selectedArc?.from, selectedArc?.to, hoveredObjectPlace, hoveredArcKey, isMobile, isStreetZoom, processedArcs.dataSource, processedArcs.arcLayerData.length, matchesArcFocus, isLowZoomArcView, listHoverKey, matchesListHover, keepPlaceArcs])
 
     // Derived values from processedArcs
     const { arcCards, uniqueArcsCount } = useMemo(() => ({
@@ -1161,7 +1192,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     // Push layers to MapboxOverlay
     useEffect(() => {
       if (!deckOverlay.current || !isMapReady) return
-      try { deckOverlay.current.setProps({ layers, pickingRadius: isMobile ? 10 : 3 }) } catch (e) {}
+      // A finger needs a wide target: a tap within 16px of a thin arc picks it.
+      try { deckOverlay.current.setProps({ layers, pickingRadius: isMobile ? 16 : 3 }) } catch (e) {}
     }, [layers, isMapReady, isMobile])
 
     // Notify parent when arcCards change
@@ -1247,37 +1279,21 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               const fromSub = city && country ? `${city}, ${country}` : city || country
               const fromFull = hoveredArc.fromHistorical && hoveredArc.fromHistorical.toLowerCase() !== hoveredArc.fromName.toLowerCase()
                 ? `${hoveredArc.fromName} (${hoveredArc.fromHistorical})` : hoveredArc.fromName
-              // Place and country on one line, same type: "Konya, Turkey" → "Berlin, Germany"
-              const fromLine = fromSub ? `${fromFull}, ${fromSub}` : fromFull
+              const siteLine = fromSub ? `${fromFull}, ${fromSub}` : fromFull
+              // "Tiled Kiosk (Çinili Köşk), Istanbul, Turkey": the arc's own point, then its site.
+              const fromLine = hoveredArc.precise ? `${hoveredArc.precise}, ${siteLine}` : siteLine
               const toLine = toCountry && toCountry.toLowerCase() !== toPlace.toLowerCase() ? `${toPlace}, ${toCountry}` : toPlace
+              // Read like the phone's preview card: "Konya, Turkey → Berlin, Germany", then the collection and count.
+              const route = toLine ? `${fromLine} → ${toLine}` : fromLine
               return (
                 <>
-                  <div className="mb-1 flex min-w-0 gap-3">
-                    <div className="flex min-w-0">
-                      <span className="text-muted-foreground mr-1.5 flex-shrink-0">From:</span>
-                      {/* Former name after the present-day one: "Al-Shirqat (Assur)" */}
-                      <span className="text-foreground truncate" title={fromLine}>{fromLine}</span>
-                    </div>
-                    {toLine && (
-                      <div className="flex min-w-0 flex-shrink-0 max-w-[50%]">
-                        <span className="text-muted-foreground mr-1.5 flex-shrink-0">To:</span>
-                        <span className="text-foreground truncate" title={toLine}>{toLine}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mb-1">
-                    <span className="text-muted-foreground mr-2">Collection:</span>
-                    <span className="text-foreground">{hoveredArc.toName}</span>
+                  <div className="text-foreground">{route}</div>
+                  <div className="text-muted-foreground">
+                    {hoveredArc.toName} · {hoveredArc.count.toLocaleString("en-US")} artifact{hoveredArc.count === 1 ? "" : "s"}
                   </div>
                 </>
               )
             })()}
-            <div>
-              <span className="text-muted-foreground mr-2">{hoveredArc.count === 1 ? "Artifact:" : "Artifacts:"}</span>
-              <span className="text-foreground">
-                {hoveredArc.count}
-              </span>
-            </div>
           </div>
         )}
 

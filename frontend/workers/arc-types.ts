@@ -24,6 +24,8 @@ export interface ArcDatum {
   connectionCount?: number
   /** Coordinate precision of the source location */
   coordinatePrecision?: string
+  /** Street-zoom arcs: the precise place inside the site ("Dolmabahçe Palace"), when all its objects share one */
+  precisePlace?: string
 }
 
 export interface ArcCardData {

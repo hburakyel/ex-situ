@@ -102,6 +102,10 @@ export interface SelectedArc {
   toCity?: string
   toCountry?: string
   objectCount?: number  // Total object count from geospatial API
+  // An arc picked at street zoom starts at one point (fromLat/fromLng) among several
+  // with the same site label; precise is that point's precise place, if it has one.
+  atPoint?: boolean
+  precise?: string | null
 }
 
 export interface SearchResult {

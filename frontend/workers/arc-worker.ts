@@ -47,6 +47,7 @@ interface ArcDatum {
   sampleImgUrl?: string
   connectionCount?: number
   coordinatePrecision?: string
+  precisePlace?: string
 }
 
 interface ArcCardData {
@@ -216,6 +217,8 @@ function processStatisticsOrClusters(
 
 function processObjects(data: any[]): ProcessedArcsResult {
   const arcGroups = new Map<string, ArcDatum>()
+  // A point's precise place, when every object there names the same one ("" otherwise).
+  const precisePlaces = new Map<string, string>()
 
   for (let i = 0; i < data.length; i++) {
     if (cancelled) return EMPTY
@@ -259,6 +262,10 @@ function processObjects(data: any[]): ProcessedArcsResult {
       })
     }
 
+    const precise = (obj.precise_place || "").trim()
+    const groupPrecise = precisePlaces.get(key)
+    precisePlaces.set(key, groupPrecise === undefined || groupPrecise.toLowerCase() === precise.toLowerCase() ? (groupPrecise ?? precise) : "")
+
     const group = arcGroups.get(key)!
     group.count++
     if (!group.sampleImgUrl && sampleImgUrl) {
@@ -278,6 +285,7 @@ function processObjects(data: any[]): ProcessedArcsResult {
     }
   }
 
+  arcGroups.forEach((group, key) => { group.precisePlace = precisePlaces.get(key) || undefined })
   const arcLayerData = Array.from(arcGroups.values())
 
   const arcCards: ArcCardData[] = arcLayerData.map((d) => ({
