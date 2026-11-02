@@ -8,8 +8,65 @@
  * scripts/rebuild-map-views.js when their definitions change.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { buildEraBuckets } = require('./api/museum-object/services/era-buckets');
 const { PLACE_GROUP_KEY, PLACE_DISPLAY_EXPR, PLACE_VARIANTS_AGG, HISTORICAL_NAMES_AGG } = require('./api/museum-object/services/place-group');
+
+// ── Object points: where the map draws each object. One row per object at its own
+// point, except for a record that names several possible origins ("Egypt or Syria"):
+// one row per named place in museum_object_origins (migration 019), and none at the
+// record's own point. The place columns (point, country, label) are the named
+// place's, under the museum_objects names, so the site grouping (place-group.js) and
+// every filter read them unchanged; id is the object's, so an object on two arcs is
+// one object (COUNT(DISTINCT …), DISTINCT ON). The record's own label stays in
+// museum_objects, which the panel reads.
+//   origin_ordinal    1 for an object's own point, else the named place's ordinal
+//   is_primary        the one point a total spanning places counts the object at
+//   first_in_country  false for a second named place in the same country ("Bursa or
+//                     Istanbul"): per-country totals count the object once
+//   from_origins      the row is a named place, not the record's own point
+// Both branches have exactly the same column types, so Postgres flattens the UNION
+// ALL and a filter on the view reaches museum_objects' indexes.
+const POINT_COLUMNS = [
+  'id', 'object_id', 'title', 'img_url', 'inventory_number', 'institution_name', 'institution_place',
+  'institution_city_en', 'institution_latitude', 'institution_longitude', 'source_link', 'image_rights',
+  'published_at', 'place_name', 'origin_event_type_en', 'origin_is_findspot', 'origin_person_name',
+  'object_date_precision', 'object_date_earliest', 'object_date_latest', 'acquisition_date_confidence',
+  'acquisition_year_earliest', 'acquisition_year_latest', 'review_status',
+];
+const POINTS_VIEW_SQL = `
+  CREATE OR REPLACE VIEW public.museum_object_points AS
+  SELECT ${POINT_COLUMNS.map((c) => `mo.${c}`).join(', ')},
+      mo.latitude, mo.longitude, mo.manual_latitude, mo.manual_longitude,
+      mo.country_en, mo.city_en, mo.place_name_normalized, mo.historical_name, mo.precise_place,
+      1::smallint AS origin_ordinal, true AS is_primary, true AS first_in_country, false AS from_origins
+  FROM museum_objects mo
+  WHERE NOT EXISTS (SELECT 1 FROM museum_object_origins o WHERE o.object_id = mo.id)
+  UNION ALL
+  SELECT ${POINT_COLUMNS.map((c) => `mo.${c}`).join(', ')},
+      o.latitude, o.longitude, NULL::double precision, NULL::double precision,
+      o.country_en::varchar(255), NULL::varchar(255), o.label, NULL::varchar(255), NULL::varchar(255),
+      o.ordinal, o.ordinal = 1,
+      NOT EXISTS (SELECT 1 FROM museum_object_origins e WHERE e.object_id = o.object_id
+                  AND e.ordinal < o.ordinal AND e.country_en IS NOT DISTINCT FROM o.country_en),
+      true
+  FROM museum_object_origins o
+  JOIN museum_objects mo ON mo.id = o.object_id;
+`;
+
+// The table the points view reads. scripts/rebuild-map-views.js runs before the
+// restart that would run the migration, so it creates the table itself.
+const ORIGINS_MIGRATION = path.join(__dirname, '..', 'database', 'migrations', '019_add_object_origins.sql');
+
+// Counted once per dedup key (inventory number, else row id), as on every arc.
+const DEDUP_COUNT = `COUNT(DISTINCT CASE
+          WHEN inventory_number IS NOT NULL AND inventory_number != ''
+          THEN inventory_number ELSE id::text END)::integer`;
+const PRIMARY_COUNT = `COUNT(DISTINCT CASE
+          WHEN NOT is_primary THEN NULL
+          WHEN inventory_number IS NOT NULL AND inventory_number != ''
+          THEN inventory_number ELSE id::text END)::integer`;
 
 const MV_COUNTRY_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_country_institution_stats AS
@@ -20,13 +77,13 @@ const MV_COUNTRY_SQL = `
       institution_name,
       avg(institution_latitude)                         AS inst_lat,
       avg(institution_longitude)                        AS inst_lon,
-      COUNT(DISTINCT CASE
-          WHEN inventory_number IS NOT NULL AND inventory_number != ''
-          THEN inventory_number ELSE id::text END)::integer AS object_count,
+      ${DEDUP_COUNT} AS object_count,
+      ${PRIMARY_COUNT} AS primary_count,
       min(img_url)                                      AS sample_img_url
-  FROM museum_objects
+  FROM museum_object_points
   WHERE
       published_at IS NOT NULL
+      AND first_in_country
       AND (manual_latitude IS NOT NULL OR latitude IS NOT NULL)
       AND (manual_longitude IS NOT NULL OR longitude IS NOT NULL)
       AND institution_latitude IS NOT NULL
@@ -55,15 +112,14 @@ const MV_CITY_SQL = `
       institution_name,
       avg(institution_latitude)                  AS inst_lat,
       avg(institution_longitude)                 AS inst_lon,
-      COUNT(DISTINCT CASE
-          WHEN inventory_number IS NOT NULL AND inventory_number != ''
-          THEN inventory_number ELSE id::text END)::integer AS object_count,
+      ${DEDUP_COUNT} AS object_count,
+      ${PRIMARY_COUNT} AS primary_count,
       min(img_url)                               AS sample_img_url,
       min(COALESCE(manual_latitude, latitude))   AS min_lat,
       max(COALESCE(manual_latitude, latitude))   AS max_lat,
       min(COALESCE(manual_longitude, longitude)) AS min_lon,
       max(COALESCE(manual_longitude, longitude)) AS max_lon
-  FROM museum_objects
+  FROM museum_object_points
   WHERE
       published_at IS NOT NULL
       AND (manual_latitude IS NOT NULL OR latitude IS NOT NULL)
@@ -142,42 +198,45 @@ const MV_DATE_SPAN_SQL = `
 // counts add up. Counting a Smithsonian collection live took seconds per request.
 // inst_key / country_key: the unique index columns, NULL written as CHR(1) so it
 // stays apart from an empty string.
+// Rows come from the object points, once per object and country (first_in_country):
+// an object that names Egypt or Syria counts under both. is_primary marks the rows
+// that count each object once in all: an institution's totals sum those only.
 const MV_TIME_BY_GROUP_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_time_bucket_by_group AS
-  SELECT institution_name, country_en,
+  SELECT institution_name, country_en, is_primary,
       COALESCE(institution_name::text, CHR(1)) AS inst_key, COALESCE(country_en::text, CHR(1)) AS country_key,
       ${TIME_SELECTS.join(',\n      ')}
-  FROM museum_objects
-  WHERE published_at IS NOT NULL
-  GROUP BY institution_name, country_en
+  FROM museum_object_points
+  WHERE published_at IS NOT NULL AND first_in_country
+  GROUP BY institution_name, country_en, is_primary
   WITH DATA;
 `;
 
 const MV_ACQUISITION_BY_GROUP_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_acquisition_year_by_group AS
-  SELECT institution_name, country_en,
+  SELECT institution_name, country_en, is_primary,
       COALESCE(institution_name::text, CHR(1)) AS inst_key, COALESCE(country_en::text, CHR(1)) AS country_key,
       confirmed, year, COALESCE(year, -2147483648) AS year_key, COUNT(*)::integer AS count
   FROM (
-    SELECT institution_name, country_en,
+    SELECT institution_name, country_en, is_primary,
         acquisition_date_confidence IS NOT DISTINCT FROM 'confirmed' AS confirmed,
         CASE WHEN acquisition_date_confidence = 'confirmed' THEN acquisition_year_earliest END AS year
-    FROM museum_objects
-    WHERE published_at IS NOT NULL
+    FROM museum_object_points
+    WHERE published_at IS NOT NULL AND first_in_country
   ) o
-  GROUP BY institution_name, country_en, confirmed, year
+  GROUP BY institution_name, country_en, is_primary, confirmed, year
   WITH DATA;
 `;
 
 const MV_DATE_SPAN_BY_GROUP_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_date_span_by_group AS
-  SELECT institution_name, country_en,
+  SELECT institution_name, country_en, is_primary,
       COALESCE(institution_name::text, CHR(1)) AS inst_key, COALESCE(country_en::text, CHR(1)) AS country_key,
       object_date_earliest AS earliest, object_date_latest AS latest, COUNT(*)::integer AS count
-  FROM museum_objects
-  WHERE published_at IS NOT NULL
+  FROM museum_object_points
+  WHERE published_at IS NOT NULL AND first_in_country
     AND object_date_earliest IS NOT NULL AND object_date_latest IS NOT NULL
-  GROUP BY institution_name, country_en, object_date_earliest, object_date_latest
+  GROUP BY institution_name, country_en, is_primary, object_date_earliest, object_date_latest
   WITH DATA;
 `;
 
@@ -188,7 +247,9 @@ const MV_DATE_SPAN_BY_GROUP_SQL = `
 // distinct combination of those four fields: a prefix selects rows of this view
 // exactly as it selected rows of the table, and their counts and coordinate sums
 // add up to the same result. The site key and display name follow from the four
-// fields, so they are stored per row too.
+// fields, so they are stored per row too. Built from the object points, so a site
+// counts the objects that name it among other places; for those rows the raw place
+// is the named place's label, so "Egypt" doesn't find Syria through "Egypt or Syria".
 const MV_PLACE_SUGGEST_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_place_suggest AS
   SELECT
@@ -205,7 +266,11 @@ const MV_PLACE_SUGGEST_SQL = `
       COUNT(COALESCE(manual_latitude, latitude))::integer AS n_lat,
       SUM(COALESCE(manual_longitude, longitude)) AS sum_lon,
       COUNT(COALESCE(manual_longitude, longitude))::integer AS n_lon
-  FROM museum_objects
+  FROM (
+    SELECT CASE WHEN from_origins THEN place_name_normalized ELSE place_name END AS place_name,
+           place_name_normalized, city_en, country_en, latitude, longitude, manual_latitude, manual_longitude
+    FROM museum_object_points
+  ) p
   WHERE place_name IS NOT NULL
   GROUP BY place_name, place_name_normalized, city_en, country_en
   WITH DATA;
@@ -220,9 +285,9 @@ const MAP_VIEWS = [
   { name: 'mv_acquisition_year_stats', sql: MV_ACQUISITION_YEAR_SQL, key: 'year' },
   { name: 'mv_date_span_stats', sql: MV_DATE_SPAN_SQL, key: 'earliest, latest' },
   { name: 'mv_place_suggest', sql: MV_PLACE_SUGGEST_SQL, key: 'row_key' },
-  { name: 'mv_time_bucket_by_group', sql: MV_TIME_BY_GROUP_SQL, key: 'inst_key, country_key' },
-  { name: 'mv_acquisition_year_by_group', sql: MV_ACQUISITION_BY_GROUP_SQL, key: 'inst_key, country_key, confirmed, year_key' },
-  { name: 'mv_date_span_by_group', sql: MV_DATE_SPAN_BY_GROUP_SQL, key: 'inst_key, country_key, earliest, latest' },
+  { name: 'mv_time_bucket_by_group', sql: MV_TIME_BY_GROUP_SQL, key: 'inst_key, country_key, is_primary' },
+  { name: 'mv_acquisition_year_by_group', sql: MV_ACQUISITION_BY_GROUP_SQL, key: 'inst_key, country_key, is_primary, confirmed, year_key' },
+  { name: 'mv_date_span_by_group', sql: MV_DATE_SPAN_BY_GROUP_SQL, key: 'inst_key, country_key, is_primary, earliest, latest' },
 ];
 
 /** The view's CREATE statement under another name (scripts/rebuild-map-views.js). */
@@ -248,8 +313,15 @@ ${MAP_VIEWS.map((v) => `    REFRESH MATERIALIZED VIEW CONCURRENTLY public.${v.na
   $$;
 `;
 
+/** The origins table (migration 019) and the points view the map views read. */
+async function ensurePointsView(db) {
+  await db.raw(fs.readFileSync(ORIGINS_MIGRATION, 'utf8'));
+  await db.raw(POINTS_VIEW_SQL);
+}
+
 /** Create any missing view and its unique index, and the refresh function. */
 async function ensureMapViews(db) {
+  await ensurePointsView(db);
   for (const view of MAP_VIEWS) {
     const { rows } = await db.raw('SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = ?) AS exists', [view.name]);
     if (!rows[0].exists) await db.raw(createViewSql(view));
@@ -258,4 +330,4 @@ async function ensureMapViews(db) {
   await db.raw(REFRESH_FUNCTION_SQL);
 }
 
-module.exports = { MAP_VIEWS, REFRESH_FUNCTION_SQL, createViewSql, uniqueIndexSql, ensureMapViews };
+module.exports = { MAP_VIEWS, POINTS_VIEW_SQL, ORIGINS_MIGRATION, REFRESH_FUNCTION_SQL, createViewSql, uniqueIndexSql, ensurePointsView, ensureMapViews };

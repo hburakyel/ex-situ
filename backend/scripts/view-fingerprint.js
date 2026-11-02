@@ -24,6 +24,7 @@ const VIEW_FILES = [
   'src/map-views.js',
   'src/api/museum-object/services/place-group.js',
   'src/api/museum-object/services/era-buckets.js',
+  'database/migrations/019_add_object_origins.sql',
 ];
 
 function jsonFilesUnder(dir) {

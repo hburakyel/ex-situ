@@ -25,6 +25,7 @@ import { track } from "@/lib/analytics"
 import { MAP_DEFAULT_TITLE, mapTitle, withSiteName } from "@/lib/map-title"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
+import { objectsAcrossPlaces } from "@/lib/arc-total"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -626,13 +627,14 @@ function MapContent() {
         .forEach((a) => { map.set(a.institution_name, (map.get(a.institution_name) || 0) + a.object_count) })
       return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
     }
-    // At global zoom (no active country) aggregate from all arcs
+    // At global zoom (no active country) aggregate from all arcs, across places
     let source = activeCountry ? countryArcs : filteredGlobalAggregateArcs
     if (activeInstitution) {
       source = source.filter((arc) => arc.institution_name.toLowerCase() === activeInstitution.toLowerCase())
     }
+    const count = activeCountry ? (arc: ArcData) => arc.object_count : objectsAcrossPlaces
     const map = new Map<string, number>()
-    source.forEach((arc) => { map.set(arc.institution_name, (map.get(arc.institution_name) || 0) + arc.object_count) })
+    source.forEach((arc) => { map.set(arc.institution_name, (map.get(arc.institution_name) || 0) + count(arc)) })
     return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
   }, [activePrecise, arcObjects, countryArcs, filteredGlobalAggregateArcs, filteredSubArcs, activeSite, activeCountry, activeInstitution])
 
@@ -1450,7 +1452,7 @@ function MapContent() {
   const globalArcCount = filteredGlobalAggregateArcs.length
   const globalCollectionCount = useMemo(() => new Set(filteredGlobalAggregateArcs.map(a => a.institution_name)).size, [filteredGlobalAggregateArcs])
   const globalTotalCount = useMemo(
-    () => filteredGlobalAggregateArcs.reduce((sum, arc) => sum + (arc.object_count || 0), 0),
+    () => filteredGlobalAggregateArcs.reduce((sum, arc) => sum + objectsAcrossPlaces(arc), 0),
     [filteredGlobalAggregateArcs],
   )
 

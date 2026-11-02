@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import CollectionDetailClient from "./collection-client"
+import { objectsAcrossPlaces } from "@/lib/arc-total"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:1337/api"
 
@@ -7,6 +8,7 @@ interface ArcEntry {
   place_name?: string
   institution_name?: string
   object_count?: number
+  primary_count?: number
 }
 
 async function fetchInstitutionEntries(institution: string): Promise<ArcEntry[]> {
@@ -68,7 +70,7 @@ export async function generateMetadata({
     .join(" ")
 
   const entries = await fetchInstitutionEntries(decodedSlug)
-  const totalObjects = entries.reduce((sum, a) => sum + (a.object_count ?? 0), 0)
+  const totalObjects = entries.reduce((sum, a) => sum + objectsAcrossPlaces(a), 0)
   const origins = [
     ...new Set(entries.map((a) => a.place_name).filter(Boolean)),
   ].slice(0, 3) as string[]

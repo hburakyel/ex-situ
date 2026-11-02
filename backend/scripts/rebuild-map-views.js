@@ -14,7 +14,10 @@
  *   node backend/scripts/rebuild-map-views.js --if-changed
  *
  * The running backend reads the new views by the old names until it restarts,
- * so a definition change must keep the columns the old code reads. A change to
+ * so a definition change must keep the columns the old code reads. The object
+ * points view the map views read (museum_object_points) is replaced in place,
+ * with the origins table it reads (migration 019) created first: a change to it
+ * may only add columns at the end (CREATE OR REPLACE VIEW). A change to
  * Strapi's schemas still drops and rebuilds the views at startup: Strapi has to
  * alter columns they depend on.
  *
@@ -25,10 +28,11 @@
  *                     existed keeps the views as well
  */
 
+const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
 const { viewFingerprints, FINGERPRINT_TABLE_SQL } = require('./view-fingerprint');
-const { MAP_VIEWS, REFRESH_FUNCTION_SQL, createViewSql, uniqueIndexSql } = require('../src/map-views');
+const { MAP_VIEWS, REFRESH_FUNCTION_SQL, POINTS_VIEW_SQL, ORIGINS_MIGRATION, createViewSql, uniqueIndexSql } = require('../src/map-views');
 
 const NEXT = (name) => `${name}__next`;
 
@@ -67,6 +71,10 @@ async function main() {
       log('view definitions unchanged — nothing to do');
       return;
     }
+
+    // Before the restart that runs migration 019: the table, then the view.
+    await client.query(fs.readFileSync(ORIGINS_MIGRATION, 'utf8'));
+    await client.query(POINTS_VIEW_SQL);
 
     for (const view of MAP_VIEWS) {
       const started = Date.now();

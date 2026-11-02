@@ -74,6 +74,8 @@ async function main() {
       DROP MATERIALIZED VIEW IF EXISTS public.mv_time_bucket_by_group;
       DROP MATERIALIZED VIEW IF EXISTS public.mv_acquisition_year_by_group;
       DROP MATERIALIZED VIEW IF EXISTS public.mv_date_span_by_group;
+      -- Read by the views above; a plain view, but it names museum_objects columns too.
+      DROP VIEW IF EXISTS public.museum_object_points;
     `);
 
     console.log('[pre-strapi] Views or schemas changed — dropped the map views; Strapi can sync safely and rebuilds them.');

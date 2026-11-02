@@ -52,15 +52,21 @@ function singleFlight(key, fn) {
 }
 
 // The rows only change through imports and corrections. This counter of rows
-// written to museum_objects (inserted + updated + deleted, from Postgres' table
-// statistics) moves with every such change, so a result stored with it is current
-// for as long as the counter has not moved.
+// written to museum_objects and museum_object_origins (inserted + updated + deleted,
+// from Postgres' table statistics) moves with every such change, so a result stored
+// with it is current for as long as the counter has not moved.
 async function dataVersion(db) {
   const { rows } = await db.raw(
-    "SELECT (n_tup_ins + n_tup_upd + n_tup_del)::text AS v FROM pg_stat_user_tables WHERE relname = 'museum_objects'"
+    `SELECT string_agg((n_tup_ins + n_tup_upd + n_tup_del)::text, '.' ORDER BY relname) AS v
+     FROM pg_stat_user_tables WHERE relname IN ('museum_objects', 'museum_object_origins')`
   );
   return rows[0]?.v ?? null;
 }
+
+// The objects with a point matching place filters on the object points
+// (src/map-views.js): an object that names Egypt or Syria is found under either,
+// and counts once however many of its points match.
+const OBJECTS_AT_POINTS = (where) => `id IN (SELECT id FROM museum_object_points WHERE ${where})`;
 
 // Results that took long to compute (a whole Smithsonian collection or country in
 // the object grid: half a million rows to read), kept until the data changes.
@@ -198,6 +204,21 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
   },
 
   /**
+   * Place filters (site, country, precise place) for a query that counts objects in
+   * museum_objects: they select the objects with a matching point
+   * (OBJECTS_AT_POINTS), so each object counts once. Empty when no filter is set.
+   * @param {...{clause: string, bindings: object}} filters - from buildSiteFilter etc.
+   */
+  atPoints(...filters) {
+    const clauses = filters.map((f) => f.clause).filter(Boolean);
+    if (clauses.length === 0) return { clause: '', bindings: {} };
+    return {
+      clause: `AND ${OBJECTS_AT_POINTS(`published_at IS NOT NULL ${clauses.join(' ')}`)} `,
+      bindings: Object.assign({}, ...filters.map((f) => f.bindings)),
+    };
+  },
+
+  /**
    * Build parameterized SQL clause for the object-date time filter.
    * Two mutually exclusive modes:
    *  - filters.undated: matches only object_date_precision = 'unknown'
@@ -307,13 +328,17 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       && await this._materializedViewExists(db, 'mv_acquisition_year_stats');
     // Institution and/or country filters (no city): sums over the views' rows per
     // institution and country (src/map-views.js), the same counts as the live query.
-    const groupedReady = hasFilters && !filters.city && !filters.precise
+    // An object that names places in two countries has a row under each: the rows
+    // add up for one country, and without a country filter only the is_primary rows
+    // are summed. Several countries are counted live, where it counts once.
+    const groupInstitution = this.buildMultiValueFilter('institution_name', filters.institution, 'grp_inst');
+    const groupCountry = this.buildMultiValueFilter('country_en', filters.country, 'grp_country');
+    const countryCount = Object.keys(groupCountry.bindings).length;
+    const groupedReady = hasFilters && !filters.city && !filters.precise && countryCount <= 1
       && await this._materializedViewExists(db, 'mv_time_bucket_by_group')
       && await this._materializedViewExists(db, 'mv_acquisition_year_by_group')
       && await this._materializedViewExists(db, 'mv_date_span_by_group');
-    const groupInstitution = this.buildMultiValueFilter('institution_name', filters.institution, 'grp_inst');
-    const groupCountry = this.buildMultiValueFilter('country_en', filters.country, 'grp_country');
-    const groupWhere = `WHERE TRUE ${groupInstitution.clause} ${groupCountry.clause}`;
+    const groupWhere = `WHERE TRUE ${groupInstitution.clause} ${groupCountry.clause} ${countryCount === 0 ? 'AND is_primary' : ''}`;
     const groupBindings = { ...groupInstitution.bindings, ...groupCountry.bindings };
 
     if (mvReady) {
@@ -353,6 +378,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const preciseFilter = filters.precise
         ? { clause: 'AND LOWER(BTRIM(precise_place)) = LOWER(BTRIM(:db_precise)) ', bindings: { db_precise: filters.precise } }
         : { clause: '', bindings: {} };
+      const places = this.atPoints(cityFilter, countryFilter, preciseFilter);
 
       const timeSelects = [
         `COUNT(*) FILTER (WHERE object_date_precision = 'unknown') AS time_undated`,
@@ -370,15 +396,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         FROM museum_objects
         WHERE published_at IS NOT NULL
           ${institutionFilter.clause}
-          ${cityFilter.clause}
-          ${countryFilter.clause}
-          ${preciseFilter.clause}
+          ${places.clause}
       `;
       const timeResult = await db.raw(timeQuery, {
         ...institutionFilter.bindings,
-        ...cityFilter.bindings,
-        ...countryFilter.bindings,
-        ...preciseFilter.bindings,
+        ...places.bindings,
       });
       timeRow = this.getRows(timeResult)[0] || {};
 
@@ -390,6 +412,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const acqInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'acqy_inst');
       const acqCityFilter = this.buildSiteFilter(filters.city, 'acqy_city');
       const acqCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'acqy_country');
+      const acqPlaces = this.atPoints(acqCityFilter, acqCountryFilter, preciseFilter);
 
       const acqUndatedQuery = `
         SELECT COUNT(*)::integer AS count
@@ -397,9 +420,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         WHERE published_at IS NOT NULL
           AND acquisition_date_confidence IS DISTINCT FROM 'confirmed'
           ${acqInstitutionFilter.clause}
-          ${acqCityFilter.clause}
-          ${acqCountryFilter.clause}
-          ${preciseFilter.clause}
+          ${acqPlaces.clause}
       `;
       const acqYearsQuery = `
         SELECT acquisition_year_earliest AS year, COUNT(*)::integer AS count
@@ -407,17 +428,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         WHERE published_at IS NOT NULL
           AND acquisition_date_confidence = 'confirmed'
           ${acqInstitutionFilter.clause}
-          ${acqCityFilter.clause}
-          ${acqCountryFilter.clause}
-          ${preciseFilter.clause}
+          ${acqPlaces.clause}
         GROUP BY acquisition_year_earliest
         ORDER BY acquisition_year_earliest
       `;
       const acqBindings = {
         ...acqInstitutionFilter.bindings,
-        ...acqCityFilter.bindings,
-        ...acqCountryFilter.bindings,
-        ...preciseFilter.bindings,
+        ...acqPlaces.bindings,
       };
       const [acqUndatedResult, acqYearsResult] = await Promise.all([
         db.raw(acqUndatedQuery, acqBindings),
@@ -457,14 +474,14 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     const spanInstitutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'span_inst');
     const spanCityFilter = this.buildSiteFilter(filters.city, 'span_city');
     const spanCountryFilter = this.buildMultiValueFilter('country_en', filters.country, 'span_country');
+    const spanPlaces = this.atPoints(spanCityFilter, spanCountryFilter);
     const spansQuery = `
       SELECT object_date_earliest AS earliest, object_date_latest AS latest, COUNT(*)::integer AS count
       FROM museum_objects
       WHERE published_at IS NOT NULL
         AND object_date_earliest IS NOT NULL AND object_date_latest IS NOT NULL
         ${spanInstitutionFilter.clause}
-        ${spanCityFilter.clause}
-        ${spanCountryFilter.clause}
+        ${spanPlaces.clause}
       GROUP BY object_date_earliest, object_date_latest
     `;
     const spansResult = !hasFilters && await this._materializedViewExists(db, 'mv_date_span_stats')
@@ -474,8 +491,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
                       GROUP BY earliest, latest`, groupBindings)
       : await db.raw(spansQuery, {
         ...spanInstitutionFilter.bindings,
-        ...spanCityFilter.bindings,
-        ...spanCountryFilter.bindings,
+        ...spanPlaces.bindings,
       });
     const objectDateSpans = this.getRows(spansResult).map((r) => ({
       earliest: parseInt(r.earliest, 10),
@@ -506,6 +522,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'dec_inst');
     const cityFilter = this.buildSiteFilter(filters.city, 'dec_city');
     const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'dec_country');
+    const places = this.atPoints(cityFilter, countryFilter);
 
     const selects = decades.map((bucket) => {
       const overlapConds = [];
@@ -519,13 +536,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       FROM museum_objects
       WHERE published_at IS NOT NULL
         ${institutionFilter.clause}
-        ${cityFilter.clause}
-        ${countryFilter.clause}
+        ${places.clause}
     `;
     const result = await db.raw(query, {
       ...institutionFilter.bindings,
-      ...cityFilter.bindings,
-      ...countryFilter.bindings,
+      ...places.bindings,
     });
     const row = this.getRows(result)[0] || {};
 
@@ -627,6 +642,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             institution_latitude: parseFloat(row.inst_lat) || 0,
             institution_longitude: parseFloat(row.inst_lon) || 0,
             object_count: parseInt(row.object_count) || 0,
+            primary_count: parseInt(row.primary_count) || 0,
             sample_img_url: row.sample_img_url || null,
             type: 'arc',
             cluster_id: `arc_country_${row.origin_country}_${row.institution_name}`
@@ -657,9 +673,11 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             AVG(institution_latitude) as inst_lat,
             AVG(institution_longitude) as inst_lon,
             COUNT(*)::integer as object_count,
+            COUNT(*) FILTER (WHERE is_primary)::integer as primary_count,
             MIN(img_url) as sample_img_url
-          FROM museum_objects
-          WHERE published_at IS NOT NULL
+          FROM museum_object_points
+          -- an object with two named places in one country is one object there
+          WHERE published_at IS NOT NULL AND first_in_country
             AND ${latFilter}
             AND ${lonFilter}
             AND institution_latitude IS NOT NULL
@@ -701,6 +719,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           institution_latitude: parseFloat(row.inst_lat) || 0,
           institution_longitude: parseFloat(row.inst_lon) || 0,
           object_count: parseInt(row.object_count) || 0,
+          primary_count: parseInt(row.primary_count) || 0,
           sample_img_url: row.sample_img_url || null,
           type: 'arc',
           cluster_id: `arc_country_${row.origin_country}_${row.institution_name}`
@@ -751,7 +770,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           SELECT
             origin_city, place_variants, historical_names, country_en, origin_lat, origin_lon,
             institution_name, inst_lat, inst_lon,
-            object_count, sample_img_url
+            object_count, primary_count, sample_img_url
           FROM mv_city_institution_stats
           WHERE origin_lat BETWEEN :minLat AND :maxLat
             AND origin_lon BETWEEN :minLon AND :maxLon
@@ -785,6 +804,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         const query = `
           WITH bbox_filter AS (
             SELECT
+              is_primary,
               ${latExpr} as latitude,
               ${lonExpr} as longitude,
               city_en,
@@ -796,7 +816,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               institution_latitude,
               institution_longitude,
               img_url
-            FROM museum_objects
+            FROM museum_object_points
             WHERE published_at IS NOT NULL
               AND ${latFilter}
               AND ${lonFilter}
@@ -822,6 +842,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
               AVG(institution_latitude) as inst_lat,
               AVG(institution_longitude) as inst_lon,
               COUNT(*)::integer as object_count,
+              COUNT(*) FILTER (WHERE is_primary)::integer as primary_count,
               MIN(img_url) as sample_img_url
             FROM bbox_filter
             GROUP BY
@@ -859,6 +880,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           institution_latitude: parseFloat(row.inst_lat) || 0,
           institution_longitude: parseFloat(row.inst_lon) || 0,
           object_count: parseInt(row.object_count) || 0,
+          // Of these, the objects this is the first-named place of: totals spanning
+          // places add these up, so an object named at two places counts once.
+          primary_count: parseInt(row.primary_count) || 0,
           sample_img_url: row.sample_img_url || null,
           type: 'arc',
           cluster_id: `arc_city_${row.origin_city}_${row.institution_name}`
@@ -907,7 +931,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       strapi.log.info(`getIndividualObjects: bbox=[${minLat},${maxLat},${minLon},${maxLon}], institution=${filters.institution || 'all'}, city=${filters.city || 'all'}, country=${filters.country || 'all'}`);
 
       // SAFETY GATE: Use Named Bindings to ensure query always sees 4 bindings
-      // Deduplicate by inventory_number+institution so duplicate DB rows show only once
+      // Deduplicate by inventory_number+institution so duplicate DB rows show only once,
+      // at each of the object's points: a record that names Egypt or Syria has one
+      // here at each, with that place's label, so its arc leads to that site.
       // The link lookups run outside the LIMIT, for the returned rows only: inside
       // it the planner evaluated them for every row in the bbox (48k in the eastern
       // United States, 4 s instead of 0.6 s).
@@ -923,9 +949,10 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
            ORDER BY moc."order" LIMIT 1) as object_link_display
         FROM (
         SELECT * FROM (
-          SELECT DISTINCT ON (${DEDUP_KEY})
+          SELECT DISTINCT ON (${DEDUP_KEY}, origin_ordinal)
           id,
           object_id,
+          origin_ordinal,
           title,
           img_url,
           ${latExpr} as resolved_latitude,
@@ -948,7 +975,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           historical_name,
           precise_place,
           ${manualSelect}
-          FROM museum_objects
+          FROM museum_object_points
           WHERE published_at IS NOT NULL
             AND ${latFilter}
             AND ${lonFilter}
@@ -961,12 +988,12 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             ${countryFilter.clause}
             ${dateFilter.clause}
             ${acqDateFilter.clause}
-          ORDER BY ${DEDUP_KEY}, id
+          ORDER BY ${DEDUP_KEY}, origin_ordinal, id
         ) deduped
-        ORDER BY object_id
+        ORDER BY object_id, origin_ordinal
         LIMIT 5000
         ) page
-        ORDER BY object_id;
+        ORDER BY object_id, origin_ordinal;
       `;
 
       // Create named bindings object
@@ -1017,7 +1044,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           manual_longitude: row.manual_longitude ? parseFloat(row.manual_longitude) : null,
           object_links: row.object_link_url ? [{ link_text: row.object_link_url, link_display: row.object_link_display }] : null,
           type: 'object',
-          cluster_id: `object_${row.object_id}`
+          cluster_id: row.origin_ordinal > 1 ? `object_${row.object_id}_${row.origin_ordinal}` : `object_${row.object_id}`
         }))
       };
     } catch (error) {
@@ -1069,7 +1096,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
     const result = await db.raw(`
       SELECT mode() WITHIN GROUP (ORDER BY BTRIM(precise_place)) AS name, COUNT(*)::integer AS count,
              AVG(COALESCE(manual_latitude, latitude)) AS latitude, AVG(COALESCE(manual_longitude, longitude)) AS longitude
-      FROM museum_objects WHERE ${where}
+      FROM museum_object_points WHERE ${where}
       GROUP BY LOWER(BTRIM(precise_place)) ORDER BY count DESC, name LIMIT 200`, bindings);
     return (result.rows || []).map((r) => ({
       name: r.name, count: r.count,
@@ -1093,7 +1120,10 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const hasManual = await hasManualCoords(db);
       const latExpr = hasManual ? 'COALESCE(manual_latitude, latitude)' : 'latitude';
       const lonExpr = hasManual ? 'COALESCE(manual_longitude, longitude)' : 'longitude';
-      // Build WHERE clauses with parameterized queries for safety
+      // Build WHERE clauses with parameterized queries for safety. They select rows of
+      // the object points (src/map-views.js), so an object that names Egypt or Syria
+      // is found under either; DISTINCT ON below keeps one row per object, and the
+      // page's columns (its own label among them) come from museum_objects.
       // Match country_en OR place_name so that arc-click works at every zoom level.
       // country is optional — when null, only institution filter is used (global institution drill-down).
       let whereClause = `WHERE published_at IS NOT NULL`;
@@ -1143,7 +1173,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const countQuery = `
         SELECT COUNT(*)::integer as total FROM (
           SELECT DISTINCT ON (${DEDUP_KEY}) id
-          FROM museum_objects
+          FROM museum_object_points
           ${whereClause}
           ORDER BY ${DEDUP_KEY}, id
         ) deduped
@@ -1162,12 +1192,15 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         WITH page AS (
           -- total: the deduplicated count, from the same pass (window functions run
           -- before LIMIT), so the matching rows are deduplicated once, not twice.
-          SELECT id, has_image, COUNT(*) OVER () AS total FROM (
+          -- point_*: the point the filters matched, the record's own or, for a record
+          -- that names several places, the named place's (its first one that matched).
+          SELECT id, has_image, point_lat, point_lon, COUNT(*) OVER () AS total FROM (
             SELECT DISTINCT ON (${DEDUP_KEY}) id,
-              NULLIF(BTRIM(COALESCE(img_url, '')), '') IS NOT NULL AS has_image
-            FROM museum_objects
+              NULLIF(BTRIM(COALESCE(img_url, '')), '') IS NOT NULL AS has_image,
+              ${latExpr} AS point_lat, ${lonExpr} AS point_lon
+            FROM museum_object_points
             ${whereClause}
-            ORDER BY ${DEDUP_KEY}, id
+            ORDER BY ${DEDUP_KEY}, id, origin_ordinal
           ) deduped
           -- Objects with an image first, so the grid shows images before the
           -- inventory-number tiles of objects without one.
@@ -1207,8 +1240,8 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
              JOIN components_time_name_time_infos ti ON ti.id = moc.component_id
              WHERE moc.entity_id = m.id AND moc.field = 'time'
              ORDER BY moc."order" LIMIT 1) as time_end,
-            ${latExpr} as latitude,
-            ${lonExpr} as longitude,
+            page.point_lat as latitude,
+            page.point_lon as longitude,
             institution_latitude,
             institution_longitude,
             (SELECT ol.link_text FROM museum_objects_components moc
@@ -1503,6 +1536,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
   async _countResolverStats() {
     const db = strapi.db.connection;
+    // A point of its own, or the points of the places it names ("Egypt or Syria").
+    const LOCATED = `((latitude IS NOT NULL AND longitude IS NOT NULL)
+      OR id IN (SELECT object_id FROM museum_object_origins))`;
     try {
       // Main per-institution aggregation (only existing columns)
       const query = `
@@ -1512,9 +1548,9 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           institution_latitude,
           institution_longitude,
           COUNT(*)::integer AS total_objects,
-          COUNT(CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN 1 END)::integer AS geocoded_count,
+          COUNT(CASE WHEN ${LOCATED} THEN 1 END)::integer AS geocoded_count,
           ROUND(
-            COUNT(CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN 1 END)::numeric
+            COUNT(CASE WHEN ${LOCATED} THEN 1 END)::numeric
             / NULLIF(COUNT(*), 0) * 100, 1
           ) AS resolved_pct,
           COUNT(DISTINCT country_en COLLATE "C")::integer AS distinct_countries,
@@ -1531,7 +1567,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const totalsQuery = `
         SELECT
           COUNT(*)::integer AS total_objects,
-          COUNT(CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN 1 END)::integer AS total_geocoded,
+          COUNT(CASE WHEN ${LOCATED} THEN 1 END)::integer AS total_geocoded,
           COUNT(DISTINCT institution_name COLLATE "C")::integer AS total_institutions,
           COUNT(DISTINCT country_en COLLATE "C")::integer AS total_countries
         FROM museum_objects
@@ -1607,12 +1643,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
   async getResolverDetail(institutionName) {
     const db = strapi.db.connection;
     try {
-      // Top origin countries — parameterized
+      // Top origin countries — parameterized. An object that names places in two
+      // countries counts under each.
       const countriesQuery = `
         SELECT
           COALESCE(NULLIF(country_en, ''), 'Unknown') AS country,
-          COUNT(*)::integer AS count
-        FROM museum_objects
+          COUNT(DISTINCT id)::integer AS count
+        FROM museum_object_points
         WHERE published_at IS NOT NULL
           AND institution_name = :institutionName
         GROUP BY COALESCE(NULLIF(country_en, ''), 'Unknown')
@@ -2023,6 +2060,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
              object_date, acquisition_year, object_date_display, object_date_earliest,
              object_date_latest, object_date_precision, acquisition_date_confidence,
              acquisition_year_earliest,
+             EXISTS (SELECT 1 FROM museum_object_origins o WHERE o.object_id = museum_objects.id) AS has_origin_points,
              CASE
                WHEN inventory_number_normalized = :invExact THEN 0
                WHEN lower(inventory_number) LIKE :invPrefix THEN 1
@@ -2057,7 +2095,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         source_link: r.source_link || null,
         object_date: object_date || null,
         acquisition_year,
-        located: lat !== null && lat !== undefined && lng !== null && lng !== undefined,
+        located: r.has_origin_points === true || (lat !== null && lat !== undefined && lng !== null && lng !== undefined),
         match: r.match_rank < 2 ? 'inventory_number' : 'text',
       };
     });

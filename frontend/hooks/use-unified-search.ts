@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { sharedRequest } from "@/lib/api"
+import { objectsAcrossPlaces } from "@/lib/arc-total"
 
 // Arc data from geospatial API
 export interface ArcData {
@@ -15,6 +16,8 @@ export interface ArcData {
   institution_latitude: number
   institution_longitude: number
   object_count: number
+  /** Of object_count, the objects this is the first-named place of (lib/arc-total.ts). */
+  primary_count?: number
   sample_img_url: string | null
   type: string
   cluster_id: string
@@ -146,6 +149,7 @@ function normalizeArcItem(raw: any): ArcData {
     institution_latitude: raw.institution_latitude ?? raw.center?.latitude ?? 0,
     institution_longitude: raw.institution_longitude ?? raw.center?.longitude ?? 0,
     object_count: raw.object_count ?? raw.total_objects ?? raw.count ?? 0,
+    primary_count: raw.primary_count ?? undefined,
     sample_img_url: raw.sample_img_url || null,
     type: raw.type || 'unknown',
     cluster_id: raw.cluster_id || '',
@@ -264,17 +268,17 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
     return () => { cancelled = true }
   }, [])
 
-  // Aggregate collections from arc data
+  // Aggregate collections from arc data (across places: each object once)
   const collections = useMemo(() => {
     const institutionMap = new Map<string, { count: number; countries: Set<string>; sampleImg: string | null }>()
     arcData.forEach(arc => {
       const existing = institutionMap.get(arc.institution_name)
       if (existing) {
-        existing.count += arc.object_count
+        existing.count += objectsAcrossPlaces(arc)
         existing.countries.add(arc.place_name)
       } else {
         institutionMap.set(arc.institution_name, {
-          count: arc.object_count,
+          count: objectsAcrossPlaces(arc),
           countries: new Set([arc.place_name]),
           sampleImg: arc.sample_img_url
         })

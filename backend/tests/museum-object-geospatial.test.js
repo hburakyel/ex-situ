@@ -179,7 +179,7 @@ test('getCountryStatistics: uses the materialized view when no city/date filter'
     place_name: 'Egypt', latitude: 26.8, longitude: 30.8,
     institution_name: 'Antikensammlung', institution_place: 'Antikensammlung',
     institution_latitude: 52.52, institution_longitude: 13.39,
-    object_count: 42, sample_img_url: null, type: 'arc',
+    object_count: 42, primary_count: 0, sample_img_url: null, type: 'arc',
     cluster_id: 'arc_country_Egypt_Antikensammlung',
   });
 });
@@ -191,7 +191,10 @@ test('getCountryStatistics: a date filter forces the live query (MV has no dates
 
   assert.equal(db.calls.length, 1);
   const { query, bindings } = db.calls[0];
-  assert.match(query, /FROM museum_objects/);
+  // The object points: an object that names Egypt or Syria is on both arcs, once on each.
+  assert.match(query, /FROM museum_object_points/);
+  assert.match(query, /first_in_country/);
+  assert.match(query, /FILTER \(WHERE is_primary\)::integer as primary_count/);
   assert.doesNotMatch(query, /mv_country_institution_stats/);
   assert.match(query, /published_at IS NOT NULL/);
   assert.match(query, /COALESCE\(manual_latitude, latitude\)/);
@@ -202,7 +205,7 @@ test('getCountryStatistics: falls back to the live query when the MV is missing'
   const db = makeDb({ mviews: [] });
   const s = withDb(makeService(), db);
   await s.getCountryStatistics(db, { institution: 'Antikensammlung' });
-  assert.match(db.calls[0].query, /FROM museum_objects/);
+  assert.match(db.calls[0].query, /FROM museum_object_points/);
   assert.deepEqual(db.calls[0].bindings, { fb_inst_0: 'Antikensammlung' });
 });
 
@@ -248,7 +251,7 @@ test('getClusteredData: an acquisition filter forces the live query', async () =
   const db = makeDb({ mviews: ['mv_city_institution_stats'] });
   const s = withDb(makeService(), db);
   await s.getClusteredData(db, 5, null, { acqUndated: true });
-  assert.match(db.calls[0].query, /FROM museum_objects/);
+  assert.match(db.calls[0].query, /FROM museum_object_points/);
   assert.match(db.calls[0].query, /acquisition_date_confidence IS DISTINCT FROM 'confirmed'/);
 });
 
@@ -300,4 +303,63 @@ test('getIndividualObjects: binds bbox + filters and maps rows', async () => {
   assert.deepEqual(obj.object_links, [{ link_text: 'https://example.org/record/1-permalink', link_display: 'Permalink' }]);
   assert.equal(obj.manual_latitude, null);
   assert.equal(obj.cluster_id, 'object_o1');
+});
+
+// ── Records that name several origins ("Egypt or Syria") ─────────────────────
+
+test('getIndividualObjects: one row per point of an object, each with its own cluster id', async () => {
+  const row = { id: 7, object_id: 'o7', resolved_latitude: '26.2', resolved_longitude: '29.2', institution_name: 'X' };
+  const db = makeDb({ rows: [{ ...row, origin_ordinal: 1 }, { ...row, origin_ordinal: 2, resolved_latitude: '34.8' }] });
+  const s = withDb(makeService(), db);
+  const result = await s.getIndividualObjects(db, { minLat: 20, maxLat: 40, minLon: 20, maxLon: 40 }, {});
+
+  const { query } = db.calls[0];
+  assert.match(query, /FROM museum_object_points/);
+  assert.match(query, /DISTINCT ON \(.*, origin_ordinal\)/s);
+  assert.deepEqual(result.data.map((o) => o.cluster_id), ['object_o7', 'object_o7_2']);
+  assert.deepEqual(result.data.map((o) => o.id), [7, 7]);
+});
+
+test('getObjectsByCountry: filters the object points, one row per object, the record\'s own columns', async () => {
+  const db = makeDb({ rows: [] });
+  const s = withDb(makeService(), db);
+  await s._objectsByCountry('Syria', { site: 'Syria', page: 1, pageSize: 60 });
+
+  const dataQuery = db.calls.find((c) => c.query.includes('WITH page AS')).query;
+  assert.match(dataQuery, /SELECT DISTINCT ON \(.*\) id,.*FROM museum_object_points/s);
+  // The page's label and other columns are the record's; its point is the one that matched.
+  assert.match(dataQuery, /FROM museum_objects m\s+JOIN page ON page.id = m.id/);
+  assert.match(dataQuery, /page.point_lat as latitude/);
+});
+
+test('getDateBucketCounts: grouped sums count an object once per country, and once in all', async () => {
+  const mviews = ['mv_time_bucket_by_group', 'mv_acquisition_year_by_group', 'mv_date_span_by_group'];
+
+  let db = makeDb({ mviews, rows: [] });
+  let s = withDb(makeService(), db);
+  await s._dateBucketCounts({ institution: 'Antikensammlung' });
+  assert.ok(db.calls.every((c) => /mv_\w+_by_group/.test(c.query) && /AND is_primary/.test(c.query)));
+
+  db = makeDb({ mviews, rows: [] });
+  s = withDb(makeService(), db);
+  await s._dateBucketCounts({ country: 'Syria' });
+  assert.ok(db.calls.every((c) => /mv_\w+_by_group/.test(c.query) && !/is_primary/.test(c.query)));
+
+  // Two countries: an object that names both would be summed twice, so it counts live.
+  db = makeDb({ mviews, rows: [] });
+  s = withDb(makeService(), db);
+  await s._dateBucketCounts({ country: 'Egypt,Syria' });
+  assert.ok(db.calls.every((c) => !/_by_group/.test(c.query)));
+  const live = db.calls.find((c) => c.query.includes('time_undated'));
+  assert.match(live.query, /FROM museum_objects\s+WHERE published_at IS NOT NULL/);
+  assert.match(live.query, /id IN \(SELECT id FROM museum_object_points WHERE published_at IS NOT NULL AND country_en IN/);
+  assert.deepEqual(live.bindings, { db_country_0: 'Egypt', db_country_1: 'Syria' });
+});
+
+test('atPoints: no place filter, no subquery', () => {
+  const s = makeService();
+  assert.deepEqual(s.atPoints({ clause: '', bindings: {} }), { clause: '', bindings: {} });
+  const f = s.atPoints(s.buildMultiValueFilter('country_en', 'Peru', 'x'), { clause: '', bindings: {} });
+  assert.equal(f.clause, 'AND id IN (SELECT id FROM museum_object_points WHERE published_at IS NOT NULL AND country_en = :x_0 ) ');
+  assert.deepEqual(f.bindings, { x_0: 'Peru' });
 });
