@@ -279,6 +279,18 @@ function MapContent() {
   const [activeSite, setActiveSite] = useState<string | null>(urlSite || null)
   const activeSiteRef = useRef<string | null>(urlSite || null)
   useEffect(() => { activeSiteRef.current = activeSite }, [activeSite])
+  // Place chips name the place on show. A chip left from a place the map has moved
+  // away from (Bergama after a map click on Benin City) is dropped, not kept beside it.
+  useEffect(() => {
+    if (!activeCountry) return
+    const keep = (values: string[], name: string | null) =>
+      values.filter((v) => !!name && normalizePlaceKey(v) === normalizePlaceKey(name))
+    setFacetedFilters((f) => {
+      const countries = keep(f.countries, activeCountry)
+      const cities = keep(f.cities, activeSite)
+      return countries.length === f.countries.length && cities.length === f.cities.length ? f : { ...f, countries, cities }
+    })
+  }, [activeCountry, activeSite])
   const [activeInstitution, setActiveInstitution] = useState<string | null>(urlInstitution || null)
   // Links from /research/collection/<slug> carry the lower-case slug ("rijksmuseum"); once
   // the arcs are in, use the museum's own spelling (breadcrumb, title, URL, toggles).
