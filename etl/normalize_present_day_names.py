@@ -51,6 +51,8 @@ RENAMES = {
     ("Rajahmundry", "India"): "Rajamahendravaram",
     ("Allahabad", "India"): "Prayagraj",
     ("Edo", "Japan"): "Tokyo",
+    # The kingdom's Wikidata point (Q193619) is its capital; one site with the city (2026-10-30).
+    ("Kingdom of Benin", "Nigeria"): "Benin City",
     ("Shahabad", "Iran"): "Eslamabad-e Gharb",
     ("Rayy", "Iran"): "Rey",
     ("Khotan", "China"): "Hotan",
