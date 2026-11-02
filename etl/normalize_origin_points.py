@@ -20,8 +20,8 @@ follow a fixed rule (METHODOLOGY.md, "Origins"):
 Reported by the audit but not changed here: no_country (a country inferred from
 the nearest town would carry a wrong geocode further) and present_day names.
 
-Rows with review_status = 'verified' or a manual coordinate are never touched;
-place_name is never changed. Each changed row gets an
+Rows with review_status = 'verified' are never touched; a manual coordinate is never
+changed, though UN usage still sets its country; place_name is never changed. Each changed row gets an
 "[origin-audit] <date> …" note in geocoding_notes with the old values.
 
 Usage:
@@ -46,7 +46,10 @@ NOTE_TAG = "[origin-audit]"
 # UN Security Council 242, 497, 2334, GA 68/262, ICJ 2004/2024): a point in the
 # West Bank including East Jerusalem or in Gaza lies in Palestine, in the Golan
 # Heights in Syria, in Crimea in Ukraine. A point in Western Sahara recorded as
-# Morocco contradicts it either way and is removed for review.
+# Morocco contradicts it either way and is removed for review. A point in the
+# former princely state of Jammu and Kashmir, whose status the Security Council
+# left to be settled (resolution 47, 1948), lies in Kashmir, not in India,
+# Pakistan or China, the states that administer its parts.
 UN = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "un_territories.json"), encoding="utf-8"))
 
 
@@ -56,6 +59,11 @@ def _in_ring(lon, lat, ring):
         if (y1 > lat) != (y2 > lat) and lon < (x2 - x1) * (lat - y1) / (y2 - y1) + x1:
             inside = not inside
     return inside
+
+
+def _in(geom, lat, lon):
+    polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
+    return any(_in_ring(lon, lat, p[0]) and not any(_in_ring(lon, lat, h) for h in p[1:]) for p in polys)
 
 
 def un_country(lat, lon, country, label=None):
@@ -84,10 +92,10 @@ def un_country(lat, lon, country, label=None):
         if name == "jerusalem" or old_city or east_of_old_city:
             return settle("Palestine")
         return ("keep", country)
-    geom = UN["Palestine"]
-    polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
-    if any(_in_ring(lon, lat, p[0]) and not any(_in_ring(lon, lat, h) for h in p[1:]) for p in polys):
+    if _in(UN["Palestine"], lat, lon):
         return settle("Palestine")
+    if 32.2 < lat < 37.1 and 72.5 < lon < 80.4 and _in(UN["Kashmir"], lat, lon):
+        return settle("Kashmir")
     # Golan Heights; the country condition keeps northern Jordan (Umm Qais) out.
     if country in ("Israel", "Syria", None, "") and 32.55 < lat < 33.35 and lon > 35.62:
         return settle("Syria")
@@ -201,6 +209,19 @@ def plan(cur, classifier):
             elif only:
                 actions[("country", only)].append(oid)
                 examples["country"][raw] += 1
+
+    # A hand-set point is kept, but UN usage still settles its country (Kashmir, Palestine).
+    cur.execute(
+        """SELECT id, place_name, place_name_normalized, country_en, manual_latitude, manual_longitude
+           FROM museum_objects
+           WHERE published_at IS NOT NULL AND COALESCE(review_status, '') <> 'verified'
+             AND manual_latitude IS NOT NULL AND manual_longitude IS NOT NULL"""
+    )
+    for oid, raw, label, country, lat, lon in cur.fetchall():
+        un = un_country(float(lat), float(lon), country, label or raw)
+        if un and un[0] == "country":
+            actions[un].append(oid)
+            examples["country"][f"{raw} → {un[1]} (UN usage, hand-set point)"] += 1
 
     # Unlocated rows that name a region.
     cur.execute(

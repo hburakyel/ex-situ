@@ -38,9 +38,10 @@ REGIONS = {
     "Southeast Asia": (12.0, 105.1, "Wikidata Q11708", None),
     "East Asia": (47.210278, 102.847778, "Wikidata Q27231", None),
     "Korea": (38.62545, 127.55127, "GeoNames 11494804 (Korean Peninsula)", None),
-    # As the Tibet and Kashmir rows already on the map are filed (one site each).
+    # One site each, at the point the rows already on the map use. Kashmir is its own place
+    # (normalize_origin_points.py, un_country).
     "Tibet": (29.8556443, 90.8749807, "the point of the Tibet rows on the map", "China"),
-    "Kashmir": (34.5, 76.0, "Wikidata Q43100, as the Kashmir rows on the map", "India"),
+    "Kashmir": (34.5, 76.0, "Wikidata Q43100, as the Kashmir rows on the map", "Kashmir"),
     "Himalayas": (28.0, 84.0, "GeoNames 1252558", None),
     "Sub-Saharan Africa": (-10.0, 23.0, "Wikidata Q132959", None),
     "West Africa": (12.0, 3.0, "Wikidata Q4412", None),
