@@ -598,18 +598,19 @@ export interface DateBucketCounts {
 // Per-bucket counts for the "Time"/"Migration" left-panel filter sections,
 // cross-filtered by the current institution/city/country selection.
 export async function fetchDateBucketCounts(
-  filters?: { institutions?: string[]; countries?: string[]; cities?: string[] }
+  filters?: { institutions?: string[]; countries?: string[]; cities?: string[]; precise?: string }
 ): Promise<DateBucketCounts> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const params = new URLSearchParams()
   if (filters?.institutions && filters.institutions.length > 0) params.append('institution', filters.institutions.join(','))
   if (filters?.cities && filters.cities.length > 0) params.append('city', filters.cities.join('|')) // site names contain commas
   if (filters?.countries && filters.countries.length > 0) params.append('country', filters.countries.join(','))
+  if (filters?.precise) params.append('precise', filters.precise)
 
   const institutionsKey = filters?.institutions?.sort().join(',') || 'all'
   const citiesKey = filters?.cities?.sort().join(',') || 'all'
   const countriesKey = filters?.countries?.sort().join(',') || 'all'
-  const cacheKey = `date-buckets:${institutionsKey}:${citiesKey}:${countriesKey}`
+  const cacheKey = `date-buckets:${institutionsKey}:${citiesKey}:${countriesKey}:${filters?.precise || ''}`
 
   const isServer = typeof window === "undefined"
   const url = isServer
@@ -846,10 +847,11 @@ export async function fetchSpatialDocuments(
 export interface PrecisePlace { name: string; count: number; latitude: number | null; longitude: number | null }
 
 /** Precise places inside a site (Istanbul → Dolmabahçe Palace …); empty for most sites. */
-export async function fetchPrecisePlaces(site: string, country?: string | null, institution?: string | null): Promise<PrecisePlace[]> {
+export async function fetchPrecisePlaces(site: string, country?: string | null, institution?: string | null, dateFilters?: ByCountryDateFilters): Promise<PrecisePlace[]> {
   const params = new URLSearchParams({ site })
   if (country) params.set("country", country)
   if (institution) params.set("institution", institution)
+  for (const [k, v] of Object.entries(dateFilters || {})) if (v !== undefined && v !== false) params.set(k, String(v))
   try {
     const res = await fetch(`/api/proxy/precise-places?${params.toString()}`)
     if (!res.ok) return []

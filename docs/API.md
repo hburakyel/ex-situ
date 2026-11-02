@@ -37,7 +37,7 @@ Returns `{data: [{id, attributes}], meta: {pagination: {page, pageSize, pageCoun
 `meta.pagination.total` is the object count for the filter.
 
 ### `GET /museum-objects/date-buckets`
-Time histograms. Params: `country`, `institution`, `city`.
+Time histograms. Params: `country`, `institution`, `city`, `precise` (a precise place inside `city`).
 Returns `objectDateBuckets` / `acquisitionBuckets` (`[{id, label, count}]`),
 `objectDateExactCount`, `acquisitionExactCount`, `objectDateSpans` (`[{earliest, latest, count}]`).
 

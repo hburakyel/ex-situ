@@ -17,8 +17,9 @@ export async function GET(request: NextRequest) {
   const institution = searchParams.get('institution')
   const city = searchParams.get('city')
   const country = searchParams.get('country')
+  const precise = searchParams.get('precise')
 
-  const cacheKey = `date-buckets:${institution || 'all'}:${city || 'all'}:${country || 'all'}`
+  const cacheKey = `date-buckets:${institution || 'all'}:${city || 'all'}:${country || 'all'}:${precise || ''}`
 
   const cached = responseCache.get(cacheKey)
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Only forward known safe parameters
-    const ALLOWED_PARAMS = new Set(['institution', 'city', 'country'])
+    const ALLOWED_PARAMS = new Set(['institution', 'city', 'country', 'precise'])
     const safeParams = new URLSearchParams()
     for (const [key, value] of searchParams.entries()) {
       if (ALLOWED_PARAMS.has(key)) safeParams.set(key, value)

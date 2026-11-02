@@ -226,7 +226,10 @@ export default function InfoPanel({
       : (activeCountry || '')
   // A place or site with its own chip is named by the chip alone, like a collection.
   // A precise place has no filter of its own; its chip clears it.
-  const precisePlace = activePrecise ? precisePlaces.find((p) => p.name === activePrecise) : undefined
+  // Its chip stays when a Time pick leaves it out of the list, so it can still be cleared.
+  const precisePlace = activePrecise
+    ? precisePlaces.find((p) => p.name === activePrecise) ?? { name: activePrecise, count: 0, latitude: null, longitude: null }
+    : undefined
   const nameIsChip = !!precisePlace || [...facetedFilters.countries, ...facetedFilters.cities]
     .some((v) => v.toLowerCase() === displayName.toLowerCase())
 

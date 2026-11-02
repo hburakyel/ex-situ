@@ -12,6 +12,10 @@ export async function GET(request: NextRequest) {
   if (!site || site.length > 200) return NextResponse.json({ error: "site parameter is required" }, { status: 400 })
   const params = new URLSearchParams({ site })
   for (const k of ["country", "institution"]) { const v = sp.get(k); if (v && v.length <= 200) params.set(k, v) }
+  // Time and Migration picks: integer years or "true"
+  for (const k of ["dateStart", "dateEnd", "undated", "acqDateStart", "acqDateEnd", "acqUndated"]) {
+    const v = sp.get(k); if (v && /^(-?\d{1,5}|true)$/.test(v)) params.set(k, v)
+  }
   const key = params.toString()
   const hit = cache.get(key)
   if (hit && Date.now() - hit.timestamp < CACHE_DURATION) return NextResponse.json(hit.data, { headers: { "X-Cache": "HIT" } })

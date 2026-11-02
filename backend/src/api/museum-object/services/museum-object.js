@@ -298,7 +298,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
 
   async _dateBucketCounts(filters = {}) {
     const db = strapi.db.connection;
-    const hasFilters = !!(filters.institution || filters.city || filters.country);
+    const hasFilters = !!(filters.institution || filters.city || filters.country || filters.precise);
 
     let timeRow, acqUndatedCount, acqYearRows;
 
@@ -307,7 +307,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       && await this._materializedViewExists(db, 'mv_acquisition_year_stats');
     // Institution and/or country filters (no city): sums over the views' rows per
     // institution and country (src/map-views.js), the same counts as the live query.
-    const groupedReady = hasFilters && !filters.city
+    const groupedReady = hasFilters && !filters.city && !filters.precise
       && await this._materializedViewExists(db, 'mv_time_bucket_by_group')
       && await this._materializedViewExists(db, 'mv_acquisition_year_by_group')
       && await this._materializedViewExists(db, 'mv_date_span_by_group');
@@ -349,6 +349,10 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
       const institutionFilter = this.buildMultiValueFilter('institution_name', filters.institution, 'db_inst');
       const cityFilter = this.buildSiteFilter(filters.city, 'db_city');
       const countryFilter = this.buildMultiValueFilter('country_en', filters.country, 'db_country');
+      // A precise place inside the site ("Kabirion" in Thiva), as getObjectsByCountry filters it.
+      const preciseFilter = filters.precise
+        ? { clause: 'AND LOWER(BTRIM(precise_place)) = LOWER(BTRIM(:db_precise)) ', bindings: { db_precise: filters.precise } }
+        : { clause: '', bindings: {} };
 
       const timeSelects = [
         `COUNT(*) FILTER (WHERE object_date_precision = 'unknown') AS time_undated`,
@@ -368,11 +372,13 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ${institutionFilter.clause}
           ${cityFilter.clause}
           ${countryFilter.clause}
+          ${preciseFilter.clause}
       `;
       const timeResult = await db.raw(timeQuery, {
         ...institutionFilter.bindings,
         ...cityFilter.bindings,
         ...countryFilter.bindings,
+        ...preciseFilter.bindings,
       });
       timeRow = this.getRows(timeResult)[0] || {};
 
@@ -393,6 +399,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ${acqInstitutionFilter.clause}
           ${acqCityFilter.clause}
           ${acqCountryFilter.clause}
+          ${preciseFilter.clause}
       `;
       const acqYearsQuery = `
         SELECT acquisition_year_earliest AS year, COUNT(*)::integer AS count
@@ -402,6 +409,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
           ${acqInstitutionFilter.clause}
           ${acqCityFilter.clause}
           ${acqCountryFilter.clause}
+          ${preciseFilter.clause}
         GROUP BY acquisition_year_earliest
         ORDER BY acquisition_year_earliest
       `;
@@ -409,6 +417,7 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
         ...acqInstitutionFilter.bindings,
         ...acqCityFilter.bindings,
         ...acqCountryFilter.bindings,
+        ...preciseFilter.bindings,
       };
       const [acqUndatedResult, acqYearsResult] = await Promise.all([
         db.raw(acqUndatedQuery, acqBindings),
@@ -1045,13 +1054,18 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
    * [{ name, count, latitude, longitude }], largest first. Empty for most sites —
    * most records name only their city.
    */
-  async getPrecisePlaces({ country, site, institution }) {
+  async getPrecisePlaces({ country, site, institution, ...dateFilters }) {
     const db = strapi.db.connection;
     const bindings = { site };
     let where = `published_at IS NOT NULL AND NULLIF(BTRIM(precise_place), '') IS NOT NULL
       AND ${PLACE_GROUP_KEY} = ${SITE_KEY(':site')}`;
     if (country) { where += ` AND country_en = :country`; bindings.country = country; }
     if (institution) { where += ` AND institution_name ILIKE :institution`; bindings.institution = `%${institution}%`; }
+    // The Time and Migration picks count too, as they do for the sites above it.
+    const dateFilter = this.buildDateRangeFilter(dateFilters, 'pp_date');
+    const acqDateFilter = this.buildAcquisitionDateRangeFilter(dateFilters, 'pp_acq');
+    where += ` ${dateFilter.clause} ${acqDateFilter.clause}`;
+    Object.assign(bindings, dateFilter.bindings, acqDateFilter.bindings);
     const result = await db.raw(`
       SELECT mode() WITHIN GROUP (ORDER BY BTRIM(precise_place)) AS name, COUNT(*)::integer AS count,
              AVG(COALESCE(manual_latitude, latitude)) AS latitude, AVG(COALESCE(manual_longitude, longitude)) AS longitude

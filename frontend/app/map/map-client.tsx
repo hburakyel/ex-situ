@@ -316,9 +316,10 @@ function MapContent() {
   useEffect(() => {
     if (!activeSite) { setPrecisePlaces([]); return }
     let cancelled = false
-    fetchPrecisePlaces(activeSite, activeCountry, activeInstitution).then((p) => { if (!cancelled) setPrecisePlaces(p) })
+    fetchPrecisePlaces(activeSite, activeCountry, activeInstitution, eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra))
+      .then((p) => { if (!cancelled) setPrecisePlaces(p) })
     return () => { cancelled = true }
-  }, [activeSite, activeCountry, activeInstitution])
+  }, [activeSite, activeCountry, activeInstitution, facetedFilters.era, facetedFilters.migrationEra])
 
   // Tab title follows the drill (the server only sets it for the URL the page loaded with).
   useEffect(() => {
@@ -372,6 +373,7 @@ function MapContent() {
       institutions: activeInstitution ? [activeInstitution] : (activeCountry ? undefined : (facetedFilters.institutions.length > 0 ? facetedFilters.institutions : undefined)),
       countries: activeCountry ? [activeCountry] : (facetedFilters.countries.length > 0 ? facetedFilters.countries : undefined),
       cities: activeSite ? [activeSite] : (activeCountry ? undefined : (facetedFilters.cities.length > 0 ? facetedFilters.cities : undefined)),
+      precise: activePrecise || undefined,
     }).then((result) => {
       if (!cancelled) setDateBuckets(result)
     }).catch((error) => {
@@ -382,7 +384,7 @@ function MapContent() {
     })
     return () => { cancelled = true }
   }, [
-    activeCountry, activeSite, activeInstitution,
+    activeCountry, activeSite, activePrecise, activeInstitution,
     facetedFilters.institutions.join(','), facetedFilters.countries.join(','), facetedFilters.cities.join(','),
   ])
 

@@ -192,11 +192,12 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
    */
   async dateBuckets(ctx) {
     try {
-      const { institution, city, country } = ctx.query;
+      const { institution, city, country, precise } = ctx.query;
       const filters = {};
       if (institution) filters.institution = institution;
       if (city) filters.city = city;
       if (country) filters.country = country;
+      if (city && precise) filters.precise = String(precise).slice(0, 200);
 
       const data = await strapi
         .service('api::museum-object.museum-object')
@@ -244,8 +245,10 @@ module.exports = createCoreController('api::museum-object.museum-object', ({ str
     try {
       const { site, country, institution } = ctx.query;
       if (!site || String(site).length > 200) return ctx.badRequest('site parameter is required');
+      const { filters: dateFilters, error: dateError } = parseDateQueryFilters(ctx.query);
+      if (dateError) return ctx.badRequest(dateError);
       const data = await strapi.service('api::museum-object.museum-object')
-        .getPrecisePlaces({ site: String(site), country: country ? String(country) : null, institution: institution ? String(institution) : null });
+        .getPrecisePlaces({ site: String(site), country: country ? String(country) : null, institution: institution ? String(institution) : null, ...dateFilters });
       ctx.send({ data });
     } catch (error) {
       strapi.log.error('precisePlaces endpoint error:', error.message);
