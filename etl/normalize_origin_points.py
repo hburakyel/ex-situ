@@ -12,7 +12,9 @@ follow a fixed rule (METHODOLOGY.md, "Origins"):
   region   a region spanning several countries ("Middle East", "Polynesien",
            "Caucasus"), stored as a point or unlocated → the region's point and
            English label from region_points.py, no country, origin_type
-           'cultural_area' (one site per region in every collection).
+           'cultural_area' (one site per region in every collection). city_en, which the
+           map's site list prefers, is cleared on region rows: it held the source's name
+           ("Mittlerer Orient", "Afrika") or a reverse-geocoded district.
   area     any other cultural area stored as a point (continents, empires, "Egypt
            or Syria") → no coordinates, no country, origin_type 'cultural_area',
            geocoding_status 'ambiguous'.
@@ -38,7 +40,7 @@ from datetime import date
 
 from audit_data_quality import SOURCE_PLACE_SQL, Classifier, effective
 from audit_places import get_conn
-from region_points import WHOLE, region_of
+from region_points import REGIONS, WHOLE, region_of
 
 NOTE_TAG = "[origin-audit]"
 
@@ -235,6 +237,18 @@ def plan(cur, classifier):
     return actions, examples
 
 
+def clear_region_cities(cur):
+    """city_en off rows labelled with a region: the site list shows city_en first."""
+    labels = sorted(set(REGIONS) | {r + "?" for r in REGIONS})
+    cur.execute(
+        f"""UPDATE museum_objects SET {note('city_en')}, city_en = NULL
+            WHERE published_at IS NOT NULL AND COALESCE(review_status, '') <> 'verified'
+              AND place_name_normalized = ANY(%s) AND NULLIF(BTRIM(city_en), '') IS NOT NULL""",
+        (labels,),
+    )
+    return cur.rowcount
+
+
 def apply(cur, actions):
     for (action, value), ids in actions.items():
         if action == "outside":
@@ -295,6 +309,7 @@ def main():
                 for name, n in examples[action].most_common(10):
                     print(f"  {n:>5}  {name[:70]}")
             apply(cur, actions)
+            print(f"== city_en cleared on region rows: {clear_region_cities(cur)} artifacts")
         if args.apply:
             conn.commit()
             print("\nCommitted. SELECT refresh_geospatial_views(); to rebuild the map views.")
