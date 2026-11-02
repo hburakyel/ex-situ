@@ -11,7 +11,8 @@ normalize_present_day_names.py — Label origins with the place's present-day na
   label    labels that carried a colonial name for a country or a German tag
            ("Southwest Africa" → Namibia, "King (Papua Neuguinea)" → King).
   area     historical units spanning several present-day countries
-           ("Rhodesia") → unlocated, origin_type 'cultural_area'.
+           ("Rhodesia") → unlocated, origin_type 'cultural_area'; a region with a
+           point in region_points.py ("Korea") is left to normalize_origin_points.py.
   point    a point far from the named place → removed, flagged for review.
 
 Present-day names are those in official use today, applied the same way
@@ -33,6 +34,7 @@ import sys
 from datetime import date
 
 from audit_places import get_conn
+from region_points import region_of
 
 NOTE_TAG = "[present-day]"
 LABEL = "COALESCE(NULLIF(BTRIM(place_name_normalized), ''), city_en)"
@@ -134,7 +136,22 @@ RENAMES = {
     ("Swatow", "China"): "Shantou",
     ("Port Arthur", "China"): "Lüshunkou",
     ("Saigon", "Vietnam"): "Ho Chi Minh City",
-    ("Moçâmedes", "Angola"): "Namibe",
+    # Namibe 1985–2016; the city is Moçâmedes again since 2016 (desk review 2026-11-02).
+    ("Namibe", "Angola"): "Moçâmedes",
+    # Desk review 2026-11-02 (geocoding audit).
+    ("Ahmednagar", "India"): "Ahilyanagar",
+    ("Ahmadnagar", "India"): "Ahilyanagar",
+    ("Bellary", "India"): "Ballari",
+    ("Hubli", "India"): "Hubballi",
+    ("Thana", "India"): "Thane",
+    ("Chandernagore", "India"): "Chandannagar",
+    ("Berhampore", "India"): "Baharampur",
+    ("Grissee", "Indonesia"): "Gresik",
+    ("Chinchow", "China"): "Jinzhou",
+    ("Léopoldville", "Democratic Republic of the Congo"): "Kinshasa",
+    ("Memphis", "Egypt"): "Mit Rahina",
+    ("Petra", "Jordan"): "Wadi Musa",
+    ("Nushagak", "United States"): "Dillingham",
 }
 
 # Exact labels → (new label, country_en or None to keep).
@@ -209,6 +226,9 @@ LABELS = {
     # "Nusayri" is a pejorative name for Alawites.
     "Nusayriyah Mountains": ("Syrian Coastal Mountains", None),
     "West Coast of Asia Minor": ("Western Anatolia", None),
+    "Leopoldstad": ("Léopoldville", None),  # Dutch; RENAMES then gives Kinshasa on the next run
+    "Beër Sjeva": ("Beersheba", None),
+    "Municipio Metepec": ("Metepec", None),
 }
 
 # Korea before 1945 lies in both present-day Koreas; the Mughal Empire spanned several countries.
@@ -266,6 +286,8 @@ def run(cur):
 
     print("historical unit spanning several present-day countries → unlocated")
     for old in sorted(AREAS):
+        if region_of(old):
+            continue
         cur.execute(
             f"""UPDATE museum_objects SET {note('latitude', 'longitude', 'country_en')},
                   latitude = NULL, longitude = NULL, country_en = NULL,

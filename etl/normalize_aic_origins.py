@@ -15,6 +15,8 @@ country_en "Turkey", "Ottoman Empire" likewise, and "Venado Beach" (Panama) and
 Passes (one transaction):
   cultural  place_name names a cultural area, not a place → no coordinates, no
             country, origin_type 'cultural_area', geocoding_status 'ambiguous'.
+            Regions with a point in region_points.py ("Mediterranean Region") are
+            left to normalize_origin_points.py, which draws them at that point.
             The artifact stays in the index as unlocated (METHODOLOGY: never
             invent coordinates or precision).
   wrong     coordinates in the wrong country → removed; country_en from the
@@ -36,6 +38,8 @@ import argparse
 import os
 import sys
 from datetime import date
+
+from region_points import region_of
 
 AIC = "Art Institute of Chicago"
 NOTE_TAG = "[aic-region]"
@@ -103,7 +107,7 @@ def run(cur):
               geocoding_status = 'ambiguous'
             WHERE institution_name = %s AND lower(place_name) = ANY(%s) AND {located} AND {GUARD}
             RETURNING place_name""",
-        (AIC, sorted(CULTURAL_AREAS)),
+        (AIC, sorted(a for a in CULTURAL_AREAS if not region_of(a))),
     )
     counts = {}
     for (name,) in cur.fetchall():
