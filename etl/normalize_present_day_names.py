@@ -21,7 +21,8 @@ METHODOLOGY.md says so. Palestine keeps its name (country labels).
 
 Rows with review_status = 'verified' or a manual coordinate are never touched;
 place_name is never changed; a rename keeps the old name in historical_name, which the
-map shows after the present-day one ("Al-Shirqat (Assur)"). Each changed row gets a "[present-day] <date> …"
+map shows after the present-day one ("Al-Shirqat (Assur)"), unless the old name is a
+colonial one (COLONIAL): a name or spelling given by a colonial administration is not shown. Each changed row gets a "[present-day] <date> …"
 note in geocoding_notes with the old values.
 
 Usage:
@@ -154,6 +155,28 @@ RENAMES = {
     ("Nushagak", "United States"): "Dillingham",
 }
 
+# Names and spellings given by colonial administrations: a rename from one of these keeps
+# no historical_name, so the map does not show it (the record keeps it in place_name).
+# Older names of the place itself (Fustat, Edo, Assur, Constantinople) are shown.
+COLONIAL = {
+    # Dutch, in Indonesia
+    "Batavia", "Weltevreden", "Celebes", "South Celebes", "Jogjakarta", "Soekaboemi", "Soerakarta",
+    "Tjibeber", "Tjimahi", "Tjipanas", "Batoedjadjar", "Gadingredjo", "Djambi", "Soengeiliat", "Atjeh",
+    "Banda Atjeh", "Tandjong Poera", "Lampong", "Bindjai", "Modjokerto", "Grissee", "'s Lands Plantentuin",
+    "Aboe Simbel", "Deshima",
+    # British, in South Asia and elsewhere
+    "Madras", "Bombay", "Calcutta", "Bangalore", "Mysore", "Benares", "Kotah", "Gauhati", "Tanjore",
+    "Trichinopoly", "Vizagapatnam", "Masulipatam", "Negapatnam", "Baroda", "Belgaum", "Rajahmundry",
+    "Thana", "Bellary", "Hubli", "Orissa", "Oudh", "Calicut", "Cambay", "Chittagong", "Mangalore", "Simla",
+    "Berhampore", "Ceylon", "Malaya", "Malacca", "Pagan", "Mafeking", "Natal", "Natal Province",
+    "Old Calabar", "Victoria", "Port Herald", "New Hebrides", "Queen Charlotte Islands",
+    # French, Belgian, Portuguese, Russian
+    "Chandernagore", "Paliacatta", "Bône", "Tonkin", "Annam", "Léopoldville", "Leopoldstad",
+    "Equateurville", "Tiflis",
+    # Western postal romanizations in China
+    "Canton", "Kanton", "Swatow", "Port Arthur", "Chinchow", "Peking",
+}
+
 # Exact labels → (new label, country_en or None to keep).
 LABELS = {
     "Southwest Africa": ("Namibia", None),
@@ -267,7 +290,7 @@ def run(cur):
                 f"""UPDATE museum_objects SET {note('place_name_normalized')}, place_name_normalized = %s,
                       historical_name = COALESCE(historical_name, %s)
                     WHERE {LABEL} = %s AND country_en = %s AND {GUARD}""",
-                (new + suffix, old, old + suffix, country),
+                (new + suffix, None if old in COLONIAL else old, old + suffix, country),
             )
             if cur.rowcount:
                 print(f"  {cur.rowcount:>5}  {old + suffix!r} → {new + suffix!r}  ({country})")

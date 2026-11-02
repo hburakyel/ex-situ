@@ -4,12 +4,14 @@ region_points.py — One point per region that spans several present-day countri
 
 A record that names only a region ("Middle East", "Polynesien", "Caucasus") is drawn at
 the region's point from GeoNames or Wikidata, labelled with the region's English name and
-matched to no country. Where the source point lies on a city (Wikidata's East Africa is
+listed as a place of its own: country_en is the region's name, so the map's world view and
+Places list show it like a country, without filing it under one. Where the source point lies on a city (Wikidata's East Africa is
 Nairobi, its Korean Peninsula Seoul, its Tibet Lhasa) or off the region (its Polynesia
 lies off Australia), GeoNames' region feature is used instead.
 
-Not given a point: continents, empires and other historical states, and records that name
-two places ("Egypt or Syria") — a point would name a place the record does not.
+Continents get GeoNames' continent point; an empire gets its Wikidata point or, without
+one, its longest-held capital. Records that name two places ("Egypt or Syria") get no point
+here: split_origin_places.py draws them on the arc from each place.
 
 Used by normalize_origin_points.py (the "region" pass) and by the scripts that unlocate
 cultural areas (normalize_present_day_names.py, normalize_aic_origins.py), which leave
@@ -18,13 +20,12 @@ these regions alone.
 
 from audit_places import key
 
-# English label → (lat, lon, source, country_en). The country is set only for a region
-# inside one country.
+# English label → (lat, lon, source, country_en). country_en is set only for a region inside
+# one country; any other region is its own top-level place (region_of gives its name).
 REGIONS = {
-    "Middle East": (28.0, 45.0, "Wikidata Q7204", None),
-    # Wikidata's Near East point (Q48214) lies in the Sea of Galilee; the terms overlap.
-    "Near East": (28.0, 45.0, "Wikidata Q7204 (Middle East)", None),
-    "Levant": (34.0, 36.0, "GeoNames 305104", None),
+    # Named geographically, not from Europe: the records' "Middle East" and "Near East"
+    # (Wikidata's Near East point, Q48214, lies in the Sea of Galilee), and "Levant".
+    "Southwest Asia and North Africa (SWANA)": (28.0, 45.0, "Wikidata Q7204 (Middle East)", None),
     "Eastern Mediterranean": (34.0, 36.0, "Wikidata Q81483 (Levant)", None),
     "Mediterranean": (35.0, 18.0, "Wikidata Q72499 (Mediterranean Basin)", None),
     "West Asia": (29.166667, 47.6, "Wikidata Q27293", None),
@@ -67,13 +68,33 @@ REGIONS = {
     "Torres Strait": (-9.833333, 142.5, "Wikidata Q179188", None),
     "Diomede Islands": (65.76687, -168.99445, "Wikidata Q204403", None),
     "Calchaquí Valleys": (-26.448539, -65.976446, "Wikidata Q525820", "Argentina"),
+    "Northeast Africa": (9.5, 48.0, "Wikidata Q40556 (Horn of Africa)", None),
+    "Maritime Southeast Asia": (-2.080582, 126.546887, "Wikidata Q208643 (Malay Archipelago)", None),
+    "Gandhara": (33.756, 72.8291, "Wikidata Q213651", None),
+    # Continents: GeoNames continent features.
+    "Africa": (7.1881, 21.09375, "GeoNames 6255146", None),
+    "Asia": (29.84064, 89.29688, "GeoNames 6255147", None),
+    "Europe": (48.69096, 9.14062, "GeoNames 6255148", None),
+    "North America": (46.07323, -100.54688, "GeoNames 6255149", None),
+    "South America": (-14.60485, -57.65625, "GeoNames 6255150", None),
+    "Oceania": (-18.31281, 138.51562, "GeoNames 6255151", None),
+    "Americas": (19.0, -96.0, "Wikidata Q828", None),
+    # Empires and kingdoms: Wikidata point, else the longest-held capital.
+    "Mughal Empire": (28.66, 77.23, "Wikidata Q33296: capital Shahjahanabad 1648–1857 (Q3242297)", None),
+    "Roman Empire": (41.9, 12.5, "Wikidata Q2277", None),
+    "Guge": (31.481944, 79.800278, "Wikidata Q1193554", "China"),
 }
 
 # Other names in the records (German, variants) → English label.
 ALIASES = {
-    "mittlerer orient": "Middle East",
-    "vorderer orient": "Near East",
-    "levante": "Levant",
+    "middle east": "Southwest Asia and North Africa (SWANA)",
+    "near east": "Southwest Asia and North Africa (SWANA)",
+    "mittlerer orient": "Southwest Asia and North Africa (SWANA)",
+    "vorderer orient": "Southwest Asia and North Africa (SWANA)",
+    "naher osten": "Southwest Asia and North Africa (SWANA)",
+    "swana": "Southwest Asia and North Africa (SWANA)",
+    "levant": "Eastern Mediterranean",
+    "levante": "Eastern Mediterranean",
     "mediterranean region": "Mediterranean",
     "ancient mediterranean": "Mediterranean",
     "eastern mediterranean region": "Eastern Mediterranean",
@@ -114,6 +135,21 @@ ALIASES = {
     "australia or papua new guinea, torres strait": "Torres Strait",
     "diomedes-inseln": "Diomede Islands",
     "calchaquigebiet": "Calchaquí Valleys",
+    "nordost-afrika": "Northeast Africa",
+    "nordwestafrika": "Maghreb",
+    "northwest africa": "Maghreb",
+    "sub-saharan (west) africa": "West Africa",
+    "insulares sudostasien": "Maritime Southeast Asia",
+    "kushan empire (in gandharan region)": "Gandhara",
+    "western guge kingdom (in present-day tibet)": "Guge",
+    "afrika": "Africa",
+    "asien": "Asia",
+    "europa": "Europe",
+    "nordamerika": "North America",
+    "sudamerika": "South America",
+    "ozeanien": "Oceania",
+    "amerika": "Americas",
+    "mughal empire": "Mughal Empire",
 }
 # Rows of these regions that a collection filed under one country move too: Korea before 1945
 # lies in both present-day Koreas.
@@ -137,4 +173,4 @@ def region_of(name):
     if not found:
         return None
     lat, lon, source, country = REGIONS[found]
-    return (found + ("?" if hedged else ""), lat, lon, source, country)
+    return (found + ("?" if hedged else ""), lat, lon, source, country or found)
