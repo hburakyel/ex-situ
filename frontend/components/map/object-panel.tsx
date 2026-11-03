@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { ChevronDown, ChevronUp, Check, FileText, FileJson, Loader2, List } from "lucide-react"
 import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconGridSize } from "@/components/icons"
-import { fetchObjectsByCountry } from "@/lib/api"
+import { fetchMuseumObjectByImage, fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ import InfoPanel from "./info-panel"
 import type { EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { track } from "@/lib/analytics"
+import { OBJECT_PANEL_WIDTH } from "@/lib/desktop-layout"
 import type { PrecisePlace } from "@/lib/api"
 import PrecisePlaceRows from "@/components/map/precise-place-rows"
 
@@ -182,6 +183,8 @@ export default function ObjectPanel({
 }: ObjectPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
+  // A global-view preview card's real object, looked up by its image on click.
+  const previewLookupRef = useRef<"pending" | "found" | "failed">("found")
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [galleryArtifact, setGalleryArtifact] = useState<MuseumObject | null>(null)
   const closeGallery = () => {
@@ -795,14 +798,11 @@ export default function ObjectPanel({
     let idx = galleryObjects.findIndex(o => String(o.id) === String(galleryArtifact.id))
     if (idx === -1 && isPreviewArtifact) {
       const a = galleryArtifact.attributes
-      // Try an exact match first (cheap win when the sample happens to be on this
-      // page), but the aggregate's sample image is picked from potentially
-      // thousands of objects for this institution/place, so it usually won't be
-      // on the first loaded page. Rather than wait forever for a page that may
-      // never come, fall back to the first object in the (already
-      // institution/place-scoped) drilled-down list — real data beats a frozen
-      // placeholder with no inventory number or links.
+      // The sample image is usually not on the first loaded page. The click looks the
+      // real object up by its image (previewLookupRef) and swaps it in; only when that
+      // lookup found nothing does the gallery fall back to the list's first object.
       idx = a.img_url ? galleryObjects.findIndex(o => o.attributes.img_url === a.img_url) : -1
+      if (idx === -1 && previewLookupRef.current !== "failed") return
       if (idx === -1) idx = 0
     }
     if (idx !== -1) {
@@ -897,7 +897,7 @@ export default function ObjectPanel({
       default:
         return {
           transition: desktopTransition,
-          width: "40%",
+          width: OBJECT_PANEL_WIDTH,
           height: "auto",
         }
     }
@@ -946,6 +946,17 @@ export default function ObjectPanel({
       setGalleryArtifact(obj)
       setSelectedIndex(0)
       setGalleryOpen(true)
+      // The card shows one object's image: open that object, not the list's first.
+      previewLookupRef.current = "pending"
+      const img = obj.attributes.img_url
+      if (img) {
+        fetchMuseumObjectByImage(img, obj.attributes.institution_name).then((real) => {
+          previewLookupRef.current = real ? "found" : "failed"
+          setGalleryArtifact((current) => (current?.id === obj.id ? (real ?? { ...current }) : current))
+        })
+      } else {
+        previewLookupRef.current = "failed"
+      }
       return
     }
     // Pass obj so the parent zooms to the right location and starts the

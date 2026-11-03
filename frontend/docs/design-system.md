@@ -240,7 +240,7 @@ Tailwind 4px base scale. All values used in the app:
 
 | Token | Value | Description |
 |-------|-------|-------------|
-| `panelWidthDefault` | `40%` | Object panel width (desktop) |
+| `panelWidthDefault` | `calc((100vw - 24rem) / 2)` | Object panel width (desktop): as wide as the map between the panels |
 | `panelWidthExpanded` | `calc(100% - 5rem)` | Expanded panel |
 | `panelInsetDesktop` | `2.5rem` (40px) | Panel offset from edges |
 | `mobileSheetDefault` | `40%` | Mobile bottom-sheet height |

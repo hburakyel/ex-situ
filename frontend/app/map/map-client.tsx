@@ -1288,9 +1288,15 @@ function MapContent() {
         // never include the specific object the sample image came from.
         // Narrowing to the institution makes the drilled-down list small enough
         // to actually contain it.
-        if (object?.attributes.institution_name) {
-          setActiveInstitution(object.attributes.institution_name)
-        }
+        const institution = object?.attributes.institution_name || null
+        if (institution) setActiveInstitution(institution)
+        // Chips for the place and the collection, as when both are picked in the side panel.
+        setFacetedFilters((f) => ({
+          ...f,
+          countries: [origin?.country ?? objectCountry],
+          cities: [],
+          institutions: institution ? [institution] : f.institutions,
+        }))
         return
       }
 

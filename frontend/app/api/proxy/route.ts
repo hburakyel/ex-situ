@@ -5,11 +5,12 @@ const responseCache: Map<string, { data: any; timestamp: number }> = new Map()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 // Bbox / pagination / search params actually sent by fetchMuseumObjects,
-// searchMuseumObjects, fetchAllMuseumObjects (lib/api.ts) and the research
-// page fallback fetchers (app/research/**/*-client.tsx).
+// searchMuseumObjects, fetchAllMuseumObjects, fetchMuseumObjectByImage (lib/api.ts)
+// and the research page fallback fetchers (app/research/**/*-client.tsx).
 const ALLOWED_PARAMS = new Set([
   "filters[latitude][$gte]", "filters[latitude][$lte]",
   "filters[longitude][$gte]", "filters[longitude][$lte]",
+  "filters[img_url][$eq]", "filters[institution_name][$eq]",
   "_q",
   "pagination[page]", "pagination[pageSize]",
   "populate",

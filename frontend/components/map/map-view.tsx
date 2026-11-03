@@ -8,12 +8,12 @@ import { Protocol } from "pmtiles"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
-import { ChevronDown, ChevronUp, Info } from "lucide-react"
+import { ChevronDown, ChevronUp, Globe, Info, Minus, Plus } from "lucide-react"
 import { useScrollFades } from "@/hooks/use-scroll-fades"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
 import { iconSvgStrings, IconClose } from "@/components/icons"
 import SearchBar from "./search-bar"
-import { AboutText } from "./info-panel"
+import { AboutText, FilterChips } from "./info-panel"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -33,6 +33,7 @@ import { placeDisplayLabels, siteRowLabel } from "@/lib/place-label"
 import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
 import { track } from "@/lib/analytics"
+import { OBJECT_PANEL_WIDTH } from "@/lib/desktop-layout"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 import type { PrecisePlace } from "@/lib/api"
@@ -134,11 +135,12 @@ function hasValidCoordinatePair(position?: [number, number] | number[]): boolean
   return hasValidCoordinates(position[1], position[0])
 }
 
+// max-h-40 until useSharedListHeights gives the list its share of the side panel.
 function HeaderAccordionList({ children }: { children: React.ReactNode }) {
   const { ref, fades } = useScrollFades<HTMLDivElement>()
   return (
     <div className="relative">
-      <div ref={ref} className="max-h-40 overflow-y-auto pr-1 pb-1">
+      <div ref={ref} data-shared-list className="max-h-40 overflow-y-auto pr-1 pb-1">
         {children}
       </div>
       {fades.top && (
@@ -157,6 +159,89 @@ function HeaderAccordionList({ children }: { children: React.ReactNode }) {
       )}
     </div>
   )
+}
+
+// The side panel is as tall as the object panel at most: with Places, Time and
+// Collections all open, their lists share the room under the header and the panel ends
+// where the object panel does. Each list gets an equal share; one shorter than that keeps
+// its own length and leaves the rest to the others. A cut list ends half-way through a
+// row, under its fade, so it reads as one to scroll; the pixels that snapping leaves over
+// go under the lists ([data-shared-list-foot]). A list never gets less than three rows;
+// below that (a very short window) the panel scrolls.
+const SHARED_LIST_MIN = 72
+function useSharedListHeights(panelRef: React.RefObject<HTMLElement | null>, active: boolean) {
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!active || !panel) return
+    let frame = 0
+    const sizes = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => fit()) : null
+    const fit = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const lists = Array.from(panel.querySelectorAll<HTMLElement>("[data-shared-list]"))
+        const foot = panel.querySelector<HTMLElement>("[data-shared-list-foot]")
+        const maxHeight = parseFloat(getComputedStyle(panel).maxHeight)
+        if (!lists.length || !foot || !Number.isFinite(maxHeight)) return
+        let room = maxHeight - (panel.scrollHeight - foot.offsetHeight - lists.reduce((sum, l) => sum + l.clientHeight, 0))
+        // Equal shares first, then each cut list snapped down to half a row.
+        const shares = new Map<HTMLElement, number>()
+        const byLength = lists.map((l) => ({ l, length: l.scrollHeight })).sort((a, b) => a.length - b.length)
+        byLength.forEach(({ l, length }, i) => {
+          const share = Math.min(length, Math.max(SHARED_LIST_MIN, Math.floor(room / (byLength.length - i))))
+          shares.set(l, share)
+          room -= share
+        })
+        let left = Math.max(0, room)
+        const cutLists: { l: HTMLElement; length: number; row: number; height: number }[] = []
+        for (const { l, length } of byLength) {
+          let height = shares.get(l)!
+          const row = (l.firstElementChild as HTMLElement | null)?.getBoundingClientRect().height ?? 0
+          if (height < length && row > 0) {
+            const pad = parseFloat(getComputedStyle(l).paddingBottom) || 0
+            const snapped = Math.max(row * 1.5 + pad, Math.floor((height - pad - row / 2) / row) * row + row / 2 + pad)
+            left += height - snapped
+            height = snapped
+            cutLists.push({ l, length, row, height })
+          }
+          l.style.maxHeight = `${height}px`
+        }
+        // Snapping frees up to a row per list: give it back as whole rows, one list at a
+        // time from the longest, then a little to each, so the last row stays cut between
+        // half and 0.8 of a row.
+        for (let given = true; given; ) {
+          given = false
+          for (const c of [...cutLists].reverse()) {
+            if (left >= c.row && c.height + c.row < c.length) { c.height += c.row; left -= c.row; given = true }
+          }
+        }
+        const each = left / Math.max(1, cutLists.length)
+        for (const c of cutLists) {
+          const extra = Math.min(c.row * 0.3, each, c.length - c.height)
+          c.height += extra
+          left -= extra
+          c.l.style.maxHeight = `${c.height}px`
+        }
+        foot.style.height = cutLists.length ? `${Math.floor(left)}px` : "0px"
+        // A row's height changes when the web font arrives: watch the first row too.
+        lists.forEach((l) => { sizes?.observe(l); if (l.firstElementChild) sizes?.observe(l.firstElementChild) })
+      })
+    }
+    fit()
+    // Lists open and close and rows load in (mutations), fonts change row heights, and
+    // the window changes the cap.
+    const mutations = new MutationObserver(fit)
+    mutations.observe(panel, { childList: true, subtree: true })
+    sizes?.observe(panel)
+    document.fonts?.addEventListener("loadingdone", fit)
+    window.addEventListener("resize", fit)
+    return () => {
+      cancelAnimationFrame(frame)
+      mutations.disconnect()
+      sizes?.disconnect()
+      document.fonts?.removeEventListener("loadingdone", fit)
+      window.removeEventListener("resize", fit)
+    }
+  }, [panelRef, active])
 }
 
 interface MapViewProps {
@@ -291,6 +376,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const prevViewStateRef = useRef(initialViewState)
     const [mapLoaded, setMapLoaded] = useState(false)
     const isMobile = useMediaQuery("(max-width: 768px)")
+    const sidePanelRef = useRef<HTMLDivElement>(null)
+    useSharedListHeights(sidePanelRef, !isMobile)
 
     // Old UI state
     const [showArcs, setShowArcs] = useState(true)
@@ -669,8 +756,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         onZoomChangeRef.current?.(newZoom)
       })
 
-      // No map controls: zoom by scroll or pinch, the breadcrumb root goes back to the
-      // globe, and About sits in the side panel (desktop) or the info card (phones).
+      // Desktop map controls (globe, zoom) are React buttons in the render below; phones
+      // pinch to zoom and go back to the globe from the breadcrumb root.
 
       window.addEventListener("resize", handleResize)
       // The mobile map card changes size (card, full screen, put away) without a window
@@ -698,6 +785,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         }
       }
     }, [showControls])
+
+    const mapAttribution = (
+      <span className="block text-[9px] leading-none text-white/50 whitespace-nowrap"><a href="https://protomaps.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Protomaps</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">OpenStreetMap contributors</a></span>
+    )
 
     // The chosen site's row, also when an arc click chose it: highlighted and
     // scrolled into view in its list.
@@ -1248,9 +1339,37 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           }}
         />
 
-        {/* Map attribution */}
-        <div className="absolute bottom-1 left-1 z-10 text-[9px] text-white/50 px-1.5 py-0.5 rounded">
-          <span><a href="https://protomaps.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Protomaps</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">OpenStreetMap contributors</a></span>
+        {/* Desktop map controls, bottom right as on most maps (left of the object panel,
+            OBJECT_PANEL_WIDTH at right-8): back to the globe, like the breadcrumb root, and
+            zoom for those who don't scroll or pinch. Hidden under the full-page panel. */}
+        {showControls && !isMobile && !(isObjectContainerVisible && containerSize === "expanded") && (
+          <div className="absolute bottom-8 z-20 flex flex-col gap-2" data-map-cover
+            style={{ right: isObjectContainerVisible ? `calc(${OBJECT_PANEL_WIDTH} + 3rem)` : "2rem" }}>
+            {[
+              [{ label: "Global view", icon: Globe, onClick: () => onBreadcrumbClick?.("global") }],
+              [
+                { label: "Zoom in", icon: Plus, onClick: () => map.current?.zoomIn() },
+                { label: "Zoom out", icon: Minus, onClick: () => map.current?.zoomOut() },
+              ],
+            ].map((buttons, g) => (
+              <div key={g} className="flex flex-col bg-white rounded-xl shadow-lg overflow-hidden divide-y divide-gray-200">
+                {buttons.map(({ label, icon: Icon, onClick }) => (
+                  <button key={label} type="button" onClick={onClick} aria-label={label} title={label}
+                    className="flex h-10 w-10 items-center justify-center text-gray-700 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500">
+                    <Icon className="h-5 w-5" />
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Map attribution. Desktop: bottom right, on the panels' right edge, in the
+            2rem margin under them. Phones: the bottom-left corner. */}
+        <div className={isMobile
+          ? "absolute bottom-1 left-1 z-10 px-1.5 py-0.5"
+          : "absolute bottom-3 right-8 z-10"}>
+          {mapAttribution}
         </div>
 
         {/* Loading overlay */}
@@ -1363,7 +1482,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
         {!isMobile && (
         <div className="absolute top-8 left-8 sm:w-80 z-20" data-map-cover>
-        <div className="bg-white rounded-2xl shadow-lg flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto">
+        {/* As tall as the object panel at most; its lists share the height (useSharedListHeights). */}
+        <div ref={sidePanelRef} className="bg-white rounded-2xl shadow-lg flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto">
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. */}
@@ -1422,6 +1542,18 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                 <span style={{ color: '#444', fontSize: '10px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }} className="block truncate">
                   resolved → {closedResolvedPlaceName}
                 </span>
+              )}
+              {/* The object panel shows the filters while open; closed, they stay clearable here. */}
+              {parentFacetedFilters && (
+                <FilterChips
+                  facetedFilters={parentFacetedFilters}
+                  precisePlace={activePrecise ? (precisePlaces.find((p) => p.name === activePrecise) ?? { name: activePrecise, count: 0, latitude: null, longitude: null }) : undefined}
+                  onTogglePrecise={onTogglePrecise}
+                  removeFilter={(type, value) => onFacetedFiltersChange?.({ ...parentFacetedFilters, [type]: parentFacetedFilters[type].filter((v) => v !== value) })}
+                  removeEraFilter={() => onFacetedFiltersChange?.({ ...parentFacetedFilters, era: null })}
+                  removeMigrationFilter={() => onFacetedFiltersChange?.({ ...parentFacetedFilters, migrationEra: null })}
+                  className="pt-1.5 pb-1"
+                />
               )}
             </div>
           )}
@@ -1589,6 +1721,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
               </div>
             )}
 
+            <div data-shared-list-foot aria-hidden="true" />
           </div>
           </TooltipProvider>
         </div>

@@ -798,6 +798,26 @@ export async function fetchMuseumObjectById(id: string | number): Promise<Museum
   }
 }
 
+/**
+ * The object behind a global-view preview card: the arc's sample image is one object's
+ * img_url, so look that object up by its image (and collection).
+ */
+export async function fetchMuseumObjectByImage(imgUrl: string, institution?: string | null): Promise<MuseumObject | null> {
+  const params = new URLSearchParams({ "filters[img_url][$eq]": imgUrl, "pagination[pageSize]": "1" })
+  if (institution) params.set("filters[institution_name][$eq]", institution)
+  try {
+    const isServer = typeof window === "undefined"
+    const url = isServer
+      ? fixLocalhost(`${process.env.NEXT_PUBLIC_API_BASE_URL}/museum-objects?${params.toString()}`)
+      : `/api/proxy?${params.toString()}`
+    const data = await fetchWithRateLimit(url, { method: "GET", headers: { "Content-Type": "application/json" } }, 3, `object-by-image:${institution ?? ""}:${imgUrl}`)
+    return Array.isArray(data?.data) && data.data.length > 0 ? (data.data[0] as MuseumObject) : null
+  } catch (error) {
+    console.error("Error fetching object by image:", error)
+    return null
+  }
+}
+
 // ---------- Spatial Documents (Wikipedia, research notes, etc.) ----------
 
 export async function fetchSpatialDocuments(

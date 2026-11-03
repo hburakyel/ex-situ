@@ -254,7 +254,7 @@ export interface MapViewProps {
  * - `shadows.lg` (shadow-lg)
  * - `spacing.3` (p-3, gap-3)
  * - `spacing.10` (top-10, right-10, bottom-10)
- * - `layout.panelWidthDefault` (width: "40%")
+ * - `layout.panelWidthDefault` (width: as wide as the map between the panels)
  * - `layout.panelWidthExpanded` (width: "calc(100% - 5rem)")
  * - `layout.mobileSheetDefault` (height: "40%")
  * - `zIndex.panel` (z-20)

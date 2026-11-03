@@ -213,8 +213,6 @@ export default function InfoPanel({
   const [showTime, setShowTime] = sectionState("time")
   const [showCollections, setShowCollections] = sectionState("collections")
 
-  const activeFilterCount = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
-    (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
   // Real place/site name — same priority used to build the breadcrumb trail, not the reverse-geocoded name.
   // Institution is deliberately excluded: it's always shown as a filter chip
   // below (facetedFilters.institutions), so repeating it here as plain text
@@ -496,60 +494,63 @@ export default function InfoPanel({
           )}
 
           {/* Filter chips */}
-          {(activeFilterCount > 0 || precisePlace) && mobileVariant !== "summary" && (
-            <div className="flex flex-wrap items-center gap-1 pt-1">
-              {facetedFilters.countries.map(c => (
-                <span key={`c-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-sm">
-                  {c}
-                  <button onClick={() => removeFilter('countries', c)} className="hover:bg-blue-100 rounded-md p-0.5">
-                    <IconClose className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              ))}
-              {facetedFilters.cities.map(c => (
-                <span key={`s-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-sm">
-                  {c}
-                  <button onClick={() => removeFilter('cities', c)} className="hover:bg-blue-100 rounded-md p-0.5">
-                    <IconClose className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              ))}
-              {precisePlace && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-sm">
-                  {precisePlace.name}
-                  <button onClick={() => onTogglePrecise?.(precisePlace)} className="hover:bg-blue-100 rounded-md p-0.5">
-                    <IconClose className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              )}
-              {facetedFilters.institutions.map(c => (
-                <span key={`i-${c}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 text-sm">
-                  {c}
-                  <button onClick={() => removeFilter('institutions', c)} className="hover:bg-orange-100 rounded-md p-0.5">
-                    <IconClose className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              ))}
-              {facetedFilters.era && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-sm">
-                  {facetedFilters.era.label}
-                  <button onClick={() => removeEraFilter?.()} className="hover:opacity-70 rounded-md p-0.5">
-                    <IconClose className="w-2.5 h-2.5 text-white" />
-                  </button>
-                </span>
-              )}
-              {facetedFilters.migrationEra && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 text-sm">
-                  {facetedFilters.migrationEra.label}
-                  <button onClick={() => removeMigrationFilter?.()} className="hover:opacity-70 rounded-md p-0.5">
-                    <IconClose className="w-2.5 h-2.5 text-white" />
-                  </button>
-                </span>
-              )}
-            </div>
+          {mobileVariant !== "summary" && (
+            <FilterChips
+              facetedFilters={facetedFilters}
+              precisePlace={precisePlace}
+              onTogglePrecise={onTogglePrecise}
+              removeFilter={removeFilter}
+              removeEraFilter={removeEraFilter}
+              removeMigrationFilter={removeMigrationFilter}
+              className="pt-1"
+            />
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// Active filters, each with an X that clears it: the object panel's header and, while
+// that panel is closed, the desktop side panel (map-view.tsx).
+export function FilterChips({
+  facetedFilters,
+  precisePlace,
+  onTogglePrecise,
+  removeFilter,
+  removeEraFilter,
+  removeMigrationFilter,
+  className,
+}: {
+  facetedFilters: FacetedFilters
+  precisePlace?: PrecisePlace
+  onTogglePrecise?: (place: PrecisePlace) => void
+  removeFilter: (type: keyof Omit<FacetedFilters, "era" | "migrationEra">, value: string) => void
+  removeEraFilter?: () => void
+  removeMigrationFilter?: () => void
+  className?: string
+}) {
+  const count = facetedFilters.countries.length + facetedFilters.cities.length + facetedFilters.institutions.length +
+    (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
+  if (count === 0 && !precisePlace) return null
+  const chip = (key: string, label: string, onRemove: () => void, tone: string, hover: string) => (
+    <span key={key} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm ${tone}`}>
+      {label}
+      <button type="button" onClick={onRemove} className={`rounded-md p-0.5 ${hover}`} aria-label={`Remove filter ${label}`} title="Remove filter">
+        <IconClose className="w-2.5 h-2.5" />
+      </button>
+    </span>
+  )
+  const place = "bg-blue-100 text-blue-700"
+  const time = "bg-gray-100 text-gray-700"
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
+      {facetedFilters.countries.map(c => chip(`c-${c}`, c, () => removeFilter("countries", c), place, "hover:bg-blue-200"))}
+      {facetedFilters.cities.map(c => chip(`s-${c}`, c, () => removeFilter("cities", c), place, "hover:bg-blue-200"))}
+      {precisePlace && chip("p", precisePlace.name, () => onTogglePrecise?.(precisePlace), place, "hover:bg-blue-200")}
+      {facetedFilters.institutions.map(c => chip(`i-${c}`, c, () => removeFilter("institutions", c), "bg-orange-50 text-orange-700", "hover:bg-orange-100"))}
+      {facetedFilters.era && chip("era", facetedFilters.era.label, () => removeEraFilter?.(), time, "hover:bg-gray-200")}
+      {facetedFilters.migrationEra && chip("mig", facetedFilters.migrationEra.label, () => removeMigrationFilter?.(), time, "hover:bg-gray-200")}
     </div>
   )
 }

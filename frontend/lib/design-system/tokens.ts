@@ -458,10 +458,10 @@ export const spacing = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const layout = {
-  /** Right-side panel width (desktop default).
-   *  @source object-panel.tsx (width: "40%")
+  /** Right-side panel width (desktop default): as wide as the map between the panels.
+   *  @source lib/desktop-layout.ts (OBJECT_PANEL_WIDTH)
    */
-  panelWidthDefault: "40%",
+  panelWidthDefault: "calc((100vw - 24rem) / 2)",
 
   /** Right-side panel width (desktop expanded).
    *  @source object-panel.tsx (width: "calc(100% - 5rem)")
