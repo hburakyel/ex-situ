@@ -249,6 +249,7 @@ export default function ObjectPanel({
   // Grid view: the grid's right edge, 1rem from the map card, or the right margin
   // while the card is closed.
   const gridRight = gridMapHidden ? "2rem" : `calc(${OBJECT_PANEL_WIDTH} + 3rem)`
+  const denseGrid = containerSize === "expanded" && (unifiedPanel || (gridView && gridMapHidden))
   const [showCopied, setShowCopied] = useState(false)
   // Grid density: null = the responsive default; otherwise a fixed column count
   // (remembered per browser): 1 (Feed) or 3 (Grid) on phones, 4 (Spacious) on desktop.
@@ -1700,8 +1701,10 @@ export default function ObjectPanel({
             isLoading={isLoading}
             onObjectClick={(longitude, latitude, index, object) => handleObjectClick(longitude, latitude, index, object)}
             onObjectHover={onObjectHover}
-            isFullscreen={unifiedPanel && containerSize === "expanded"}
-            panelSize={unifiedPanel && containerSize === "expanded" ? 100 : 40}
+            // Dense: the full-page panel, and the grid view with its map card closed;
+            // three per row beside the map.
+            isFullscreen={denseGrid}
+            panelSize={denseGrid ? 100 : 40}
             mobileColumns={3}
             columns={unifiedPanel ? activeGridColumns : null}
             view={isGrid ? "grid" : "list"}
