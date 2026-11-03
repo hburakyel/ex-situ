@@ -261,7 +261,10 @@ export default function ObjectPanel({
     } catch {}
   }, [])
   // A value saved on the other kind of screen is ignored.
-  const activeGridColumns = isMobile && (gridColumns === 1 || gridColumns === 3) ? gridColumns : null
+  // Desktop: 4 (Spacious) only where the grid has the page to itself (map card closed).
+  const activeGridColumns = isMobile
+    ? (gridColumns === 1 || gridColumns === 3 ? gridColumns : null)
+    : (denseGrid && gridColumns === 4 ? 4 : null)
   const setGridSize = (n: number | null) => {
     setGridColumns(n)
     try {
@@ -282,14 +285,22 @@ export default function ObjectPanel({
   const isGrid = !(unifiedPanel || gridView) || objectView === "grid"
   // One Display menu, as on Are.na. Phones: Feed (one per row), Grid (three per row),
   // List. Desktop grid view: Grid (three per row, as beside the map), List.
-  type DisplayKey = "feed" | "grid" | "list"
+  // Desktop grid view: Grid (three per row) beside the map card; with the card closed,
+  // Spacious (four per row) or Dense (the full page's columns).
+  type DisplayKey = "feed" | "grid" | "spacious" | "dense" | "list"
   const displayMode: DisplayKey = !isGrid ? "list"
-    : isMobile && activeGridColumns === 1 ? "feed" : "grid"
+    : isMobile ? (activeGridColumns === 1 ? "feed" : "grid")
+    : !denseGrid ? "grid"
+    : activeGridColumns === 4 ? "spacious" : "dense"
   const showGrid = (n: number | null) => { setGridSize(n); showObjectView("grid") }
   const listOption = { key: "list" as DisplayKey, label: "List", icon: <List className="w-5 h-5" />, pick: () => showObjectView("list") }
   const displayOptions = isMobile ? [
     { key: "feed" as DisplayKey, label: "Feed", icon: <IconGridSize className="w-5 h-5" columns={1} />, pick: () => showGrid(1) },
     { key: "grid" as DisplayKey, label: "Grid", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(3) },
+    listOption,
+  ] : denseGrid ? [
+    { key: "spacious" as DisplayKey, label: "Spacious", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(4) },
+    { key: "dense" as DisplayKey, label: "Dense", icon: <IconGridSize className="w-5 h-5" columns={5} />, pick: () => showGrid(null) },
     listOption,
   ] : [
     { key: "grid" as DisplayKey, label: "Grid", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showObjectView("grid") },
@@ -1707,7 +1718,7 @@ export default function ObjectPanel({
             isFullscreen={denseGrid}
             panelSize={denseGrid ? 100 : 40}
             mobileColumns={3}
-            columns={unifiedPanel ? activeGridColumns : null}
+            columns={unifiedPanel || denseGrid ? activeGridColumns : null}
             view={isGrid ? "grid" : "list"}
             // Map card: 40dvh + its 12px bottom margin + safe area, plus a 12px gap.
             bottomInset={isMobile && MOBILE_FULL_SCREEN && mapOpen ? "calc(40dvh + 24px + env(safe-area-inset-bottom))" : undefined}
