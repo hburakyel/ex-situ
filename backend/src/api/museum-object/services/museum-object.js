@@ -695,8 +695,15 @@ module.exports = createCoreService('api::museum-object.museum-object', ({ strapi
             institution_name
           HAVING COUNT(*) >= 1
         )
-        SELECT * FROM country_groups
-        ORDER BY object_count DESC;
+        -- The arcs start at the country's point in the view (its centre point), not at
+        -- the average of the filtered records.
+        SELECT g.origin_country,
+          ${mvExists ? 'COALESCE(mv.origin_lat, g.origin_lat)' : 'g.origin_lat'} AS origin_lat,
+          ${mvExists ? 'COALESCE(mv.origin_lon, g.origin_lon)' : 'g.origin_lon'} AS origin_lon,
+          g.institution_name, g.inst_lat, g.inst_lon, g.object_count, g.primary_count, g.sample_img_url
+        FROM country_groups g
+        ${mvExists ? 'LEFT JOIN mv_country_institution_stats mv ON mv.origin_country = g.origin_country AND mv.institution_name = g.institution_name' : ''}
+        ORDER BY g.object_count DESC;
       `;
 
       const result = await db.raw(query, {

@@ -195,7 +195,9 @@ test('getCountryStatistics: a date filter forces the live query (MV has no dates
   assert.match(query, /FROM museum_object_points/);
   assert.match(query, /first_in_country/);
   assert.match(query, /FILTER \(WHERE is_primary\)::integer as primary_count/);
-  assert.doesNotMatch(query, /mv_country_institution_stats/);
+  // Counts come from the live records; the view only gives each arc its start point.
+  assert.doesNotMatch(query, /FROM mv_country_institution_stats/);
+  assert.match(query, /LEFT JOIN mv_country_institution_stats mv ON mv\.origin_country = g\.origin_country/);
   assert.match(query, /published_at IS NOT NULL/);
   assert.match(query, /COALESCE\(manual_latitude, latitude\)/);
   assert.deepEqual(bindings, { fb_date_end: 1899, fb_date_start: 1800 });

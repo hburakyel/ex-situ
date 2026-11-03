@@ -68,12 +68,33 @@ const PRIMARY_COUNT = `COUNT(DISTINCT CASE
           WHEN inventory_number IS NOT NULL AND inventory_number != ''
           THEN inventory_number ELSE id::text END)::integer`;
 
+// A country's arcs on the world map start at its own centre point: the point most of
+// its country-level records ("No site") share (etl/fix_centre_points.py). An average of
+// all its records' points drifts out to sea for a country with distant islands (Chile
+// with Rapa Nui, Portugal with the Azores). A country without country-level records
+// keeps that average.
+const COUNTRY_CENTRES_SQL = `
+  SELECT DISTINCT ON (country_en) country_en AS centre_country, lat AS centre_lat, lon AS centre_lon
+  FROM (
+      SELECT country_en, COALESCE(manual_latitude, latitude) AS lat,
+             COALESCE(manual_longitude, longitude) AS lon, count(*) AS n
+      FROM museum_object_points
+      WHERE published_at IS NOT NULL
+        AND country_en IS NOT NULL AND country_en::text <> ''
+        AND (place_name_normalized = country_en OR city_en = country_en)
+        AND COALESCE(manual_latitude, latitude) IS NOT NULL
+        AND COALESCE(manual_longitude, longitude) IS NOT NULL
+      GROUP BY 1, 2, 3
+  ) points
+  ORDER BY country_en, n DESC, lat, lon
+`;
+
 const MV_COUNTRY_SQL = `
   CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_country_institution_stats AS
   SELECT
       COALESCE(NULLIF(country_en::text, ''), 'Unknown') AS origin_country,
-      avg(COALESCE(manual_latitude, latitude))          AS origin_lat,
-      avg(COALESCE(manual_longitude, longitude))        AS origin_lon,
+      COALESCE(min(centre_lat), avg(COALESCE(manual_latitude, latitude)))   AS origin_lat,
+      COALESCE(min(centre_lon), avg(COALESCE(manual_longitude, longitude))) AS origin_lon,
       institution_name,
       avg(institution_latitude)                         AS inst_lat,
       avg(institution_longitude)                        AS inst_lon,
@@ -81,6 +102,7 @@ const MV_COUNTRY_SQL = `
       ${PRIMARY_COUNT} AS primary_count,
       min(img_url)                                      AS sample_img_url
   FROM museum_object_points
+  LEFT JOIN (${COUNTRY_CENTRES_SQL}) centres ON centres.centre_country = country_en
   WHERE
       published_at IS NOT NULL
       AND first_in_country
