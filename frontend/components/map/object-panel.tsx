@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
-import { ChevronDown, ChevronUp, Check, FileText, FileJson, Loader2, List } from "lucide-react"
+import { createPortal } from "react-dom"
+import { ChevronDown, ChevronUp, Check, FileText, FileJson, Globe, Loader2, List } from "lucide-react"
 import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconGridSize } from "@/components/icons"
 import { fetchMuseumObjectByImage, fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -132,6 +133,24 @@ interface ObjectPanelProps {
   onMapToggle?: () => void
   /** Mobile: the map card steps aside while the gallery is open. */
   onGalleryOpenChange?: (open: boolean) => void
+  /** Desktop grid view: its map card is closed, and the header's button that closes/opens it. */
+  gridMapHidden?: boolean
+  onGridMapToggle?: () => void
+}
+
+// Desktop grid view with its map card open: the map's own buttons (back to the map view,
+// close the map) sit on the card's top right, as on the phone's map card; Display and
+// Export stay in the header, with the objects. They go to <body> because the panel lies
+// under the card.
+function MapCardButtons({ onCard, children }: { onCard: boolean; children: React.ReactNode }) {
+  if (!onCard || typeof document === "undefined") return <>{children}</>
+  return createPortal(
+    <div className="fixed z-40 flex items-center gap-1 rounded-xl bg-white/95 p-1 shadow-sm"
+      style={{ top: "calc(2rem + 0.75rem)", right: "calc(2rem + 0.75rem)" }}>
+      {children}
+    </div>,
+    document.body,
+  )
 }
 
 export default function ObjectPanel({
@@ -180,6 +199,8 @@ export default function ObjectPanel({
   mapOpen,
   onMapToggle,
   onGalleryOpenChange,
+  gridMapHidden = false,
+  onGridMapToggle,
 }: ObjectPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -219,7 +240,15 @@ export default function ObjectPanel({
   // One scrolling panel with the header (breadcrumb, info/globe/search/grid icons,
   // unfolding search + Places/Time/Collections) on top of the grid: always on phones,
   // and on desktop while the panel is expanded (full page, covering the side panel).
-  const unifiedPanel = isMobile ? MOBILE_FULL_SCREEN : containerSize === "expanded"
+  // Desktop expanded is the grid view: the map and this panel swap places. The panel
+  // becomes the background (white, where the map was), its header and grid between the
+  // side panel and the map, which becomes a card in the panel's place, as on phones
+  // (map-client.tsx). Closing that card gives the grid its room; the side panel stays.
+  const gridView = !isMobile && containerSize === "expanded"
+  const unifiedPanel = isMobile && MOBILE_FULL_SCREEN
+  // Grid view: the grid's right edge, 1rem from the map card, or the right margin
+  // while the card is closed.
+  const gridRight = gridMapHidden ? "2rem" : `calc(${OBJECT_PANEL_WIDTH} + 3rem)`
   const [showCopied, setShowCopied] = useState(false)
   // Grid density: null = the responsive default; otherwise a fixed column count
   // (remembered per browser): 1 (Feed) or 3 (Grid) on phones, 4 (Spacious) on desktop.
@@ -231,9 +260,7 @@ export default function ObjectPanel({
     } catch {}
   }, [])
   // A value saved on the other kind of screen is ignored.
-  const activeGridColumns = isMobile
-    ? (gridColumns === 1 || gridColumns === 3 ? gridColumns : null)
-    : (gridColumns === 4 ? 4 : null)
+  const activeGridColumns = isMobile && (gridColumns === 1 || gridColumns === 3) ? gridColumns : null
   const setGridSize = (n: number | null) => {
     setGridColumns(n)
     try {
@@ -241,8 +268,8 @@ export default function ObjectPanel({
       else localStorage.setItem("exsitu:grid-columns", String(n))
     } catch {}
   }
-  // Grid or list (remembered per browser), only in the full-page panel (phones, desktop
-  // expanded); the 40% desktop panel is always the responsive grid.
+  // Grid or list (remembered per browser), only on phones and in the desktop grid view;
+  // the desktop panel beside the map is always the grid.
   const [objectView, setObjectView] = useState<"grid" | "list">("grid")
   useEffect(() => {
     try { if (localStorage.getItem("exsitu:object-view") === "list") setObjectView("list") } catch {}
@@ -251,13 +278,12 @@ export default function ObjectPanel({
     setObjectView(next)
     try { localStorage.setItem("exsitu:object-view", next) } catch {}
   }
-  const isGrid = !unifiedPanel || objectView === "grid"
+  const isGrid = !(unifiedPanel || gridView) || objectView === "grid"
   // One Display menu, as on Are.na. Phones: Feed (one per row), Grid (three per row),
-  // List. Desktop: Spacious (four per row), Dense (the responsive grid), List.
-  type DisplayKey = "feed" | "grid" | "spacious" | "dense" | "list"
+  // List. Desktop grid view: Grid (three per row, as beside the map), List.
+  type DisplayKey = "feed" | "grid" | "list"
   const displayMode: DisplayKey = !isGrid ? "list"
-    : isMobile ? (activeGridColumns === 1 ? "feed" : "grid")
-    : (activeGridColumns === 4 ? "spacious" : "dense")
+    : isMobile && activeGridColumns === 1 ? "feed" : "grid"
   const showGrid = (n: number | null) => { setGridSize(n); showObjectView("grid") }
   const listOption = { key: "list" as DisplayKey, label: "List", icon: <List className="w-5 h-5" />, pick: () => showObjectView("list") }
   const displayOptions = isMobile ? [
@@ -265,8 +291,7 @@ export default function ObjectPanel({
     { key: "grid" as DisplayKey, label: "Grid", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(3) },
     listOption,
   ] : [
-    { key: "spacious" as DisplayKey, label: "Spacious", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(4) },
-    { key: "dense" as DisplayKey, label: "Dense", icon: <IconGridSize className="w-5 h-5" columns={5} />, pick: () => showGrid(null) },
+    { key: "grid" as DisplayKey, label: "Grid", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showObjectView("grid") },
     listOption,
   ]
   const viewButtons = (
@@ -887,7 +912,11 @@ export default function ObjectPanel({
     const desktopTransition = "none"
     switch (containerSize) {
       case "expanded":
-        return {
+        return gridView ? {
+          transition: desktopTransition,
+          // Grid view: the background right of the side panel (left-8 w-80).
+          left: "22rem",
+        } : {
           transition: desktopTransition,
           // Full page, edge to edge.
           width: "100%",
@@ -1493,7 +1522,11 @@ export default function ObjectPanel({
   )
 
   const sheetInner = (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col"
+      // Grid view: header and grid between the side panel (left-8 w-80) and the map card
+      // (OBJECT_PANEL_WIDTH at right-8), 1rem from each; the count row level with the side
+      // panel's breadcrumb row (its pt-3 against this header's pt-2 + py-1: 6px).
+      style={gridView ? { paddingLeft: "1rem", paddingRight: gridRight, paddingTop: "calc(2rem + 6px)" } : undefined}>
       {/* Mobile drag handle */}
       {isMobile && !MOBILE_FULL_SCREEN && (
         <div
@@ -1574,6 +1607,7 @@ export default function ObjectPanel({
               />
             </div>
             <div className="flex items-center gap-2 shrink-0 pt-2 pr-4">
+              {gridView && viewButtons}
               {objects.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1610,6 +1644,7 @@ export default function ObjectPanel({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
+              <MapCardButtons onCard={gridView && !gridMapHidden}>
               {/* Expand/minimize — desktop only */}
               <Button
                 variant="ghost"
@@ -1621,8 +1656,22 @@ export default function ObjectPanel({
               >
                 {containerSize === "expanded" ? <IconMinimize className="h-5 w-5 text-gray-500" /> : <IconExpand className="h-5 w-5 text-gray-500" />}
               </Button>
+              {/* Grid view: the X closes the map card; the globe opens it again. */}
+              {gridView && onGridMapToggle && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onGridMapToggle}
+                  title={gridMapHidden ? "Show map" : "Close map"}
+                  aria-label={gridMapHidden ? "Show map" : "Close map"}
+                >
+                  {gridMapHidden ? <Globe className="h-5 w-5 text-gray-500" /> : <IconClose className="h-5 w-5 text-gray-500" />}
+                </Button>
+              )}
+              </MapCardButtons>
               {/* Hide panel — desktop only */}
-              {onCloseContainer && (
+              {onCloseContainer && !gridView && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1640,7 +1689,9 @@ export default function ObjectPanel({
 
         {/* Content — objects */}
         {containerSize !== "minimized" && (
-        <div ref={scrollContainerRef} className="flex-1 overflow-auto bg-white" style={{ touchAction: "pan-y", overscrollBehaviorY: "contain" }}>
+        <div ref={scrollContainerRef}
+          className="flex-1 overflow-auto bg-white"
+          style={{ touchAction: "pan-y", overscrollBehaviorY: "contain" }}>
           <ObjectGrid
             objects={objects}
             onLoadMore={onLoadMore}
@@ -1649,8 +1700,8 @@ export default function ObjectPanel({
             isLoading={isLoading}
             onObjectClick={(longitude, latitude, index, object) => handleObjectClick(longitude, latitude, index, object)}
             onObjectHover={onObjectHover}
-            isFullscreen={containerSize === "expanded"}
-            panelSize={containerSize === "expanded" ? 100 : 40}
+            isFullscreen={unifiedPanel && containerSize === "expanded"}
+            panelSize={unifiedPanel && containerSize === "expanded" ? 100 : 40}
             mobileColumns={3}
             columns={unifiedPanel ? activeGridColumns : null}
             view={isGrid ? "grid" : "list"}
@@ -1764,9 +1815,10 @@ export default function ObjectPanel({
       data-map-cover={isMobile ? undefined : ""}
       className={`fixed ${
         isMobile
-          ? "" // all positioning/sizing handled by inline style
-          : containerSize === "expanded" ? "inset-0" : "top-8 right-8 bottom-8 shadow-lg"
-      } bg-white ${isMobile && MOBILE_FULL_SCREEN && galleryOpen ? "z-[60]" : "z-20"} overflow-hidden`}
+          ? "bg-white" // all positioning/sizing handled by inline style
+          : containerSize === "expanded" ? "inset-0 bg-white" : "top-8 right-8 bottom-8 shadow-lg bg-white"
+        // Grid view: under the side panel and the map card.
+      } ${isMobile && MOBILE_FULL_SCREEN && galleryOpen ? "z-[60]" : gridView ? "z-10" : "z-20"} overflow-hidden`}
       style={{
         ...containerStyle,
         ...(!isMobile ? { borderRadius: containerSize === "expanded" ? 0 : "1rem" } : {}),
@@ -1778,9 +1830,15 @@ export default function ObjectPanel({
       {/* Image Gallery — subtle fade + slide entrance */}
       {galleryOpen && (
         <div
+          // Grid view: on white, no shadow around the gallery (image-gallery.tsx's shadow-lg).
+          className={gridView ? "[&>div]:!shadow-none" : undefined}
           style={{
             position: "absolute",
             inset: 0,
+            // Grid view: the gallery opens as it does in the panel beside the map: in the
+            // objects' place (over the grid, the map card stays), between the cards' top and
+            // bottom margins (2rem), so it has the same height and header line in both views.
+            ...(gridView ? { top: "2rem", bottom: "2rem", left: "1rem", right: gridRight } : {}),
             zIndex: 59,
             // Mobile (full-screen panel): the gallery opens above the map at once — a fade
             // would show the panel or the map through it for a moment.

@@ -301,6 +301,10 @@ interface MapViewProps {
   // fetched once by the parent (page.tsx) and shared with CommandPalette,
   // instead of each component fetching its own copy.
   dateBuckets?: DateBucketCounts | null
+  /** Desktop grid view: the map is a card in the object panel's place (map-client.tsx). */
+  mapCard?: boolean
+  /** Desktop grid view: the page behind the side panel is white (the object grid). */
+  onWhite?: boolean
 }
 
 const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
@@ -356,6 +360,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       onCommandPaletteOpen,
       onWikiDocumentsChange,
       dateBuckets = null,
+      mapCard = false,
+      onWhite = false,
     },
     ref,
   ) => {
@@ -376,6 +382,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const prevViewStateRef = useRef(initialViewState)
     const [mapLoaded, setMapLoaded] = useState(false)
     const isMobile = useMediaQuery("(max-width: 768px)")
+    // Desktop grid view: the map is a card in the object panel's place (map-client.tsx).
+    const gridView = !isMobile && mapCard
     const sidePanelRef = useRef<HTMLDivElement>(null)
     useSharedListHeights(sidePanelRef, !isMobile)
 
@@ -1317,7 +1325,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         {/* iOS Safari'de harita arkasında beyaz background sorununu önlemek için özel bir kapsayıcı */}
         <div
           ref={mapContainer}
-          className="h-full w-full"
+          // Grid view's map card: Safari clips the WebGL canvas to rounded corners only on
+          // its own composited layer (translateZ), not through the card's overflow.
+          className={mapCard ? "h-full w-full overflow-hidden rounded-[15px] [transform:translateZ(0)]" : "h-full w-full"}
           suppressHydrationWarning
           onMouseLeave={() => {
             // deck.gl's ArcLayer onHover only clears hover state when it picks
@@ -1341,10 +1351,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         {/* Desktop map controls, bottom right as on most maps (left of the object panel,
             OBJECT_PANEL_WIDTH at right-8): back to the globe, like the breadcrumb root, and
-            zoom for those who don't scroll or pinch. Hidden under the full-page panel. */}
-        {showControls && !isMobile && !(isObjectContainerVisible && containerSize === "expanded") && (
-          <div className="absolute bottom-8 z-20 flex flex-col gap-2" data-map-cover
-            style={{ right: isObjectContainerVisible ? `calc(${OBJECT_PANEL_WIDTH} + 3rem)` : "2rem" }}>
+            zoom for those who don't scroll or pinch. In the grid view they sit inside the
+            map card. */}
+        {showControls && !isMobile && (
+          <div className="absolute z-20 flex flex-col gap-2" data-map-cover
+            style={gridView ? { right: "0.75rem", bottom: "0.75rem" }
+              : { bottom: "2rem", right: isObjectContainerVisible ? `calc(${OBJECT_PANEL_WIDTH} + 3rem)` : "2rem" }}>
             {[
               [{ label: "Global view", icon: Globe, onClick: () => onBreadcrumbClick?.("global") }],
               [
@@ -1365,8 +1377,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         )}
 
         {/* Map attribution. Desktop: bottom right, on the panels' right edge, in the
-            2rem margin under them. Phones: the bottom-left corner. */}
-        <div className={isMobile
+            2rem margin under them. Phones and the grid view's map card: the bottom-left
+            corner. */}
+        <div className={isMobile || gridView
           ? "absolute bottom-1 left-1 z-10 px-1.5 py-0.5"
           : "absolute bottom-3 right-8 z-10"}>
           {mapAttribution}
@@ -1480,10 +1493,13 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         )}
 
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
+        {/* fixed and visible: in the grid view the map is a card on the right (or closed,
+            invisible); this stays put. */}
         {!isMobile && (
-        <div className="absolute top-8 left-8 sm:w-80 z-20" data-map-cover>
+        <div className={`fixed top-8 left-8 sm:w-80 z-20 visible ${onWhite ? "rounded-2xl border border-gray-200" : ""}`} data-map-cover>
         {/* As tall as the object panel at most; its lists share the height (useSharedListHeights). */}
-        <div ref={sidePanelRef} className="bg-white rounded-2xl shadow-lg flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto">
+        {/* On white (grid view) a stroke and a light shadow, not the shadow it has on the map. */}
+        <div ref={sidePanelRef} className={`bg-white rounded-2xl ${onWhite ? "shadow-sm" : "shadow-lg"} flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto`}>
           {/* ── Breadcrumb header with controls ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. */}
@@ -1536,7 +1552,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           {!isObjectContainerVisible && (
             <div className="px-4 pb-1">
               <span className="text-sm text-gray-700 block">
-                {totalCount} indexed artifact{totalCount !== 1 ? "s" : ""}{locationName ? ` from ${locationName}` : ""}
+                {totalCount.toLocaleString("en-US")} indexed artifact{totalCount !== 1 ? "s" : ""}{locationName ? ` from ${locationName}` : ""}
               </span>
               {closedResolvedPlaceName && (
                 <span style={{ color: '#444', fontSize: '10px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }} className="block truncate">

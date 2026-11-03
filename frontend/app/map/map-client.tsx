@@ -26,6 +26,7 @@ import { MAP_DEFAULT_TITLE, mapTitle, withSiteName } from "@/lib/map-title"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 import { objectsAcrossPlaces } from "@/lib/arc-total"
+import { OBJECT_PANEL_WIDTH } from "@/lib/desktop-layout"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -182,6 +183,15 @@ function MapContent() {
     if (mobileMapRef.current === "hidden") setMobileMap("card")
   }, [])
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
+  // Desktop grid view (the object panel expanded): the grid takes the map's place and the
+  // map becomes a card in the panel's place, under its header (object-panel.tsx).
+  // Its X closes the card and the grid takes its room; the side panel stays.
+  const [gridMapHidden, setGridMapHidden] = useState(false)
+  const gridView = !isMobile && isObjectContainerVisible && containerSize === "expanded"
+  const gridMapCard = gridView && !gridMapHidden
+  useEffect(() => {
+    if (containerSize !== "expanded" || !isObjectContainerVisible) setGridMapHidden(false)
+  }, [containerSize, isObjectContainerVisible])
   // A museum opened from the URL alone (?institution=, no place) starts as if it had been picked
   // in the left panel: the arc layer filters to it, like handleToggleInstitution does.
   const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({
@@ -967,6 +977,23 @@ function MapContent() {
     setFacetedFilters((f) => ({ ...f, cities: off ? [] : [site] }))
   }, [activeSite, handleToggleSite])
 
+  // World level, one collection: its objects, fetched directly (an effect would race
+  // arcObjectsLoading not being set yet).
+  const fetchGlobalInstitution = useCallback((inst: string) => {
+    const requestId = ++drillFetchIdRef.current
+    setArcObjectsLoading(true)
+    fetchObjectsByCountry(null, 1, 60, undefined, inst, false, eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra))
+      .then(result => {
+        if (requestId !== drillFetchIdRef.current) return
+        setArcObjects(result.objects)
+        setArcObjectsTotal(result.pagination?.total || 0)
+        setArcObjectsHasMore((result.pagination?.page || 1) < (result.pagination?.pageCount || 1))
+        setArcObjectsPage(1)
+      })
+      .catch(err => console.error("[GlobalInstitution] fetch failed:", err))
+      .finally(() => { if (requestId === drillFetchIdRef.current) setArcObjectsLoading(false) })
+  }, [facetedFilters.era, facetedFilters.migrationEra])
+
   const handleToggleInstitution = useCallback((inst: string) => {
     const next = activeInstitution === inst ? null : inst
     if (activeSite || activeCountry || next) centerOnPlaceArcs(activeSite || activeCountry, activeSite ? "site" : "country", next)
@@ -990,20 +1017,8 @@ function MapContent() {
 
     if (!activeCountry) {
       // Global level: fetch institution objects directly with the new value
-      // (direct call avoids useEffect timing race where arcObjectsLoading isn't set yet)
       if (next) {
-        const requestId = ++drillFetchIdRef.current
-        setArcObjectsLoading(true)
-        fetchObjectsByCountry(null, 1, 60, undefined, next, false, eraToDateFilters(facetedFilters.era, facetedFilters.migrationEra))
-          .then(result => {
-            if (requestId !== drillFetchIdRef.current) return
-            setArcObjects(result.objects)
-            setArcObjectsTotal(result.pagination?.total || 0)
-            setArcObjectsHasMore((result.pagination?.page || 1) < (result.pagination?.pageCount || 1))
-            setArcObjectsPage(1)
-          })
-          .catch(err => console.error("[GlobalInstitution] fetch failed:", err))
-          .finally(() => { if (requestId === drillFetchIdRef.current) setArcObjectsLoading(false) })
+        fetchGlobalInstitution(next)
       } else {
         setArcObjectsTotal(0)
         setArcObjectsHasMore(false)
@@ -1025,7 +1040,7 @@ function MapContent() {
         setActiveSite(null)
       }
     }
-  }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode, facetedFilters, setFacetedFilters, centerOnPlaceArcs])
+  }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode, facetedFilters, setFacetedFilters, centerOnPlaceArcs, fetchGlobalInstitution])
 
   const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
     if (level === "global") {
@@ -1099,9 +1114,17 @@ function MapContent() {
     const dropped = (values: string[], prev: string[], name: string | null) => !!name &&
       prev.some((v) => normalizePlaceKey(v) === normalizePlaceKey(name)) &&
       !values.some((v) => normalizePlaceKey(v) === normalizePlaceKey(name))
-    if (dropped(next.countries, facetedFilters.countries, activeCountry)) handleBreadcrumbClick("global")
+    if (dropped(next.countries, facetedFilters.countries, activeCountry)) {
+      handleBreadcrumbClick("global")
+      // A collection chip left on its own stays picked, as when picked at world level:
+      // its row selected, in the breadcrumb, its objects in the panel.
+      if (next.institutions.length === 1) {
+        setActiveInstitution(next.institutions[0])
+        fetchGlobalInstitution(next.institutions[0])
+      }
+    }
     else if (dropped(next.cities, facetedFilters.cities, activeSite)) handleBreadcrumbClick("country")
-  }, [facetedFilters, activeInstitution, activeCountry, activeSite, handleBreadcrumbClick, centerOnPlaceArcs])
+  }, [facetedFilters, activeInstitution, activeCountry, activeSite, handleBreadcrumbClick, centerOnPlaceArcs, fetchGlobalInstitution])
 
   // ── Command palette navigation handlers ──
   const commandPaletteHandlers: CommandPaletteHandlers = useMemo(() => ({
@@ -1505,7 +1528,7 @@ function MapContent() {
   return (
     <div className="flex h-full flex-col">
       {!hydrated && <div aria-hidden="true" className="fixed inset-0 z-[100] bg-white min-[769px]:hidden" />}
-      <div className="h-full w-full relative">
+      <div className={`h-full w-full relative ${gridView ? "bg-white" : ""}`}>
         {/* Safari tints its toolbar from a fixed element at the bottom edge, which was
             the dark map card. A white strip below the card keeps it white unless the
             map is full screen. */}
@@ -1521,8 +1544,13 @@ function MapContent() {
               } ${
                 mobileMap === "full" ? "left-0 right-0 bottom-0 h-dvh rounded-none" : "left-3 right-3 h-[40dvh] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
               } ${mobileMap === "hidden" || mobileGalleryOpen ? "translate-y-[calc(100%+24px)] opacity-0 pointer-events-none" : ""}`
+            // Grid view: the object panel's card (place, size, corners), with a stroke on white.
+            // z-30: it (and the side panel in it) lies over the panel, which is the background.
+            // Closed, it is hidden; the side panel in it stays (visible, map-view.tsx).
+            : gridView ? `fixed top-8 right-8 bottom-8 z-30 overflow-hidden rounded-2xl border border-gray-200 bg-[#111] shadow-sm ${gridMapHidden ? "invisible" : ""}`
             : "absolute inset-0"}
-          style={isMobile && mobileMap !== "full" ? { bottom: "calc(12px + env(safe-area-inset-bottom))" } : undefined}
+          style={isMobile && mobileMap !== "full" ? { bottom: "calc(12px + env(safe-area-inset-bottom))" }
+            : gridView ? { width: OBJECT_PANEL_WIDTH } : undefined}
           aria-hidden={isMobile && (mobileMap === "hidden" || mobileGalleryOpen) ? true : undefined}
         >
         <MapView
@@ -1577,6 +1605,8 @@ function MapContent() {
           // A tap on a touch screen fires mouseenter and no mouseleave: the hover would stick.
           hoveredObjectPlace={canHover ? hoveredObjectPlace : null}
           dateBuckets={dateBuckets}
+          mapCard={gridMapCard}
+          onWhite={gridView}
         />
         {isMobile && (
           <>
@@ -1711,6 +1741,8 @@ function MapContent() {
             mapOpen={mobileMap !== "hidden"}
             onMapToggle={() => setMobileMap((m) => (m === "hidden" ? "card" : "hidden"))}
             onGalleryOpenChange={setMobileGalleryOpen}
+            gridMapHidden={gridMapHidden}
+            onGridMapToggle={() => setGridMapHidden((h) => !h)}
           />
         )}
 

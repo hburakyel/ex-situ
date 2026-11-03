@@ -534,9 +534,10 @@ export function FilterChips({
     (facetedFilters.era ? 1 : 0) + (facetedFilters.migrationEra ? 1 : 0)
   if (count === 0 && !precisePlace) return null
   const chip = (key: string, label: string, onRemove: () => void, tone: string, hover: string) => (
-    <span key={key} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm ${tone}`}>
-      {label}
-      <button type="button" onClick={onRemove} className={`rounded-md p-0.5 ${hover}`} aria-label={`Remove filter ${label}`} title="Remove filter">
+    // One line, as in the object panel; a long name is cut short (whole on hover).
+    <span key={key} className={`inline-flex max-w-full min-w-0 items-center gap-1 px-2 py-0.5 rounded-md text-sm ${tone}`}>
+      <span className="truncate" title={label}>{label}</span>
+      <button type="button" onClick={onRemove} className={`shrink-0 rounded-md p-0.5 ${hover}`} aria-label={`Remove filter ${label}`} title="Remove filter">
         <IconClose className="w-2.5 h-2.5" />
       </button>
     </span>
