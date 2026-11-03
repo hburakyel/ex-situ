@@ -9,7 +9,7 @@ import { eraToDateFilters, type EraDateFilters } from "@/lib/era-buckets"
 import type { MuseumObject, MapBounds, SelectedArc } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { AlertTriangle } from "lucide-react"
-import { IconClose, IconExpand, IconMinimize } from "@/components/icons"
+import { IconArtifacts, IconClose, IconExpand, IconMinimize } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -1683,6 +1683,25 @@ function MapContent() {
           </>
         )}
         </div>
+
+        {/* Desktop, object panel closed: the artifacts come back from where the panel's
+            buttons were (top right), as the full-page grid's globe brings the map back.
+            Two cards, not a grid: the squares are the Display menu's. */}
+        {!isMobile && !isObjectContainerVisible && (
+          <div className="fixed z-20 rounded-xl bg-white/95 p-1 shadow-sm"
+            style={{ top: "calc(2.5rem - 0.25rem)", right: "calc(3rem - 0.25rem)" }}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setIsObjectContainerVisible(true)}
+              title="Show artifacts"
+              aria-label="Show artifacts"
+            >
+              <IconArtifacts className="h-5 w-5 text-gray-500" />
+            </Button>
+          </div>
+        )}
 
         {/* Floating object container — images only (+ header on mobile) */}
         {isObjectContainerVisible && (

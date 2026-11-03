@@ -454,6 +454,69 @@ export const IconGridSize: React.FC<IconProps & { columns?: number }> = ({
 }
 IconGridSize.displayName = "IconGridSize"
 
+/* ── Home (house outline, no door) ─────────────────────────────────────── */
+// The map's "back to the start" control. Lucide's house (ISC) without its door.
+
+export const IconHome: React.FC<IconProps> = ({
+  width = 24,
+  height = 24,
+  className,
+  ...props
+}) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    {...props}
+  >
+    <path
+      d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+IconHome.displayName = "IconHome"
+
+/* ── Artifacts (two cards, one tilted behind) ───────────────────────────── */
+// "Show artifacts" (the object panel). Ex Situ's own drawing: the front card hides
+// the part of the tilted card behind it.
+
+export const IconArtifacts: React.FC<IconProps> = ({
+  width = 24,
+  height = 24,
+  className,
+  ...props
+}) => {
+  const id = React.useId()
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      {...props}
+    >
+      <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+        <rect width="24" height="24" fill="white" />
+        <rect x="2.5" y="5.5" width="14" height="17" rx="3" fill="black" />
+      </mask>
+      <g mask={`url(#${id})`}>
+        <rect x="8" y="2.5" width="12" height="15" rx="2" transform="rotate(8 14 10)" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" />
+      </g>
+      <rect x="4" y="7" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" />
+    </svg>
+  )
+}
+IconArtifacts.displayName = "IconArtifacts"
+
 /* ── Raw SVG strings for non-React contexts (Mapbox IControl) ───────────── */
 
 export const iconSvgStrings = {

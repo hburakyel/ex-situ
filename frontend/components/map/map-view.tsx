@@ -9,10 +9,10 @@ import { Protocol } from "pmtiles"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
-import { ChevronDown, ChevronUp, Globe, Info, Minus, Plus } from "lucide-react"
+import { ChevronDown, ChevronUp, Info, Minus, Plus } from "lucide-react"
 import { useScrollFades } from "@/hooks/use-scroll-fades"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
-import { iconSvgStrings, IconClose } from "@/components/icons"
+import { iconSvgStrings, IconClose, IconHome } from "@/components/icons"
 import SearchBar from "./search-bar"
 import { AboutText, FilterChips } from "./info-panel"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
@@ -1359,7 +1359,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             style={gridView ? { right: "0.75rem", bottom: "0.75rem" }
               : { bottom: "2rem", right: isObjectContainerVisible ? `calc(${OBJECT_PANEL_WIDTH} + 3rem)` : "2rem" }}>
             {[
-              [{ label: "Global view", icon: Globe, onClick: () => onBreadcrumbClick?.("global") }],
+              // A house, "back to the start" (as the breadcrumb root): the globe is "show map".
+              [{ label: "Back to the start", icon: IconHome, onClick: () => onBreadcrumbClick?.("global") }],
               [
                 { label: "Zoom in", icon: Plus, onClick: () => map.current?.zoomIn() },
                 { label: "Zoom out", icon: Minus, onClick: () => map.current?.zoomOut() },

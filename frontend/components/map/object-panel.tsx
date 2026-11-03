@@ -1667,6 +1667,7 @@ export default function ObjectPanel({
                   title={gridMapHidden ? "Show map" : "Close map"}
                   aria-label={gridMapHidden ? "Show map" : "Close map"}
                 >
+                  {/* The globe is the map (as on phones); "back to the start" is the house. */}
                   {gridMapHidden ? <Globe className="h-5 w-5 text-gray-500" /> : <IconClose className="h-5 w-5 text-gray-500" />}
                 </Button>
               )}
