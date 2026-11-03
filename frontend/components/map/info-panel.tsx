@@ -2,6 +2,7 @@
 // This file should contain only the info panel UI/logic, not the object grid or gallery.
 
 import React from "react"
+import { pressable, PRESSABLE_FOCUS } from "@/lib/pressable"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Globe, Info, Search } from "lucide-react"
@@ -400,8 +401,9 @@ export default function InfoPanel({
                   {showOrigins && (
                     <FadedAccordionList>
                         {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5"
+                          <div key={index} className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5`}
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
+                            {...pressable(() => onOriginClick?.(origin.country, origin.lat, origin.lng))}
                           >
                             <span className="truncate max-w-[70%]" title={origin.country}>{origin.country}</span>
                             <span className="ml-2 text-gray-500 text-sm">{formatCount(origin.totalCount)}</span>
@@ -424,9 +426,10 @@ export default function InfoPanel({
                         {groupedSites.map((site, index) => (
                           <React.Fragment key={index}>
                           <div
-                            className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeSite === site.name ? "bg-gray-300" : ""}`}
+                            className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeSite === site.name ? "bg-gray-300" : ""}`}
                             data-active-site={activeSite === site.name || undefined}
                             onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
+                            {...pressable(() => onToggleSite?.(site.name, site.lat, site.lng), activeSite === site.name)}
                           >
                             <span className="truncate max-w-[70%]" title={site.name}>{siteRowLabel(site.name, activeCountry, siteLabels)}</span>
                             <span className="ml-2 text-gray-500 text-sm">{formatCount(site.totalCount)}</span>
@@ -457,8 +460,9 @@ export default function InfoPanel({
                           .filter((row) => row.count > 0)
                           .map((row) => (
                             <div key={row.id}
-                              className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-300" : ""}`}
+                              className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-300" : ""}`}
                               onClick={() => onToggleEra?.(row.era)}
+                              {...pressable(() => onToggleEra?.(row.era), facetedFilters.era?.id === row.id)}
                             >
                               <span className="truncate max-w-[70%]" title={row.label}>{row.label}</span>
                               <span className="ml-2 text-gray-500 text-sm">{formatCount(row.count)}</span>
@@ -479,8 +483,9 @@ export default function InfoPanel({
                     <FadedAccordionList>
                         {drillInstitutions.map((inst, index) => (
                           <div key={index}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeInstitution === inst.name ? "bg-gray-300" : ""}`}
+                            className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeInstitution === inst.name ? "bg-gray-300" : ""}`}
                             onClick={() => onToggleInstitution?.(inst.name)}
+                            {...pressable(() => onToggleInstitution?.(inst.name), activeInstitution === inst.name)}
                           >
                             <span className="truncate max-w-[70%]" title={inst.name}>{inst.name}</span>
                             <span className="ml-2 text-gray-500 text-sm">{formatCount(inst.count)}</span>
@@ -537,8 +542,10 @@ export function FilterChips({
     // One line, as in the object panel; a long name is cut short (whole on hover).
     <span key={key} className={`inline-flex max-w-full min-w-0 items-center gap-1 px-2 py-0.5 rounded-md text-sm ${tone}`}>
       <span className="truncate" title={label}>{label}</span>
-      <button type="button" onClick={onRemove} className={`shrink-0 rounded-md p-0.5 ${hover}`} aria-label={`Remove filter ${label}`} title="Remove filter">
-        <IconClose className="w-2.5 h-2.5" />
+      {/* 24px to hit (WCAG 2.5.8; in px, as rem is 15px here), the chip no taller: the
+          margins take the extra back. */}
+      <button type="button" onClick={onRemove} className={`-my-[5px] -mr-[6px] flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-md ${hover}`} aria-label={`Remove filter ${label}`} title="Remove filter">
+        <IconClose className="w-3.5 h-3.5" />
       </button>
     </span>
   )

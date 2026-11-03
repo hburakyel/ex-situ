@@ -1831,14 +1831,15 @@ export default function ObjectPanel({
       {galleryOpen && (
         <div
           // Grid view: on white, no shadow around the gallery (image-gallery.tsx's shadow-lg).
-          className={gridView ? "[&>div]:!shadow-none" : undefined}
+          className={gridView ? "[&>div>div]:!shadow-none" : undefined}
           style={{
             position: "absolute",
             inset: 0,
             // Grid view: the gallery opens as it does in the panel beside the map: in the
             // objects' place (over the grid, the map card stays), between the cards' top and
             // bottom margins (2rem), so it has the same height and header line in both views.
-            ...(gridView ? { top: "2rem", bottom: "2rem", left: "1rem", right: gridRight } : {}),
+            // Its white reaches the bottom edge, so the grid doesn't show below it.
+            ...(gridView ? { top: "2rem", bottom: 0, left: "1rem", right: gridRight, background: "white" } : {}),
             zIndex: 59,
             // Mobile (full-screen panel): the gallery opens above the map at once — a fade
             // would show the panel or the map through it for a moment.
@@ -1848,6 +1849,7 @@ export default function ObjectPanel({
             pointerEvents: galleryVisible || (isMobile && MOBILE_FULL_SCREEN) ? "auto" : "none",
           }}
         >
+          <div className="absolute inset-0" style={gridView ? { bottom: "2rem" } : undefined}>
           <ImageGallery
             key={galleryKey}
             objects={galleryArtifact ? [galleryArtifact] : (gallerySnapshot.current.length > 0 ? gallerySnapshot.current : galleryObjects)}
@@ -1856,6 +1858,7 @@ export default function ObjectPanel({
             isFullscreen={containerSize === "expanded"}
             isMobile={isMobile}
           />
+          </div>
         </div>
       )}
     </div>

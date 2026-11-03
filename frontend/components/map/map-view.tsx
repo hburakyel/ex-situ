@@ -1,5 +1,6 @@
 "use client"
 import "maplibre-gl/dist/maplibre-gl.css"
+import { pressable, PRESSABLE_FOCUS } from "@/lib/pressable"
 
 import type React from "react"
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, useMemo, Fragment } from "react"
@@ -1595,8 +1596,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   <div className="mt-1">
                     <HeaderAccordionList>
                       {groupedOrigins.map((origin, index) => (
-                          <div key={index} className="flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5"
+                          <div key={index} className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5`}
                             onClick={() => onOriginClick?.(origin.country, origin.lat, origin.lng)}
+                            {...pressable(() => onOriginClick?.(origin.country, origin.lat, origin.lng))}
                             {...listHoverProps("country", origin.country)}
                           >
                             <Tooltip>
@@ -1634,9 +1636,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                       {groupedSites.map((site, index) => (
                         <Fragment key={index}>
                         <div
-                          className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${isActiveSiteRow(site.name) ? "bg-gray-300" : ""}`}
+                          className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5 ${isActiveSiteRow(site.name) ? "bg-gray-300" : ""}`}
                           data-active-site={isActiveSiteRow(site.name) || undefined}
                           onClick={() => onToggleSite?.(site.name, site.lat, site.lng)}
+                          {...pressable(() => onToggleSite?.(site.name, site.lat, site.lng), isActiveSiteRow(site.name))}
                           {...listHoverProps("site", site.name)}
                         >
                           <Tooltip>
@@ -1682,8 +1685,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                         .filter((row) => row.count > 0)
                         .map((row) => (
                           <div key={row.id}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-300" : ""}`}
+                            className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5 ${facetedFilters.era?.id === row.id ? "bg-gray-300" : ""}`}
                             onClick={() => toggleEra(row.era)}
+                            {...pressable(() => toggleEra(row.era), facetedFilters.era?.id === row.id)}
                           >
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -1718,8 +1722,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                     <HeaderAccordionList>
                       {drillInstitutions.map((inst, index) => (
                         <div key={index}
-                          className={`flex justify-between cursor-pointer hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeInstitution === inst.name ? "bg-gray-300" : ""}`}
+                          className={`flex justify-between cursor-pointer ${PRESSABLE_FOCUS} hover:bg-gray-200 rounded-md px-2 py-0.5 ${activeInstitution === inst.name ? "bg-gray-300" : ""}`}
                           onClick={() => onToggleInstitution?.(inst.name)}
+                          {...pressable(() => onToggleInstitution?.(inst.name), activeInstitution === inst.name)}
                           {...listHoverProps("institution", inst.name)}
                         >
                           <Tooltip>

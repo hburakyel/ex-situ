@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { pressable, PRESSABLE_FOCUS } from "@/lib/pressable"
 import type { MuseumObject } from "../types"
 import ObjectImage from "@/components/object-image"
 import { resolveImageSrc, THUMB_WIDTH } from "@/lib/image-src"
@@ -391,6 +392,14 @@ export default function ObjectGrid({
     }
   }, [objects.length])
 
+  // What a screen reader says for a tile: its inventory number (or, on the world view's
+  // arc previews, origin and collection), then origin and collection.
+  const tileLabel = (object: MuseumObject) => {
+    const at = object.attributes
+    const name = at.inventory_number || at.title || ""
+    return [name, originFromLabel(at), at.institution_name].filter(Boolean).join(", ") || "Artifact"
+  }
+
   const handleImageClick = (index: number) => {
     const object = visibleObjects[index]
     if (!object) return
@@ -447,8 +456,10 @@ return (
         return (
           <div
             key={object.id}
-            className="group flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-gray-200"
+            className={`group flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-gray-200 ${PRESSABLE_FOCUS}`}
             onClick={() => handleImageClick(index)}
+            {...pressable(() => handleImageClick(index))}
+            aria-label={[title, detail].filter(Boolean).join(", ")}
             onMouseEnter={() => onObjectHover(at.place_name || null)}
             onMouseLeave={() => onObjectHover(null)}
           >
@@ -488,9 +499,11 @@ if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStat
   return (
     <div
       key={object.id}
-      className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileSizeClass}`}
+      className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center rounded-[4px] ${PRESSABLE_FOCUS} ${tileSizeClass}`}
       style={tileHeight ? { height: tileHeight } : undefined}
       onClick={() => handleImageClick(index)}
+      {...pressable(() => handleImageClick(index))}
+      aria-label={tileLabel(object)}
       onMouseEnter={() => {
         setSelectedImageId(object.id)
         onObjectHover(object.attributes.place_name || null)
@@ -518,9 +531,11 @@ if (isWithdrawn(object) || !hasImageUrl(object.attributes?.img_url) || imageStat
 return (
   <div
     key={object.id}
-    className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center ${tileSizeClass}`}
+    className={`group relative cursor-pointer transition-all duration-200 bg-white p-1 flex items-center justify-center rounded-[4px] ${PRESSABLE_FOCUS} ${tileSizeClass}`}
     style={tileHeight ? { height: tileHeight } : undefined}
     onClick={() => handleImageClick(index)}
+    {...pressable(() => handleImageClick(index))}
+    aria-label={tileLabel(object)}
     onMouseEnter={() => {
       setSelectedImageId(object.id)
       onObjectHover(object.attributes.place_name || null)
