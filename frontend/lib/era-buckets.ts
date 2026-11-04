@@ -122,6 +122,16 @@ function bucketOverlapsSpan(bucket: EraBucket, span: DateSpan): boolean {
 }
 
 /**
+ * The only spans collapseContiguousBuckets can use: those whose count equals that of a
+ * century bucket they overlap, at most one per bucket (a bucket's count is the sum of the
+ * spans overlapping it). The other thousands stay out of the browser's download.
+ */
+export function usableDateSpans(bucketCounts: Record<string, number>, spans: DateSpan[]): DateSpan[] {
+  const centuries = ERA_BUCKETS.filter((b) => isCenturyBucketId(b.id) && (bucketCounts[b.id] ?? 0) > 0)
+  return spans.filter((s) => centuries.some((b) => bucketCounts[b.id] === s.count && bucketOverlapsSpan(b, s)))
+}
+
+/**
  * Collapse a run of contiguous century buckets into one combined row when
  * they all trace back to the exact same object(s) — e.g. an object dated
  * "9th–14th century" currently repeats its count in every one of those 6

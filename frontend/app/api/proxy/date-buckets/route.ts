@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { usableDateSpans } from "@/lib/era-buckets"
 
 // Simple in-memory cache — bucket counts only change when the underlying
 // data changes, so a short cache is plenty and keeps repeated
@@ -42,6 +43,10 @@ export async function GET(request: NextRequest) {
     })
     if (!response.ok) throw new Error(`API error: ${response.status}`)
     const data = await response.json()
+    if (Array.isArray(data.objectDateSpans) && Array.isArray(data.objectDateBuckets)) {
+      const counts = Object.fromEntries(data.objectDateBuckets.map((b: { id: string; count: number }) => [b.id, b.count]))
+      data.objectDateSpans = usableDateSpans(counts, data.objectDateSpans)
+    }
 
     responseCache.set(cacheKey, { data, timestamp: Date.now() })
     if (responseCache.size > 50) {
