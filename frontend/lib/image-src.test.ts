@@ -3,17 +3,29 @@ import { aicInfoUrl, aicUrlAtWidth, LARGE_WIDTH, resolveImageSrc } from "./image
 
 describe("resolveImageSrc", () => {
   it("maps dead recherche.smb.museum URLs to search.smb.museum", () => {
-    expect(resolveImageSrc("https://recherche.smb.museum/images/41/4109986_1000x1000.jpg")).toBe(
+    expect(resolveImageSrc("https://recherche.smb.museum/images/41/4109986_1000x1000.jpg", LARGE_WIDTH)).toBe(
       "https://search.smb.museum/media/images/thumbs/extra_large/109/004/4109986.jpg",
     )
     expect(resolveImageSrc("https://recherche.smb.museum/images/12/123456_1000x1000.jpg")).toBe(
-      "https://search.smb.museum/media/images/thumbs/extra_large/123/123456.jpg",
+      "https://search.smb.museum/media/images/thumbs/large/123/123456.jpg",
     )
   })
 
-  it("leaves search.smb.museum URLs alone", () => {
+  it("uses the 600px rendition for thumbnails and keeps the 1200px one for large views", () => {
     const u = "https://search.smb.museum/media/images/thumbs/extra_large/273/004/4273901.jpg"
-    expect(resolveImageSrc(u)).toBe(u)
+    expect(resolveImageSrc(u)).toBe("https://search.smb.museum/media/images/thumbs/large/273/004/4273901.jpg")
+    expect(resolveImageSrc(u, LARGE_WIDTH)).toBe(u)
+  })
+})
+
+describe("resolveImageSrc — V&A (framemark IIIF)", () => {
+  const stored = "https://framemark.vam.ac.uk/collections/2006AC8460/full/!800,800/0/default.jpg"
+
+  it("fits thumbnails in a 600px box", () => {
+    expect(resolveImageSrc(stored)).toBe("https://framemark.vam.ac.uk/collections/2006AC8460/full/!600,600/0/default.jpg")
+  })
+  it("keeps the stored box for large views", () => {
+    expect(resolveImageSrc(stored, LARGE_WIDTH)).toBe(stored)
   })
 })
 

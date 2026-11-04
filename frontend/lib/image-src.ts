@@ -15,6 +15,11 @@
 // - id.smb.museum: hotlink-blocks headerless requests; proxied for the same reason.
 // - www.weltmuseumwien.at: /pics/ files are the full-size scans (often 300 KB+) and
 //   the page's own thumbnails have hashed names; proxied so tiles are resized.
+// - search.smb.museum: stored URLs are the 1200px "extra_large"; "large" is 600px and
+//   about a third of the bytes (checked on a sample of 60 records).
+// - framemark.vam.ac.uk: stored URLs ask for an 800px box; tiles take 600.
+// - upload.wikimedia.org is left alone: a width other than the stored 960px mostly
+//   answers 429, and a failed tile falls back to its inventory number.
 // - ids.si.edu (Smithsonian): stored URLs have no size; "max" asks for a web-sized one.
 // - recherche.smb.museum: dead (301 to the homepage). Rows not yet remapped by
 //   etl/refetch_smb_image_urls.py point there; the same asset lives on
@@ -32,12 +37,12 @@ const AIC_LARGE_WIDTH = 843
 
 // search.smb.museum buckets assets as dir1 = (id/1000) % 1000, dir2 = id/1e6
 // (left out when 0) — same layout as compute_search_url in the ETL.
-function smbSearchUrl(assetId: number): string {
+function smbSearchUrl(assetId: number, rendition: "large" | "extra_large"): string {
   const q1 = Math.floor(assetId / 1000)
   const pad = (n: number) => String(n).padStart(3, "0")
   const dir2 = Math.floor(q1 / 1000)
   const dirs = dir2 === 0 ? pad(q1 % 1000) : `${pad(q1 % 1000)}/${pad(dir2)}`
-  return `https://search.smb.museum/media/images/thumbs/extra_large/${dirs}/${assetId}.jpg`
+  return `https://search.smb.museum/media/images/thumbs/${rendition}/${dirs}/${assetId}.jpg`
 }
 
 // AIC refuses (403, sometimes 500) a width above the source's own. info.json
@@ -60,7 +65,17 @@ export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): strin
 
   if (url.hostname === "recherche.smb.museum") {
     const m = url.pathname.match(/\/(\d+)(?:_\d+x\d+)?\.jpe?g$/i)
-    if (m) return smbSearchUrl(Number(m[1]))
+    if (m) return smbSearchUrl(Number(m[1]), width <= THUMB_WIDTH ? "large" : "extra_large")
+  }
+
+  if (url.hostname === "search.smb.museum" && width <= THUMB_WIDTH) {
+    url.pathname = url.pathname.replace("/thumbs/extra_large/", "/thumbs/large/")
+    return url.toString()
+  }
+
+  if (url.hostname === "framemark.vam.ac.uk" && width <= THUMB_WIDTH) {
+    url.pathname = url.pathname.replace("/full/!800,800/", "/full/!600,600/")
+    return url.toString()
   }
 
   if (url.hostname === "images.metmuseum.org" && url.pathname.includes("/original/")) {
