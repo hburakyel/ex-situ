@@ -116,7 +116,6 @@ interface ObjectPanelProps {
   onToggleInstitution?: (inst: string) => void
   isLoadingSubArcs?: boolean
   locationName?: string
-  geocodedName?: string
   arcCount?: number
   collectionCount?: number
   allObjects?: MuseumObject[]
@@ -195,7 +194,6 @@ export default function ObjectPanel({
   onToggleInstitution,
   isLoadingSubArcs = false,
   locationName,
-  geocodedName,
   arcCount = 0,
   collectionCount = 0,
   allObjects = [],
@@ -729,11 +727,6 @@ export default function ObjectPanel({
   const toggleEra = useCallback((bucket: EraBucket) => {
     onFacetedFiltersChange?.({ ...facetedFilters, era: facetedFilters.era?.id === bucket.id ? null : bucket })
   }, [facetedFilters, onFacetedFiltersChange])
-
-   // Display name: only show geocoded name (not locationName fallback)
-  const displayName = geocodedName || ''
-  // Show resolved line when both names exist and differ
-  const showResolved = !!(geocodedName && locationName && geocodedName.toLowerCase() !== locationName.toLowerCase())
 
   // Match museum objects to wiki link cards by place/origin overlap
   const wikiLinks = useMemo(() => {

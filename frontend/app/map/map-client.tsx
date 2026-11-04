@@ -13,7 +13,6 @@ import { IconClose, IconExpand, IconMinimize } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import debounce from "lodash/debounce"
 import { useUnifiedSearch, type ArcData } from "@/hooks/use-unified-search"
 import ObjectImage from "@/components/object-image"
 import { Spinner } from "@/components/ui/spinner"
@@ -146,7 +145,6 @@ function MapContent() {
   const [totalCount, setTotalCount] = useState(0)
   const [currentBounds, setCurrentBounds] = useState<MapBounds | null>(null)
   const [locationName, setLocationName] = useState("")
-  const [geocodedName, setGeocodedName] = useState("")
   const [isRateLimited, setIsRateLimited] = useState(false)
   const mapRef = useRef<any>(null)
   const isMobile = useMediaQuery("(max-width: 768px)")
@@ -889,28 +887,6 @@ function MapContent() {
     fetchDrillObjects(arcObjectsPage + 1, true)
   }, [arcObjectsHasMore, arcObjectsLoading, arcObjectsPage, fetchDrillObjects])
 
-  // Reverse geocode — always runs to show geocoded name in object panel
-  const geocodeAbort = useRef<AbortController | null>(null)
-  const debouncedGeocode = useRef(
-    debounce(async (lng: number, lat: number) => {
-      // Abort any in-flight request to prevent stale responses overwriting
-      geocodeAbort.current?.abort()
-      const controller = new AbortController()
-      geocodeAbort.current = controller
-      try {
-        const params = new URLSearchParams({ lng: lng.toString(), lat: lat.toString() })
-        const res = await fetch(`/api/geocode?${params.toString()}`, { signal: controller.signal })
-        const data = await res.json()
-        // Use place_name (full: "Bergama, İzmir, Turkey") instead of text ("Bergama")
-        setGeocodedName(data?.features?.[0]?.place_name || data?.features?.[0]?.text || "")
-      } catch (e: any) {
-        if (e?.name === 'AbortError') return // ignore aborted requests
-        setGeocodedName("")
-      }
-    }, 800)
-  ).current
-  useEffect(() => () => { debouncedGeocode.cancel(); geocodeAbort.current?.abort() }, [debouncedGeocode])
-
   // ── Drill-down handlers ──
   const handleOriginClick = useCallback((country: string, lat?: number, lng?: number) => {
     // Reopen the object panel only when this is a genuinely new selection —
@@ -928,15 +904,12 @@ function MapContent() {
     setActiveInstitution(keptInstitution)
     setDrillLevel("country")
     drillLevelRef.current = "country"  // sync ref immediately
-    debouncedGeocode.cancel()           // cancel any pending reverse-geocode
-    geocodeAbort.current?.abort()        // abort in-flight fetch
-    setGeocodedName("")                   // clear stale geocoded name immediately
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setLocationName(country)
     // Frame the arcs that are drawn: with a collection kept, only those into it.
     centerOnPlaceArcs(country, "country", keptInstitution)
-  }, [debouncedGeocode, facetedFilters.institutions, centerOnPlaceArcs])
+  }, [facetedFilters.institutions, centerOnPlaceArcs])
 
   const handleToggleSite = useCallback((site: string, lat?: number, lng?: number) => {
     const next = normalizePlaceKey(activeSite) === normalizePlaceKey(site) ? null : site
@@ -948,9 +921,6 @@ function MapContent() {
     const nextLevel = next ? "objects" : "country"
     setDrillLevel(nextLevel)
     drillLevelRef.current = nextLevel
-    debouncedGeocode.cancel()
-    geocodeAbort.current?.abort()
-    setGeocodedName("")
     setLocationName(next || activeCountry || "")
     // Clear institution if the site doesn't have it
     let keptInstitution = activeInstitution || (facetedFilters.institutions.length === 1 ? facetedFilters.institutions[0] : null)
@@ -968,7 +938,7 @@ function MapContent() {
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setArcObjectsPage(1)
-  }, [activeSite, activeInstitution, groupedSites, activeCountry, debouncedGeocode, facetedFilters, centerOnPlaceArcs])
+  }, [activeSite, activeInstitution, groupedSites, activeCountry, facetedFilters, centerOnPlaceArcs])
 
   // A pick in the Places/Sites lists shows its chip, like the same pick in the search palette.
   const pickOrigin = useCallback((country: string, lat?: number, lng?: number) => {
@@ -1009,9 +979,6 @@ function MapContent() {
     drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
     setArcObjects([])
     setArcObjectsPage(1)
-    debouncedGeocode.cancel()
-    geocodeAbort.current?.abort()
-    setGeocodedName("")
     // Left-panel institution clicks are single-select and replace whatever was
     // there — mirrors the drill-only activeInstitution toggle above, but also
     // writes into facetedFilters so the arc layer actually filters (same
@@ -1044,7 +1011,7 @@ function MapContent() {
         setActiveSite(null)
       }
     }
-  }, [activeInstitution, activeSite, subArcs, activeCountry, debouncedGeocode, facetedFilters, setFacetedFilters, centerOnPlaceArcs, fetchGlobalInstitution])
+  }, [activeInstitution, activeSite, subArcs, activeCountry, facetedFilters, setFacetedFilters, centerOnPlaceArcs, fetchGlobalInstitution])
 
   const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
     if (level === "global") {
@@ -1054,9 +1021,6 @@ function MapContent() {
       setActiveInstitution(null)
       setDrillLevel("global")
       drillLevelRef.current = "global"
-      debouncedGeocode.cancel()
-      geocodeAbort.current?.abort()
-      setGeocodedName("")
       drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setArcObjectsTotal(0)
@@ -1071,7 +1035,6 @@ function MapContent() {
         const home = isMobile ? MOBILE_HOME_VIEW : DESKTOP_HOME_VIEW
         mapRef.current.flyToLocation(home.lng, home.lat, home.zoom, 1800)
         setViewState({ longitude: home.lng, latitude: home.lat, zoom: home.zoom, name: "" })
-        debouncedGeocode(home.lng, home.lat)
       }
     } else if (level === "country") {
       setSelectedArc(null)
@@ -1079,9 +1042,6 @@ function MapContent() {
       setActiveInstitution(null)
       setDrillLevel("country")
       drillLevelRef.current = "country"
-      debouncedGeocode.cancel()
-      geocodeAbort.current?.abort()
-      setGeocodedName("")
       setLocationName(activeCountry || "")
       setFacetedFilters((f) => ({ ...f, cities: [] }))
       drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
@@ -1089,7 +1049,7 @@ function MapContent() {
       setArcObjectsPage(1)
       if (activeCountry) centerOnPlaceArcs(activeCountry, "country")
     }
-  }, [activeCountry, debouncedGeocode, isMobile, centerOnPlaceArcs])
+  }, [activeCountry, isMobile, centerOnPlaceArcs])
 
   // Faceted filter chips (places/collections/time from the search palette or
   // filter chip UI) — reopen the panel only when a filter is newly added,
@@ -1135,10 +1095,8 @@ function MapContent() {
     onNavigatePlace: (longitude: number, latitude: number, name: string) => {
       setViewState({ longitude, latitude, zoom: 10, name })
       setLocationName(name)
-      setGeocodedName("")
       if (mapRef.current) {
         mapRef.current.flyToLocation(longitude, latitude, 10, 1400)
-        debouncedGeocode(longitude, latitude)
       }
     },
     onNavigateSite: (rawCountry: string, site: string, lat: number, lng: number) => {
@@ -1150,7 +1108,6 @@ function MapContent() {
         if (mapRef.current && hasValidCoordinates(lat, lng)) {
           mapRef.current.flyToLocation(lng, lat, 10, 1400)
           setViewState(prev => ({ ...prev, longitude: lng, latitude: lat, zoom: 10 }))
-          debouncedGeocode(lng, lat)
         }
         return
       }
@@ -1165,9 +1122,8 @@ function MapContent() {
       setActiveSite(site)
       setActiveInstitution(null)
       setDrillLevel("objects")
-      drillLevelRef.current = "objects"  // prevents any pending reverse-geocode from overwriting
+      drillLevelRef.current = "objects"
       setLocationName(site || country)
-      setGeocodedName("")
       drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
       setArcObjectsPage(1)
@@ -1177,7 +1133,7 @@ function MapContent() {
     onToggleSite: handleToggleSite,
     onToggleInstitution: handleToggleInstitution,
     onOpenArtifact: (id: number) => openArtifactById(id),
-  }), [handleOriginClick, handleToggleSite, handleToggleInstitution, cityArcData, debouncedGeocode, openArtifactById, centerOnPlaceArcs])
+  }), [handleOriginClick, handleToggleSite, handleToggleInstitution, cityArcData, openArtifactById, centerOnPlaceArcs])
 
   // Bbox fetch for zoomed-in objects
   const fetchObjects = useCallback(async (bounds: MapBounds, page: number, reset = false) => {
@@ -1222,9 +1178,7 @@ function MapContent() {
     const centerLat = (bounds.north + bounds.south) / 2
     // Update viewState for URL sync (no flyTo feedback — initialViewState effect is bookkeeping only)
     setViewState(prev => ({ ...prev, longitude: centerLng, latitude: centerLat, zoom }))
-    // Always reverse-geocode to keep the header accurate
-    debouncedGeocode(centerLng, centerLat)
-  }, [fetchObjects, isRateLimited, debouncedGeocode, hasActiveFacetFilters])
+  }, [fetchObjects, isRateLimited, hasActiveFacetFilters])
 
   // Clear stale unfiltered bbox objects the instant a filter is applied while
   // zoomed in — otherwise containerObjects keeps showing the last unfiltered
@@ -1253,7 +1207,6 @@ function MapContent() {
   const handleLocationFound = useCallback((longitude: number, latitude: number, name: string) => {
     setViewState({ longitude, latitude, zoom: 10, name })
     setLocationName(name)
-    setGeocodedName("")
   }, [])
 
   // ── Arc selection from header panel → triggers drill-down to site level ──
@@ -1273,10 +1226,7 @@ function MapContent() {
       // clears a precise place picked before (it would filter this route to zero).
       setPrecisePick(site && arc.precise ? { site, name: arc.precise } : null)
       setDrillLevel(site ? "objects" : "country")
-      drillLevelRef.current = site ? "objects" : "country"  // sync ref immediately to prevent stale closure geocode
-      debouncedGeocode.cancel()           // cancel any pending reverse-geocode
-      geocodeAbort.current?.abort()        // abort in-flight fetch
-      setGeocodedName("")                   // clear stale geocoded name immediately
+      drillLevelRef.current = site ? "objects" : "country"  // sync ref immediately to prevent a stale closure
       setIsObjectContainerVisible(true)
       setLocationName(site || country)
       // An arc pick shows its chips, like the same pick in the lists.
@@ -1293,7 +1243,6 @@ function MapContent() {
       setDrillLevel("global")
       drillFetchIdRef.current++ // invalidate any in-flight drill fetch from the previous scope
       setArcObjects([])
-      setGeocodedName("")
       setFacetedFilters((f) => ({ ...f, countries: [], cities: [], institutions: [] }))
     }
   }, [])
@@ -1332,7 +1281,6 @@ function MapContent() {
       const fallbackZoom = Math.min(Math.max(currentZoomRef.current, 5), 6)
       mapRef.current.flyToLocation(longitude, latitude, fallbackZoom, 1200)
       setViewState(prev => ({ ...prev, longitude, latitude, zoom: fallbackZoom }))
-      debouncedGeocode(longitude, latitude)
       return
     }
 
@@ -1400,15 +1348,13 @@ function MapContent() {
     const targetZoom = artifactZoom(object)
     mapRef.current.flyToLocation(longitude, latitude, targetZoom, 1200)
     setViewState(prev => ({ ...prev, longitude, latitude, zoom: targetZoom }))
-    debouncedGeocode(longitude, latitude)
-  }, [groupedOrigins, handleOriginClick, debouncedGeocode])
+  }, [groupedOrigins, handleOriginClick])
 
   const handleStatsItemClick = useCallback((type: "country" | "city" | "institution", name: string, centroid?: { lat: number; lng: number }) => {
     if (centroid && mapRef.current) {
       const targetZoom = type === "country" ? 6 : type === "city" ? 10 : 12
       mapRef.current.flyToLocation(centroid.lng, centroid.lat, targetZoom, 1400)
       setViewState(prev => ({ ...prev, longitude: centroid.lng, latitude: centroid.lat, zoom: targetZoom }))
-      debouncedGeocode(centroid.lng, centroid.lat)
       if (type === "country") {
         setActiveCountry(name)
         setActiveSite(null)
@@ -1417,11 +1363,8 @@ function MapContent() {
         drillLevelRef.current = "country"
       }
       setLocationName(name)
-      setGeocodedName("")
-      debouncedGeocode.cancel()
-      geocodeAbort.current?.abort()
     }
-  }, [debouncedGeocode])
+  }, [])
 
   // Zooming out keeps the selection: a country's arcs are seen whole only from the
   // world view. The breadcrumb root (or deselecting) goes back to all arcs.
@@ -1740,7 +1683,6 @@ function MapContent() {
             onToggleInstitution={handleToggleInstitution}
             isLoadingSubArcs={isLoadingSubArcs}
             locationName={effectiveLocationName}
-            geocodedName={geocodedName}
             arcCount={globalArcCount}
             collectionCount={globalCollectionCount}
             allObjects={allObjects}

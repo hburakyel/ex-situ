@@ -156,6 +156,8 @@ function normalizeArcItem(raw: any): ArcData {
   }
 }
 
+const GEOCODE_TYPING_PAUSE_MS = 400
+
 export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
   const { minChars = 3, dateFilters } = options
   const { dateStart, dateEnd, undated, acqDateStart, acqDateEnd, acqUndated } = dateFilters || {}
@@ -418,7 +420,14 @@ export function useUnifiedSearch(options: UseUnifiedSearchOptions = {}) {
       })))
     })
 
+    // Our own matches show at once. Nominatim doesn't allow search-as-you-type, so it is
+    // asked only when typing pauses.
+    setMatchingArcs(directArcs)
+
     try {
+      await new Promise((resolve) => setTimeout(resolve, GEOCODE_TYPING_PAUSE_MS))
+      if (latestQueryRef.current !== query) return
+
       const params = new URLSearchParams({
         q: query,
         limit: "5",
