@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { LARGE_WIDTH, resolveImageSrc } from "./image-src"
+import { aicInfoUrl, aicUrlAtWidth, LARGE_WIDTH, resolveImageSrc } from "./image-src"
 
 describe("resolveImageSrc", () => {
   it("maps dead recherche.smb.museum URLs to search.smb.museum", () => {
@@ -24,6 +24,27 @@ describe("resolveImageSrc — Rijksmuseum (micr.io IIIF 3)", () => {
   })
   it("uses a larger box for large views", () => {
     expect(resolveImageSrc(stored, LARGE_WIDTH)).toBe("https://iiif.micr.io/hlNHQ/full/!1000,1000/0/default.jpg")
+  })
+})
+
+describe("resolveImageSrc — Art Institute of Chicago (IIIF allowlist)", () => {
+  const stored = "https://www.artic.edu/iiif/2/c0631c11-a16c-f2b6-9142-fedac8364b8f/full/843,/0/default.jpg"
+  const proxied = (url: string, w: number) => `/api/proxy/img?url=${encodeURIComponent(url)}&w=${w}`
+  it("asks for allowed widths through the proxy", () => {
+    expect(resolveImageSrc(stored)).toBe(proxied(stored.replace("843,", "400,"), 300))
+    expect(resolveImageSrc(stored, LARGE_WIDTH)).toBe(proxied(stored, LARGE_WIDTH))
+  })
+  it("retries a narrower source at its own width, never above 843", () => {
+    expect(aicUrlAtWidth(stored, 398)).toBe(stored.replace("843,", "398,"))
+    expect(aicUrlAtWidth(stored, 8688)).toBe(stored)
+  })
+  it("replaces the blocked fit-in box from older links", () => {
+    expect(aicUrlAtWidth(stored.replace("843,", "!843,843"), 557)).toBe(stored.replace("843,", "557,"))
+  })
+  it("finds info.json next to the image", () => {
+    expect(aicInfoUrl(stored)).toBe(
+      "https://www.artic.edu/iiif/2/c0631c11-a16c-f2b6-9142-fedac8364b8f/info.json",
+    )
   })
 })
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import sharp from "sharp"
+import { aicInfoUrl, aicUrlAtWidth } from "@/lib/image-src"
 import { fetchAllowedImage, isAllowedImageUrl } from "@/lib/remote-image-url"
 
 export const runtime = "nodejs"
@@ -55,12 +56,11 @@ export async function GET(request: NextRequest) {
 
   // Fetch original image. Some museum CDNs (e.g. id.smb.museum) hotlink-block
   // headerless requests, so spoof a browser-like User-Agent/Referer.
-  let response: Response
-  try {
+  const fetchOriginal = async (target: string): Promise<Response> => {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10_000)
     try {
-      response = await fetchAllowedImage(url, {
+      return await fetchAllowedImage(target, {
         // Not Next's fetch data cache: it serializes image bodies to disk as JSON
         // and, under concurrent requests, reads back half-written entries
         // ("Unexpected end of JSON input" → 500). imageCache above plus the
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
           "User-Agent": "Mozilla/5.0 (compatible; ExSitu/1.0; +https://ex-situ.eu)",
           "Accept": "image/webp,image/jpeg,image/*,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.5",
-          "Referer": new URL(url).origin + "/",
+          "Referer": new URL(target).origin + "/",
           // AIC's Cloudflare blocks IIIF image requests (even from real
           // browsers) unless AIC's own identification header is set.
           "AIC-User-Agent": "ExSitu (https://exsitu.app)",
@@ -79,6 +79,17 @@ export async function GET(request: NextRequest) {
       })
     } finally {
       clearTimeout(timeout)
+    }
+  }
+
+  let response: Response
+  try {
+    response = await fetchOriginal(url)
+    // Sources narrower than the requested width: retry at the source's own width.
+    if (!response.ok && new URL(url).hostname === "www.artic.edu") {
+      const info = await fetchOriginal(aicInfoUrl(url))
+      const sourceWidth = info.ok ? (await info.json()).width : undefined
+      if (Number.isInteger(sourceWidth)) response = await fetchOriginal(aicUrlAtWidth(url, sourceWidth))
     }
   } catch {
     return NextResponse.json({ error: "Failed to fetch image" }, { status: 502 })

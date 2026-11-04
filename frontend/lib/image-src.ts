@@ -9,7 +9,9 @@
 //   through requests carrying AIC's documented AIC-User-Agent header, which a
 //   browser <img> can't send — so route through /api/proxy/img, which adds it.
 //   (It must live under /api/proxy/: production nginx sends every other
-//   /api/* path to Strapi, not Next.)
+//   /api/* path to Strapi, not Next.) AIC also allows only some sizes (see
+//   AIC_THUMB_WIDTH); a source narrower than the width asked for is retried at
+//   its own width by the proxy (aicInfoUrl, aicUrlAtWidth).
 // - id.smb.museum: hotlink-blocks headerless requests; proxied for the same reason.
 // - www.weltmuseumwien.at: /pics/ files are the full-size scans (often 300 KB+) and
 //   the page's own thumbnails have hashed names; proxied so tiles are resized.
@@ -23,6 +25,11 @@ const PROXIED_HOSTS = new Set(["id.smb.museum", "www.artic.edu", "www.weltmuseum
 export const THUMB_WIDTH = 300
 export const LARGE_WIDTH = 800
 
+// AIC's IIIF allowlist answers 403 to "!w,h", "full", "max", "pct:" and to most
+// widths. 400 and 843 are on the list; 843 is the width AIC documents.
+const AIC_THUMB_WIDTH = 400
+const AIC_LARGE_WIDTH = 843
+
 // search.smb.museum buckets assets as dir1 = (id/1000) % 1000, dir2 = id/1e6
 // (left out when 0) — same layout as compute_search_url in the ETL.
 function smbSearchUrl(assetId: number): string {
@@ -31,6 +38,16 @@ function smbSearchUrl(assetId: number): string {
   const dir2 = Math.floor(q1 / 1000)
   const dirs = dir2 === 0 ? pad(q1 % 1000) : `${pad(q1 % 1000)}/${pad(dir2)}`
   return `https://search.smb.museum/media/images/thumbs/extra_large/${dirs}/${assetId}.jpg`
+}
+
+// AIC refuses (403, sometimes 500) a width above the source's own. info.json
+// gives that width, which the allowlist lets through.
+export function aicInfoUrl(src: string): string {
+  return src.replace(/\/full\/.*$/, "/info.json")
+}
+
+export function aicUrlAtWidth(src: string, sourceWidth: number): string {
+  return src.replace(/\/full\/[^/]+\//, `/full/${Math.min(sourceWidth, AIC_LARGE_WIDTH)},/`)
 }
 
 export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): string {
@@ -52,10 +69,9 @@ export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): strin
   }
 
   if (url.hostname === "www.artic.edu") {
-    // Stored URLs request a fixed "843," width, which IIIF 2 rejects (403) when
-    // the source is narrower than 843px. "!843,843" fits within the box
-    // without upscaling, so it works for every source size.
-    url.pathname = url.pathname.replace(/\/full\/\d+,\//, "/full/!843,843/")
+    // The proxy resizes to the exact width; ask AIC for the nearest allowed one.
+    const aicWidth = width <= THUMB_WIDTH ? AIC_THUMB_WIDTH : AIC_LARGE_WIDTH
+    url.pathname = url.pathname.replace(/\/full\/[^/]+\//, `/full/${aicWidth},/`)
   }
 
   if (url.hostname === "iiif.micr.io") {
