@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
-import { ChevronDown, ChevronUp, Check, FileText, FileJson, Globe, Loader2, List } from "lucide-react"
-import { IconSearch, IconClose, IconDownloadCsv, IconExpand, IconMinimize, IconShare, IconGridSize } from "@/components/icons"
+import { ChevronDown, ChevronUp, Check, Download, FileText, FileJson, Globe, Loader2, List } from "lucide-react"
+import { IconArtifacts, IconSearch, IconClose, IconDownloadCsv, IconShare, IconGridSize } from "@/components/icons"
 import { fetchMuseumObjectByImage, fetchObjectsByCountry } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -128,25 +128,35 @@ interface ObjectPanelProps {
   initialGalleryArtifact?: MuseumObject | null
   /** Hide the panel — desktop only. */
   onCloseContainer?: () => void
+  /** Desktop: the panel is hidden; only its buttons stay, on the map. */
+  closed?: boolean
+  onShowContainer?: () => void
   /** Mobile: whether the map card is showing, and the button that shows/puts it away. */
   mapOpen?: boolean
   onMapToggle?: () => void
   /** Mobile: the map card steps aside while the gallery is open. */
   onGalleryOpenChange?: (open: boolean) => void
+  /** Desktop: the side panel is closed; in the grid view the panel takes its room. */
+  sideCollapsed?: boolean
   /** Desktop grid view: its map card is closed, and the header's button that closes/opens it. */
   gridMapHidden?: boolean
   onGridMapToggle?: () => void
 }
 
-// Desktop grid view with its map card open: the map's own buttons (back to the map view,
-// close the map) sit on the card's top right, as on the phone's map card; Display and
-// Export stay in the header, with the objects. They go to <body> because the panel lies
-// under the card.
+// The object panel's menus (Display, Export) look alike: a muted title, then rows.
+const MENU_CONTENT = "min-w-[180px]"
+const MENU_LABEL = "text-sm font-normal text-gray-500"
+const MENU_ITEM = "gap-2 cursor-pointer text-sm"
+
+// Desktop grid view with its map card open: the card's close button sits on its top right;
+// Export, Share and Display stay in the header, with the objects. It goes to <body> because
+// the panel lies under the card.
 function MapCardButtons({ onCard, children }: { onCard: boolean; children: React.ReactNode }) {
   if (!onCard || typeof document === "undefined") return <>{children}</>
   return createPortal(
-    <div className="fixed z-40 flex items-center gap-1 rounded-xl bg-white/95 p-1 shadow-sm"
-      style={{ top: "calc(2rem + 0.75rem)", right: "calc(2rem + 0.75rem)" }}>
+    // Like the map's home button, 0.75rem inside the card (and its 1px stroke), in line with it.
+    <div className="fixed z-40 overflow-hidden rounded-xl bg-white shadow-lg [&>button]:h-10 [&>button]:w-10"
+      style={{ top: "calc(2.75rem + 1px)", right: "calc(2.75rem + 1px)" }}>
       {children}
     </div>,
     document.body,
@@ -196,9 +206,12 @@ export default function ObjectPanel({
   linkObjects = [],
   initialGalleryArtifact,
   onCloseContainer,
+  closed = false,
+  onShowContainer,
   mapOpen,
   onMapToggle,
   onGalleryOpenChange,
+  sideCollapsed = false,
   gridMapHidden = false,
   onGridMapToggle,
 }: ObjectPanelProps) {
@@ -272,8 +285,7 @@ export default function ObjectPanel({
       else localStorage.setItem("exsitu:grid-columns", String(n))
     } catch {}
   }
-  // Grid or list (remembered per browser), only on phones and in the desktop grid view;
-  // the desktop panel beside the map is always the grid.
+  // Grid or list (remembered per browser).
   const [objectView, setObjectView] = useState<"grid" | "list">("grid")
   useEffect(() => {
     try { if (localStorage.getItem("exsitu:object-view") === "list") setObjectView("list") } catch {}
@@ -282,11 +294,11 @@ export default function ObjectPanel({
     setObjectView(next)
     try { localStorage.setItem("exsitu:object-view", next) } catch {}
   }
-  const isGrid = !(unifiedPanel || gridView) || objectView === "grid"
+  const isGrid = objectView === "grid"
   // One Display menu, as on Are.na. Phones: Feed (one per row), Grid (three per row),
   // List. Desktop grid view: Grid (three per row, as beside the map), List.
   // Desktop grid view: Grid (three per row) beside the map card; with the card closed,
-  // Spacious (four per row) or Dense (the full page's columns).
+  // Grid (four per row) or Dense (the full page's columns).
   type DisplayKey = "feed" | "grid" | "spacious" | "dense" | "list"
   const displayMode: DisplayKey = !isGrid ? "list"
     : isMobile ? (activeGridColumns === 1 ? "feed" : "grid")
@@ -299,7 +311,7 @@ export default function ObjectPanel({
     { key: "grid" as DisplayKey, label: "Grid", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(3) },
     listOption,
   ] : denseGrid ? [
-    { key: "spacious" as DisplayKey, label: "Spacious", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(4) },
+    { key: "spacious" as DisplayKey, label: "Grid", icon: <IconGridSize className="w-5 h-5" columns={3} />, pick: () => showGrid(4) },
     { key: "dense" as DisplayKey, label: "Dense", icon: <IconGridSize className="w-5 h-5" columns={5} />, pick: () => showGrid(null) },
     listOption,
   ] : [
@@ -313,10 +325,10 @@ export default function ObjectPanel({
           {displayOptions.find((o) => o.key === displayMode)!.icon}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[180px]">
-        <DropdownMenuLabel className="text-sm font-normal text-gray-500">Display</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className={MENU_CONTENT}>
+        <DropdownMenuLabel className={MENU_LABEL}>Display</DropdownMenuLabel>
         {displayOptions.map((o) => (
-          <DropdownMenuItem key={o.key} onClick={o.pick} className="gap-2 cursor-pointer text-base">
+          <DropdownMenuItem key={o.key} onClick={o.pick} className={MENU_ITEM}>
             <Check className={`h-4 w-4 ${displayMode === o.key ? "" : "invisible"}`} />
             {o.icon}
             {o.label}
@@ -325,10 +337,20 @@ export default function ObjectPanel({
       </DropdownMenuContent>
     </DropdownMenu>
   )
+  // The narrow panel has two choices: one button goes straight to the other. Like the
+  // toggle and the menu, its icon shows what's on. The wide grid keeps the menu.
+  const otherDisplay = displayOptions.find((o) => o.key !== displayMode)!
+  const displaySwitch = (
+    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={otherDisplay.pick} title={otherDisplay.label} aria-label={`Show as ${otherDisplay.label.toLowerCase()}`}>
+      {displayOptions.find((o) => o.key === displayMode)!.icon}
+    </Button>
+  )
   const [isExporting, setIsExporting] = useState(false)
   const hasSiteExportScope = Boolean(activeSite)
   const hasTerritoryExportScope = Boolean(activeCountry) && !activeSite
   const hasExportScope = hasSiteExportScope || hasTerritoryExportScope
+  // The menu says what it would export, also while the grid is hidden.
+  const exportTitle = activeSite || activeCountry ? `Export · ${activeSite || activeCountry}` : "Export"
   const cappedExportCount = hasTerritoryExportScope ? Math.min(totalCount, EXPORT_ROW_CAP) : totalCount
   const exportCapNote = hasTerritoryExportScope
     ? `${exportCountFormatter.format(cappedExportCount)} of ${exportCountFormatter.format(totalCount)}`
@@ -927,7 +949,7 @@ export default function ObjectPanel({
         return gridView ? {
           transition: desktopTransition,
           // Grid view: the background right of the side panel (left-8 w-80).
-          left: "22rem",
+          left: sideCollapsed ? 0 : "22rem",
         } : {
           transition: desktopTransition,
           // Full page, edge to edge.
@@ -944,16 +966,6 @@ export default function ObjectPanel({
     }
   }
 
-  const toggleSize = () => {
-    if (isMobile) {
-      // Cycle: minimized → default → expanded → default
-      if (containerSize === "minimized") setContainerSize("default")
-      else if (containerSize === "default") setContainerSize("expanded")
-      else setContainerSize("default")
-    } else {
-      setContainerSize(containerSize === "default" ? "expanded" : "default")
-    }
-  }
 
   const toggleMinimize = () => {
     setContainerSize(containerSize === "minimized" ? "default" : "minimized")
@@ -1406,7 +1418,7 @@ export default function ObjectPanel({
     icon: React.ReactNode
   }) => {
     const item = (
-      <DropdownMenuItem onClick={onClick} disabled={disabled} className="gap-2 cursor-pointer">
+      <DropdownMenuItem onClick={onClick} disabled={disabled} className={MENU_ITEM}>
         {icon}
         <span className="flex flex-col leading-tight">
           <span>{label}</span>
@@ -1432,12 +1444,9 @@ export default function ObjectPanel({
   const reportIssueMenuItem = (
     <>
       <DropdownMenuSeparator />
-      <DropdownMenuItem
-        onClick={handleReportIssue}
-        className="gap-2 cursor-pointer text-[12px] text-gray-500 focus:text-gray-500"
-      >
-        <span className="h-4 w-4 text-center leading-4">↗</span>
-        Report a data issue
+      {/* Leaves the site, so it reads as a link, like GitHub in About. */}
+      <DropdownMenuItem onClick={handleReportIssue} className={`${MENU_ITEM} text-link focus:text-link`}>
+        Report a data issue ↗
       </DropdownMenuItem>
     </>
   )
@@ -1459,7 +1468,6 @@ export default function ObjectPanel({
         onInfoToggle={variant === "drill" && unifiedPanel ? () => toggleMobileHeaderPanel("search") : undefined}
         aboutOpen={variant === "drill" && unifiedPanel ? mobileHeaderPanel === "about" : undefined}
         onAboutToggle={variant === "drill" && unifiedPanel ? () => toggleMobileHeaderPanel("about") : undefined}
-        headerSlot={variant === "drill" && unifiedPanel ? viewButtons : undefined}
         sectionColumns={variant === "drill" && unifiedPanel && !isMobile}
         mapToggle={isMobile ? "globe" : "collapse"}
         breadcrumb={variant === "drill" ? breadcrumb : []}
@@ -1467,16 +1475,18 @@ export default function ObjectPanel({
         onCommandPaletteOpen={variant === "drill" ? onCommandPaletteOpen : undefined}
         // Always rendered so the count row keeps its height while objects load.
         actionSlot={variant === "drill" ? undefined : (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+          {viewButtons}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[160px]">
-              <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
-                {showCopied ? <Check className="h-4 w-4 text-green-500" /> : <IconShare className="h-4 w-4 text-gray-500" />}
+            <DropdownMenuContent align="end" className={MENU_CONTENT}>
+              <DropdownMenuLabel className={MENU_LABEL}>{exportTitle}</DropdownMenuLabel>
+              <DropdownMenuItem onClick={handleShare} className={MENU_ITEM}>
+                {showCopied ? <Check className="h-5 w-5 text-green-500" /> : <IconShare className="h-5 w-5" />}
                 {showCopied ? "Link copied!" : "Share link"}
               </DropdownMenuItem>
               {renderExportMenuItem({
@@ -1484,25 +1494,24 @@ export default function ObjectPanel({
                 sublabel: exportCapNote,
                 onClick: downloadObjectsAsCSV,
                 disabled: isExporting || !hasExportScope,
-                icon: <IconDownloadCsv className="h-4 w-4 text-gray-500" />,
+                icon: <IconDownloadCsv className="h-5 w-5" />,
               })}
               {renderExportMenuItem({
                 label: "Download as JSON",
                 sublabel: exportCapNote,
                 onClick: exportAsJSON,
                 disabled: isExporting || !hasExportScope,
-                icon: <FileJson className="h-4 w-4 text-gray-500" />,
+                icon: <FileJson className="h-5 w-5" />,
               })}
               {renderExportMenuItem({
                 label: "Download as MD",
                 onClick: downloadProvenanceReport,
                 disabled: isExporting || !hasExportScope,
-                icon: <FileText className="h-4 w-4 text-gray-500" />,
+                icon: <FileText className="h-5 w-5" />,
               })}
               {reportIssueMenuItem}
             </DropdownMenuContent>
           </DropdownMenu>
-          {!unifiedPanel && viewButtons}
           </div>
         )}
         totalCount={totalCount}
@@ -1531,6 +1540,55 @@ export default function ObjectPanel({
         locationName={locationName}
         activeCountry={activeCountry}
       />
+  )
+
+  // Export and Share: in the desktop header, and on the map while the panel is closed.
+  const exportAndShare = (
+    <>
+      {objects.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            {/* Below 1200px the word gives way to an icon, so the header stays on one line. */}
+            <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm max-[1199px]:w-8 max-[1199px]:px-0 max-[1199px]:border-transparent max-[1199px]:bg-transparent max-[1199px]:shadow-none" title="Export options" aria-label="Export options">
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : (
+                <>
+                  <span className="contents max-[1199px]:hidden">Export<ChevronDown className="h-4 w-4 text-gray-500" /></span>
+                  <Download className="hidden h-5 w-5 text-gray-500 max-[1199px]:block" />
+                </>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className={MENU_CONTENT}>
+            <DropdownMenuLabel className={MENU_LABEL}>{exportTitle}</DropdownMenuLabel>
+            {renderExportMenuItem({
+              label: "Download as CSV",
+              sublabel: exportCapNote,
+              onClick: downloadObjectsAsCSV,
+              disabled: isExporting || !hasExportScope,
+              icon: <IconDownloadCsv className="h-5 w-5" />,
+            })}
+            {renderExportMenuItem({
+              label: "Download as JSON",
+              sublabel: exportCapNote,
+              onClick: exportAsJSON,
+              disabled: isExporting || !hasExportScope,
+              icon: <FileJson className="h-5 w-5" />,
+            })}
+            {renderExportMenuItem({
+              label: "Download as MD",
+              onClick: downloadProvenanceReport,
+              disabled: isExporting || !hasExportScope,
+              icon: <FileText className="h-5 w-5" />,
+            })}
+            {reportIssueMenuItem}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      {/* Sharing isn't exporting: its own button, a check once the link is copied. */}
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} title={showCopied ? "Link copied" : "Share link"} aria-label={showCopied ? "Link copied" : "Share link"}>
+        {showCopied ? <Check className="h-5 w-5 text-green-600" /> : <IconShare className="h-5 w-5 text-gray-500" />}
+      </Button>
+    </>
   )
 
   const sheetInner = (
@@ -1582,7 +1640,8 @@ export default function ObjectPanel({
             {renderMobileInfo("summary")}
           </div>
         ) : (
-          <div className="sticky top-0 z-30 flex flex-row items-start bg-white">
+          // Grid view, side panel closed: the count clears the button that opens it.
+          <div className="sticky top-0 z-30 flex flex-row items-start bg-white" style={gridView && sideCollapsed ? { paddingLeft: "6rem" } : undefined}>
             <div className="flex-1 min-w-0">
               <InfoPanel
                 isMobile={isMobile}
@@ -1618,56 +1677,11 @@ export default function ObjectPanel({
                 activeCountry={activeCountry}
               />
             </div>
-            <div className="flex items-center gap-2 shrink-0 pt-2 pr-4">
-              {gridView && viewButtons}
-              {objects.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 rounded-md text-sm" title="Export options">
-                      {isExporting ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : <>Export<ChevronDown className="h-4 w-4 text-gray-500" /></>}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[160px]">
-                    <DropdownMenuItem onClick={handleShare} className="gap-2 cursor-pointer">
-                      {showCopied ? <Check className="h-5 w-5 text-green-500" /> : <IconShare className="h-5 w-5" />}
-                      {showCopied ? "Link copied!" : "Share link"}
-                    </DropdownMenuItem>
-                    {renderExportMenuItem({
-                      label: "Download as CSV",
-                      sublabel: exportCapNote,
-                      onClick: downloadObjectsAsCSV,
-                      disabled: isExporting || !hasExportScope,
-                      icon: <IconDownloadCsv className="h-5 w-5" />,
-                    })}
-                    {renderExportMenuItem({
-                      label: "Download as JSON",
-                      sublabel: exportCapNote,
-                      onClick: exportAsJSON,
-                      disabled: isExporting || !hasExportScope,
-                      icon: <FileJson className="h-5 w-5" />,
-                    })}
-                    {renderExportMenuItem({
-                      label: "Download as MD",
-                      onClick: downloadProvenanceReport,
-                      disabled: isExporting || !hasExportScope,
-                      icon: <FileText className="h-5 w-5" />,
-                    })}
-                    {reportIssueMenuItem}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+            {/* Grid view: back up the 6px its header sits lower, so the buttons don't move. */}
+            <div className="flex items-center gap-2 shrink-0 pt-2 pr-4" style={gridView ? { marginTop: -6 } : undefined}>
+              {denseGrid ? viewButtons : displaySwitch}
+              {exportAndShare}
               <MapCardButtons onCard={gridView && !gridMapHidden}>
-              {/* Expand/minimize — desktop only */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={toggleSize}
-                title={containerSize === "expanded" ? "Minimize panel" : "Expand panel"}
-                aria-label={containerSize === "expanded" ? "Minimize panel" : "Expand panel"}
-              >
-                {containerSize === "expanded" ? <IconMinimize className="h-5 w-5 text-gray-500" /> : <IconExpand className="h-5 w-5 text-gray-500" />}
-              </Button>
               {/* Grid view: the X closes the map card; the globe opens it again. */}
               {gridView && onGridMapToggle && (
                 <Button
@@ -1809,6 +1823,22 @@ export default function ObjectPanel({
       </div>
   )
 
+  // Desktop, panel closed: no grid, only its buttons, where the header has them. The two
+  // cards bring the panel back (not a grid icon: the squares are the Display menu's).
+  if (closed) {
+    if (typeof document === "undefined") return null
+    return createPortal(
+      <div className="fixed z-20 flex items-center gap-2 rounded-xl bg-white/95 p-1 shadow-sm"
+        style={{ top: "calc(2.5rem - 0.25rem)", right: "calc(3rem - 0.25rem)" }}>
+        {exportAndShare}
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onShowContainer} title="Show artifacts" aria-label="Show artifacts">
+          <IconArtifacts className="h-5 w-5 text-gray-500" />
+        </Button>
+      </div>,
+      document.body,
+    )
+  }
+
   return (
     <>
     {/* Mobile info card — top of the map, separate from the object sheet (as on desktop).
@@ -1854,7 +1884,7 @@ export default function ObjectPanel({
             // objects' place (over the grid, the map card stays), between the cards' top and
             // bottom margins (2rem), so it has the same height and header line in both views.
             // Its white reaches the bottom edge, so the grid doesn't show below it.
-            ...(gridView ? { top: "2rem", bottom: 0, left: "1rem", right: gridRight, background: "white" } : {}),
+            ...(gridView ? { top: "2rem", bottom: 0, left: sideCollapsed ? 0 : "1rem", right: gridRight, background: "white" } : {}),
             zIndex: 59,
             // Mobile (full-screen panel): the gallery opens above the map at once — a fade
             // would show the panel or the map through it for a moment.
@@ -1864,7 +1894,8 @@ export default function ObjectPanel({
             pointerEvents: galleryVisible || (isMobile && MOBILE_FULL_SCREEN) ? "auto" : "none",
           }}
         >
-          <div className="absolute inset-0" style={gridView ? { bottom: "2rem" } : undefined}>
+          {/* Side panel closed: the white runs to the left edge, the gallery clears its buttons. */}
+          <div className="absolute inset-0" style={gridView ? { bottom: "2rem", left: sideCollapsed ? "7.25rem" : 0 } : undefined}>
           <ImageGallery
             key={galleryKey}
             objects={galleryArtifact ? [galleryArtifact] : (gallerySnapshot.current.length > 0 ? gallerySnapshot.current : galleryObjects)}

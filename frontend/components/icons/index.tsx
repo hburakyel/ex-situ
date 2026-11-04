@@ -415,14 +415,14 @@ export const IconGridSize: React.FC<IconProps & { columns?: number }> = ({
   columns = 3,
   ...props
 }) => {
-  // 1 → one large tile, 3 → 2×2, 5 → 3×3: the icon hints at how dense the grid is.
-  const n = columns <= 1 ? 1 : columns >= 5 ? 3 : 2
+  // 1 → one large tile, 3 → 2×2, outlined like the other icons; 5 → 3×3, solid, too small
+  // for an outline.
+  const across = columns <= 1 ? 1 : columns >= 5 ? 3 : 2
   const gap = 4
-  const stroke = n === 1 ? 2 : n === 2 ? 1.5 : 1.25
-  const size = (18 - gap * (n - 1)) / n
+  const size = (18 - gap * (across - 1)) / across
   const tiles: React.ReactNode[] = []
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
+  for (let r = 0; r < across; r++) {
+    for (let c = 0; c < across; c++) {
       tiles.push(
         <rect
           key={`${r}-${c}`}
@@ -430,10 +430,8 @@ export const IconGridSize: React.FC<IconProps & { columns?: number }> = ({
           y={3 + r * (size + gap)}
           width={size}
           height={size}
-          rx={n === 1 ? 2 : 1}
-          stroke="currentColor"
-          strokeWidth={stroke}
-          strokeLinejoin="round"
+          rx={across === 3 ? 1 : 1.5}
+          {...(across === 3 ? { fill: "currentColor" } : { stroke: "currentColor", strokeWidth: 2, strokeLinejoin: "round" as const })}
         />,
       )
     }
@@ -483,6 +481,30 @@ export const IconHome: React.FC<IconProps> = ({
 )
 IconHome.displayName = "IconHome"
 
+/* ── Toggle (a switch; the knob moves to the right when on) ────────────── */
+
+export const IconToggle: React.FC<IconProps & { on?: boolean }> = ({
+  width = 24,
+  height = 24,
+  className,
+  on = false,
+  ...props
+}) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    {...props}
+  >
+    <rect x="1.5" y="5.5" width="21" height="13" rx="6.5" stroke="currentColor" strokeWidth="2" />
+    <circle cx={on ? 15.5 : 8.5} cy="12" r="3.5" fill="currentColor" />
+  </svg>
+)
+IconToggle.displayName = "IconToggle"
+
 /* ── Artifacts (two cards, one tilted behind) ───────────────────────────── */
 // "Show artifacts" (the object panel). Ex Situ's own drawing: the front card hides
 // the part of the tilted card behind it.
@@ -509,9 +531,9 @@ export const IconArtifacts: React.FC<IconProps> = ({
         <rect x="2.5" y="5.5" width="14" height="17" rx="3" fill="black" />
       </mask>
       <g mask={`url(#${id})`}>
-        <rect x="8" y="2.5" width="12" height="15" rx="2" transform="rotate(8 14 10)" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" />
+        <rect x="8" y="2.5" width="12" height="15" rx="2" transform="rotate(8 14 10)" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
       </g>
-      <rect x="4" y="7" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" />
+      <rect x="4" y="7" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
     </svg>
   )
 }

@@ -9,10 +9,10 @@ import { Protocol } from "pmtiles"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
-import { ChevronDown, ChevronUp, Info, Minus, Plus } from "lucide-react"
+import { ChevronDown, ChevronUp, Info, Minus, PanelLeft, Plus } from "lucide-react"
 import { useScrollFades } from "@/hooks/use-scroll-fades"
 import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
-import { iconSvgStrings, IconClose, IconHome } from "@/components/icons"
+import { iconSvgStrings, IconClose, IconHome, IconToggle } from "@/components/icons"
 import SearchBar from "./search-bar"
 import { AboutText, FilterChips } from "./info-panel"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
@@ -114,11 +114,11 @@ interface InstitutionItem {
 }
 
 const HEADER_ACCORDION_FADE_STYLE = {
-  background: "linear-gradient(to top, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+  background: "linear-gradient(to top, rgba(255, 255, 255, 1) 25%, rgba(255, 255, 255, 0) 100%)",
 }
 
 const HEADER_ACCORDION_TOP_FADE_STYLE = {
-  background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.92) 14%, rgba(255, 255, 255, 0.45) 30%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0) 100%)",
+  background: "linear-gradient(to bottom, rgba(255, 255, 255, 1) 25%, rgba(255, 255, 255, 0) 100%)",
 }
 
 // Same place, same key: "Çorum" / "Corum (Province)", "Istanbul" / "Istanbul?" (lib/site-key.ts)
@@ -147,14 +147,14 @@ function HeaderAccordionList({ children }: { children: React.ReactNode }) {
       {fades.top && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-5"
+          className="pointer-events-none absolute inset-x-0 top-0 h-8 max-h-[33%]"
           style={HEADER_ACCORDION_TOP_FADE_STYLE}
         />
       )}
       {fades.bottom && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-8 max-h-[33%]"
           style={HEADER_ACCORDION_FADE_STYLE}
         />
       )}
@@ -175,6 +175,7 @@ function useSharedListHeights(panelRef: React.RefObject<HTMLElement | null>, act
     const panel = panelRef.current
     if (!active || !panel) return
     let frame = 0
+    let settledRest = 0
     const sizes = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => fit()) : null
     const fit = () => {
       cancelAnimationFrame(frame)
@@ -182,8 +183,13 @@ function useSharedListHeights(panelRef: React.RefObject<HTMLElement | null>, act
         const lists = Array.from(panel.querySelectorAll<HTMLElement>("[data-shared-list]"))
         const foot = panel.querySelector<HTMLElement>("[data-shared-list-foot]")
         const maxHeight = parseFloat(getComputedStyle(panel).maxHeight)
-        if (!lists.length || !foot || !Number.isFinite(maxHeight)) return
-        let room = maxHeight - (panel.scrollHeight - foot.offsetHeight - lists.reduce((sum, l) => sum + l.clientHeight, 0))
+        // Nothing to measure while the side panel is closed.
+        if (!lists.length || !foot || !Number.isFinite(maxHeight) || lists[0].offsetParent === null) return
+        // The rest of the panel's height. These are rounded numbers: a pixel either way must
+        // not change a list by a row, which would fit again and flicker.
+        const rest = panel.scrollHeight - foot.offsetHeight - lists.reduce((sum, l) => sum + l.clientHeight, 0)
+        if (Math.abs(rest - settledRest) > 2) settledRest = rest
+        let room = maxHeight - settledRest
         // Equal shares first, then each cut list snapped down to half a row.
         const shares = new Map<HTMLElement, number>()
         const byLength = lists.map((l) => ({ l, length: l.scrollHeight })).sort((a, b) => a.length - b.length)
@@ -306,6 +312,11 @@ interface MapViewProps {
   mapCard?: boolean
   /** Desktop grid view: the page behind the side panel is white (the object grid). */
   onWhite?: boolean
+  /** Desktop: the side panel is closed to the left; the page takes its room. */
+  sideCollapsed?: boolean
+  onSideCollapsedChange?: (collapsed: boolean) => void
+  /** Desktop: the switch between the map and the artifacts as the page. */
+  onViewToggle?: () => void
 }
 
 const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
@@ -363,6 +374,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       dateBuckets = null,
       mapCard = false,
       onWhite = false,
+      sideCollapsed = false,
+      onSideCollapsedChange,
+      onViewToggle,
     },
     ref,
   ) => {
@@ -385,6 +399,24 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const isMobile = useMediaQuery("(max-width: 768px)")
     // Desktop grid view: the map is a card in the object panel's place (map-client.tsx).
     const gridView = !isMobile && mapCard
+    const f = parentFacetedFilters
+    const hasFilters = !!activePrecise || !!f && (f.countries.length + f.cities.length + f.institutions.length > 0 || !!f.era || !!f.migrationEra)
+    // About opens in the middle of the screen, like the search palette.
+    const aboutDialog = (trigger: React.ReactNode) => (
+      <DialogPrimitive.Root>
+        <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[80] bg-black/25 backdrop-blur-[2px]" />
+          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[80] w-[calc(100%-1.5rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[20px] border border-gray-200 bg-white p-5 pr-12 shadow-2xl text-sm leading-normal focus-visible:outline-none">
+            <DialogPrimitive.Title className="sr-only">About Ex Situ</DialogPrimitive.Title>
+            <AboutText />
+            <DialogPrimitive.Close className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md hover:bg-gray-100" aria-label="Close">
+              <IconClose className="h-5 w-5 text-gray-500" />
+            </DialogPrimitive.Close>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    )
     const sidePanelRef = useRef<HTMLDivElement>(null)
     useSharedListHeights(sidePanelRef, !isMobile)
 
@@ -1496,56 +1528,81 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
         {/* ════════════ HEADER PANEL (top-left) — desktop only ════════════ */}
         {/* fixed and visible: in the grid view the map is a card on the right (or closed,
-            invisible); this stays put. */}
+            invisible); this stays put. Its stroke there is a ring, which takes no room, so
+            nothing in it moves when the view changes. */}
         {!isMobile && (
-        <div className={`fixed top-8 left-8 sm:w-80 z-20 visible ${onWhite ? "rounded-2xl border border-gray-200" : ""}`} data-map-cover>
+        <div className={`fixed z-20 visible ${sideCollapsed ? "top-[2.5rem] left-[2.375rem]" : `top-8 left-8 sm:w-80 ${onWhite ? "rounded-2xl ring-1 ring-gray-200" : ""}`}`} data-map-cover>
         {/* As tall as the object panel at most; its lists share the height (useSharedListHeights). */}
         {/* On white (grid view) a stroke and a light shadow, not the shadow it has on the map. */}
-        <div ref={sidePanelRef} className={`bg-white rounded-2xl ${onWhite ? "shadow-sm" : "shadow-lg"} flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto`}>
-          {/* ── Breadcrumb header with controls ── */}
+        {/* Closed, the card is just the button: the map's home button on the map, no stroke
+            or shadow on white. Its left and top keep the button where the open panel has it. */}
+        <div ref={sidePanelRef} className={`bg-white ${sideCollapsed ? `rounded-xl ${onWhite ? "" : "shadow-lg"}` : `rounded-2xl ${onWhite ? "shadow-sm" : "shadow-lg"}`} flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto`}>
+          {/* ── Header: close to the left, name, About ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
-              so "Ex Situ" and "N artifacts" sit on one baseline. */}
-          <div className="flex items-center justify-between px-4 pt-3 pb-2">
-            {/* Breadcrumb */}
-            <div className="flex items-center min-h-8 min-w-0 flex-1 overflow-hidden text-sm leading-normal text-black">
-              {breadcrumb.map((seg, i) => {
-                const isLast = i === breadcrumb.length - 1
-                return (
-                  <Fragment key={i}>
-                    {i > 0 && <span className="text-black/30 px-1 flex-shrink-0">/</span>}
-                    {isLast ? (
-                      <span className="font-medium truncate min-w-0" title={seg.label}>{seg.label}</span>
-                    ) : (
-                      <button
-                        className="hover:underline transition-colors whitespace-nowrap flex-shrink-0 text-left"
-                        onClick={() => onBreadcrumbClick?.(seg.level)}
-                      >
-                        {seg.label}
-                      </button>
-                    )}
-                  </Fragment>
-                )
-              })}
+              so "Ex Situ" and "N artifacts" sit on one baseline. Closed, only the button
+              stays, in the same place. */}
+          <div className={`flex items-center gap-1 ${sideCollapsed ? "p-1" : "pl-2.5 pr-2.5 pt-3 pb-2"}`}>
+            <Button variant="ghost" size="icon" className="relative h-8 w-8 flex-shrink-0" onClick={() => onSideCollapsedChange?.(!sideCollapsed)}
+              title={sideCollapsed ? "Show side panel" : "Hide side panel"} aria-label={sideCollapsed ? (hasFilters ? "Show side panel, filters are on" : "Show side panel") : "Hide side panel"} aria-expanded={!sideCollapsed}>
+              <PanelLeft className="w-5 h-5 text-gray-600" />
+              {/* Both panels closed, the chips are out of sight: a dot says filters are on. */}
+              {sideCollapsed && !isObjectContainerVisible && hasFilters && (
+                <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-blue-500" />
+              )}
+            </Button>
+            {!sideCollapsed && (
+            <>
+            <div className="min-w-0 flex-1 text-sm leading-normal text-black">
+              {breadcrumb.length > 1 ? (
+                <button type="button" className="hover:underline transition-colors text-left" onClick={() => onBreadcrumbClick?.(breadcrumb[0].level)}>
+                  {breadcrumb[0].label}
+                </button>
+              ) : (
+                <span className="font-medium">{breadcrumb[0]?.label}</span>
+              )}
             </div>
-            {/* About — opens in the middle of the screen, like the search palette */}
-            <DialogPrimitive.Root>
-              <DialogPrimitive.Trigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-1.5 data-[state=open]:bg-gray-200" title="About" aria-label="About">
-                  <Info className="w-5 h-5 text-gray-600" />
-                </Button>
-              </DialogPrimitive.Trigger>
-              <DialogPrimitive.Portal>
-                <DialogPrimitive.Overlay className="fixed inset-0 z-[80] bg-black/25 backdrop-blur-[2px]" />
-                <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[80] w-[calc(100%-1.5rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[20px] border border-gray-200 bg-white p-5 pr-12 shadow-2xl text-sm leading-normal focus-visible:outline-none">
-                  <DialogPrimitive.Title className="sr-only">About Ex Situ</DialogPrimitive.Title>
-                  <AboutText />
-                  <DialogPrimitive.Close className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md hover:bg-gray-100" aria-label="Close">
-                    <IconClose className="h-5 w-5 text-gray-500" />
-                  </DialogPrimitive.Close>
-                </DialogPrimitive.Content>
-              </DialogPrimitive.Portal>
-            </DialogPrimitive.Root>
+            {aboutDialog(
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 data-[state=open]:bg-gray-200" title="About" aria-label="About">
+                <Info className="w-5 h-5 text-gray-600" />
+              </Button>
+            )}
+            </>
+            )}
+            {/* Map or artifacts as the page: a switch, the knob to the right for artifacts,
+                named on hover like the site rows. It stays beside the button when the side
+                panel is closed. */}
+            {onViewToggle && (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onViewToggle} aria-label={onWhite ? "Map view" : "Artifacts view"}>
+                      <IconToggle on={onWhite} className="h-6 w-6 text-gray-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">{onWhite ? "Map view" : "Artifacts view"}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
+          {/* Hidden, not removed: the lists keep their scroll and open sections. */}
+          <div className={sideCollapsed ? "hidden" : "contents"}>
+          {/* The place, on its own line as on phones: names in full, on more lines if need be. */}
+          {breadcrumb.length > 1 && (
+            <div className="-mt-1 px-4 pb-2 text-sm leading-normal text-black">
+              {breadcrumb.slice(1).map((seg, i, trail) => (
+                <Fragment key={i}>
+                  {i > 0 && <span className="text-black/30 px-1">/</span>}
+                  {i === trail.length - 1 ? (
+                    <span className="font-medium">{seg.label}</span>
+                  ) : (
+                    <button type="button" className="hover:underline transition-colors text-left" onClick={() => onBreadcrumbClick?.(seg.level)}>
+                      {seg.label}
+                    </button>
+                  )}
+                </Fragment>
+              ))}
+            </div>
+          )}
           <div className="px-4 pb-2">
             <SearchBar onOpen={() => onCommandPaletteOpen?.()} />
           </div>
@@ -1554,7 +1611,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           {!isObjectContainerVisible && (
             <div className="px-4 pb-1">
               <span className="text-sm text-gray-700 block">
-                {totalCount.toLocaleString("en-US")} indexed artifact{totalCount !== 1 ? "s" : ""}{locationName ? ` from ${locationName}` : ""}
+                {totalCount.toLocaleString("en-US")} indexed artifact{totalCount !== 1 ? "s" : ""}
               </span>
               {closedResolvedPlaceName && (
                 <span style={{ color: '#444', fontSize: '10px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }} className="block truncate">
@@ -1746,6 +1803,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             <div data-shared-list-foot aria-hidden="true" />
           </div>
           </TooltipProvider>
+          </div>
         </div>
         </div>
         )}

@@ -9,7 +9,7 @@ import { eraToDateFilters, type EraDateFilters } from "@/lib/era-buckets"
 import type { MuseumObject, MapBounds, SelectedArc } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { AlertTriangle } from "lucide-react"
-import { IconArtifacts, IconClose, IconExpand, IconMinimize } from "@/components/icons"
+import { IconClose, IconExpand, IconMinimize } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -183,15 +183,16 @@ function MapContent() {
     if (mobileMapRef.current === "hidden") setMobileMap("card")
   }, [])
   const [isObjectContainerVisible, setIsObjectContainerVisible] = useState(true)
+  const [sideCollapsed, setSideCollapsed] = useState(false)
   // Desktop grid view (the object panel expanded): the grid takes the map's place and the
   // map becomes a card in the panel's place, under its header (object-panel.tsx).
   // Its X closes the card and the grid takes its room; the side panel stays.
   const [gridMapHidden, setGridMapHidden] = useState(false)
   const gridView = !isMobile && isObjectContainerVisible && containerSize === "expanded"
   const gridMapCard = gridView && !gridMapHidden
-  useEffect(() => {
-    if (containerSize !== "expanded" || !isObjectContainerVisible) setGridMapHidden(false)
-  }, [containerSize, isObjectContainerVisible])
+  // The toggle comes back to each view as it was left: the panel open or hidden here,
+  // the map card open or closed there.
+  const panelOpenInMapView = useRef(true)
   // A museum opened from the URL alone (?institution=, no place) starts as if it had been picked
   // in the left panel: the arc layer filters to it, like handleToggleInstitution does.
   const [facetedFilters, setFacetedFilters] = useState<FacetedFilters>({
@@ -1607,6 +1608,13 @@ function MapContent() {
           dateBuckets={dateBuckets}
           mapCard={gridMapCard}
           onWhite={gridView}
+          sideCollapsed={sideCollapsed}
+          onSideCollapsedChange={setSideCollapsed}
+          onViewToggle={() => {
+            if (!gridView) panelOpenInMapView.current = isObjectContainerVisible
+            setIsObjectContainerVisible(gridView ? panelOpenInMapView.current : true)
+            setContainerSize(gridView ? "default" : "expanded")
+          }}
         />
         {isMobile && (
           <>
@@ -1684,28 +1692,11 @@ function MapContent() {
         )}
         </div>
 
-        {/* Desktop, object panel closed: the artifacts come back from where the panel's
-            buttons were (top right), as the full-page grid's globe brings the map back.
-            Two cards, not a grid: the squares are the Display menu's. */}
-        {!isMobile && !isObjectContainerVisible && (
-          <div className="fixed z-20 rounded-xl bg-white/95 p-1 shadow-sm"
-            style={{ top: "calc(2.5rem - 0.25rem)", right: "calc(3rem - 0.25rem)" }}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setIsObjectContainerVisible(true)}
-              title="Show artifacts"
-              aria-label="Show artifacts"
-            >
-              <IconArtifacts className="h-5 w-5 text-gray-500" />
-            </Button>
-          </div>
-        )}
-
         {/* Floating object container — images only (+ header on mobile) */}
-        {isObjectContainerVisible && (
+        {(isObjectContainerVisible || !isMobile) && (
           <ObjectPanel
+            closed={!isObjectContainerVisible}
+            onShowContainer={() => setIsObjectContainerVisible(true)}
             objects={containerObjects}
             onLoadMore={isGlobalInstitutionDrill || drillLevel !== "global" ? handleDrillLoadMore : handleLoadMore}
             hasMore={isGlobalInstitutionDrill || drillLevel !== "global" ? arcObjectsHasMore : hasMore}
@@ -1760,6 +1751,7 @@ function MapContent() {
             mapOpen={mobileMap !== "hidden"}
             onMapToggle={() => setMobileMap((m) => (m === "hidden" ? "card" : "hidden"))}
             onGalleryOpenChange={setMobileGalleryOpen}
+            sideCollapsed={sideCollapsed}
             gridMapHidden={gridMapHidden}
             onGridMapToggle={() => setGridMapHidden((h) => !h)}
           />

@@ -149,8 +149,6 @@ interface InfoPanelProps {
   /** Mobile: the info icon unfolds the About text under the header (instead of a popover). */
   onAboutToggle?: () => void
   aboutOpen?: boolean
-  /** Mobile: extra header buttons after the icons (grid size). */
-  headerSlot?: React.ReactNode
   /** Desktop expanded panel: Places/Sites, Time and Collections side by side, all open. */
   sectionColumns?: boolean
   /** "collapse": the map button is the minimize icon at the end of the row (desktop expanded panel). */
@@ -197,7 +195,6 @@ export default function InfoPanel({
   infoOpen,
   onAboutToggle,
   aboutOpen,
-  headerSlot,
   sectionColumns,
   mapToggle = "globe",
 }: InfoPanelProps) {
@@ -239,19 +236,16 @@ export default function InfoPanel({
     return (
       <span
         key={i}
-        className={`flex items-center ${isLast ? "min-w-0 overflow-hidden" : "flex-shrink-0"}`}
+        className="inline"
       >
-        {k > 0 && <span className="text-black/30 mx-1 flex-shrink-0">/</span>}
+        {k > 0 && <span className="text-black/30 mx-1">/</span>}
         {isLast ? (
-          <span
-            className="text-black font-medium truncate"
-            title={seg.label}
-          >
+          <span className="text-black font-medium">
             {seg.label}
           </span>
         ) : (
           <button
-            className="text-black hover:underline transition-colors whitespace-nowrap flex-shrink-0"
+            className="text-black hover:underline transition-colors text-left"
             onClick={() => onBreadcrumbClick?.(seg.level)}
             title={seg.label}
           >
@@ -275,9 +269,25 @@ export default function InfoPanel({
 
       {breadcrumb.length > 0 && (
         <div className="flex py-1 items-center justify-between gap-2 pb-1.5">
-          <div className="flex items-center min-w-0 flex-1 overflow-hidden text-sm">
+          {/* Names in full, on more lines if need be, never cut short. */}
+          <div className="min-w-0 flex-1 text-sm">
             {renderTrail(splitTrail ? breadcrumb.slice(0, 1) : breadcrumb, 0)}
           </div>
+          {/* Most used first: search, the map, then About, in the corner hardest to reach. */}
+          {mobileVariant === "drill" && onInfoToggle && (
+            <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${infoOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onInfoToggle}
+              title={infoOpen ? "Hide search and lists" : "Search and lists"} aria-label={infoOpen ? "Hide search and lists" : "Search and lists"} aria-pressed={infoOpen}
+            >
+              <Search className={`w-5 h-5 ${infoOpen ? "text-black" : "text-gray-500"}`} />
+            </Button>
+          )}
+          {mobileVariant === "drill" && onMapToggle && mapToggle !== "collapse" && (
+            <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${mapOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onMapToggle}
+              title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
+            >
+              <Globe className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
+            </Button>
+          )}
           {/* About — on phones this replaces the map's info control */}
           {mobileVariant === "drill" && onAboutToggle && (
             <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${aboutOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onAboutToggle}
@@ -298,21 +308,6 @@ export default function InfoPanel({
               </PopoverContent>
             </Popover>
           )}
-          {mobileVariant === "drill" && onMapToggle && mapToggle !== "collapse" && (
-            <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${mapOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onMapToggle}
-              title={mapOpen ? "Hide map" : "Show map"} aria-label={mapOpen ? "Hide map" : "Show map"} aria-pressed={mapOpen}
-            >
-              <Globe className={`w-5 h-5 ${mapOpen ? "text-black" : "text-gray-500"}`} />
-            </Button>
-          )}
-          {mobileVariant === "drill" && onInfoToggle && (
-            <Button variant="ghost" size="icon" className={`h-8 w-8 flex-shrink-0 ${infoOpen ? "bg-gray-200 hover:bg-gray-200" : ""}`} onClick={onInfoToggle}
-              title={infoOpen ? "Hide search and lists" : "Search and lists"} aria-label={infoOpen ? "Hide search and lists" : "Search and lists"} aria-pressed={infoOpen}
-            >
-              <Search className={`w-5 h-5 ${infoOpen ? "text-black" : "text-gray-500"}`} />
-            </Button>
-          )}
-          {mobileVariant === "drill" && headerSlot}
           {/* Desktop expanded panel: the way back is the counterpart of the icon that
               expanded it (not the globe, which on the map means "global view"). */}
           {mobileVariant === "drill" && onMapToggle && mapToggle === "collapse" && (
@@ -325,7 +320,7 @@ export default function InfoPanel({
         </div>
       )}
       {splitTrail && (
-        <div className="flex items-center min-w-0 overflow-hidden text-sm pb-1.5">
+        <div className="min-w-0 text-sm pb-1.5">
           {renderTrail(breadcrumb.slice(1), 1)}
         </div>
       )}
@@ -359,9 +354,11 @@ export default function InfoPanel({
               <div className="leading-normal text-left">
                 {!(totalCount === 0 && isLoading) && (
                   <>
-                    <span className="inline-block whitespace-nowrap">
+                    {/* Beside the buttons of a narrow desktop panel: the short form, on one line;
+                        narrowest, the number alone. */}
+                    <span className="inline-block max-w-full truncate align-bottom" title={`${formatCount(totalCount)} indexed artifact${totalCount !== 1 ? "s" : ""}`}>
                       <span className="text-black font-medium">{formatCount(totalCount)}</span>
-                      <span className="ml-1">indexed artifact{totalCount !== 1 ? "s" : ""}</span>
+                      <span className="ml-1 min-[769px]:max-[999px]:hidden"><span className="min-[769px]:max-[1399px]:hidden">indexed </span>artifact{totalCount !== 1 ? "s" : ""}</span>
                     </span>
                     {isLoading && <Spinner className="ml-2 h-3 w-3 inline-block" />}
                   </>
@@ -540,7 +537,7 @@ export function FilterChips({
   if (count === 0 && !precisePlace) return null
   const chip = (key: string, label: string, onRemove: () => void, tone: string, hover: string) => (
     // One line, as in the object panel; a long name is cut short (whole on hover).
-    <span key={key} className={`inline-flex max-w-full min-w-0 items-center gap-1 px-2 py-0.5 rounded-md text-sm ${tone}`}>
+    <span key={key} className={`inline-flex max-w-full min-w-0 items-center gap-1 px-2 py-0.5 rounded-md text-sm [&_*]:text-inherit ${tone}`}>
       <span className="truncate" title={label}>{label}</span>
       {/* 24px to hit (WCAG 2.5.8; in px, as rem is 15px here), the chip no taller: the
           margins take the extra back. */}
@@ -549,16 +546,16 @@ export function FilterChips({
       </button>
     </span>
   )
-  const place = "bg-blue-100 text-blue-700"
-  const time = "bg-gray-100 text-gray-700"
+  const place = "bg-blue-50 text-blue-700"
+  const time = "bg-gray-50 text-gray-600"
   return (
     <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
-      {facetedFilters.countries.map(c => chip(`c-${c}`, c, () => removeFilter("countries", c), place, "hover:bg-blue-200"))}
-      {facetedFilters.cities.map(c => chip(`s-${c}`, c, () => removeFilter("cities", c), place, "hover:bg-blue-200"))}
-      {precisePlace && chip("p", precisePlace.name, () => onTogglePrecise?.(precisePlace), place, "hover:bg-blue-200")}
+      {facetedFilters.countries.map(c => chip(`c-${c}`, c, () => removeFilter("countries", c), place, "hover:bg-blue-100"))}
+      {facetedFilters.cities.map(c => chip(`s-${c}`, c, () => removeFilter("cities", c), place, "hover:bg-blue-100"))}
+      {precisePlace && chip("p", precisePlace.name, () => onTogglePrecise?.(precisePlace), place, "hover:bg-blue-100")}
       {facetedFilters.institutions.map(c => chip(`i-${c}`, c, () => removeFilter("institutions", c), "bg-orange-50 text-orange-700", "hover:bg-orange-100"))}
-      {facetedFilters.era && chip("era", facetedFilters.era.label, () => removeEraFilter?.(), time, "hover:bg-gray-200")}
-      {facetedFilters.migrationEra && chip("mig", facetedFilters.migrationEra.label, () => removeMigrationFilter?.(), time, "hover:bg-gray-200")}
+      {facetedFilters.era && chip("era", facetedFilters.era.label, () => removeEraFilter?.(), time, "hover:bg-gray-100")}
+      {facetedFilters.migrationEra && chip("mig", facetedFilters.migrationEra.label, () => removeMigrationFilter?.(), time, "hover:bg-gray-100")}
     </div>
   )
 }
