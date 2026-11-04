@@ -3,7 +3,7 @@
 import type React from "react"
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { Search, X, ChevronRight, ArrowRight } from "lucide-react"
-import { Spinner } from "@radix-ui/themes"
+import { SpinnerMark as Spinner } from "@/components/ui/spinner"
 import { useUnifiedSearch } from "@/hooks/use-unified-search"
 import { ERA_BUCKETS, eraToDateFilters, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import { fetchDecadeBucketCounts, type DateBucket, type DateBucketCounts } from "@/lib/api"

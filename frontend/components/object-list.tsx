@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import type { MuseumObject } from "../types"
-import { Spinner } from "@radix-ui/themes"
+import { SpinnerMark as Spinner } from "@/components/ui/spinner"
 import { useInView } from "react-intersection-observer"
 import { useMediaQuery } from "../hooks/use-media-query"
 import { IconSource } from "@/components/icons"

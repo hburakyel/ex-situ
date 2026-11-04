@@ -1,5 +1,3 @@
-@import "@radix-ui/themes/styles.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -113,6 +111,67 @@
   div {
     font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
+}
+
+/* Page root: the base type and colours the interface is built on. */
+.app-root {
+  position: relative;
+  z-index: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-wrap: break-word;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Open Sans", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 16px;
+  line-height: 24px;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #202020;
+  background-color: white;
+  color-scheme: light;
+}
+
+.app-root ::selection {
+  background-color: rgb(0 0 0 / 0.122);
+}
+
+/* Loading spinner: components/ui/spinner.tsx */
+.spinner {
+  display: block;
+  position: relative;
+  opacity: 0.65;
+}
+.spinner-1 { width: 12px; height: 12px; }
+.spinner-2 { width: 16px; height: 16px; }
+.spinner-3 { width: 20px; height: 20px; }
+.spinner-leaf {
+  position: absolute;
+  top: 0;
+  left: calc(50% - 12.5% / 2);
+  width: 12.5%;
+  height: 100%;
+  animation: spinner-leaf-fade 800ms linear infinite;
+}
+.spinner-leaf::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 30%;
+  border-radius: 4px;
+  background-color: currentColor;
+}
+.spinner-leaf:nth-child(1) { transform: rotate(0deg); animation-delay: -800ms; }
+.spinner-leaf:nth-child(2) { transform: rotate(45deg); animation-delay: -700ms; }
+.spinner-leaf:nth-child(3) { transform: rotate(90deg); animation-delay: -600ms; }
+.spinner-leaf:nth-child(4) { transform: rotate(135deg); animation-delay: -500ms; }
+.spinner-leaf:nth-child(5) { transform: rotate(180deg); animation-delay: -400ms; }
+.spinner-leaf:nth-child(6) { transform: rotate(225deg); animation-delay: -300ms; }
+.spinner-leaf:nth-child(7) { transform: rotate(270deg); animation-delay: -200ms; }
+.spinner-leaf:nth-child(8) { transform: rotate(315deg); animation-delay: -100ms; }
+@keyframes spinner-leaf-fade {
+  from { opacity: 1; }
+  to { opacity: 0.25; }
 }
 
 /* Map container styles — MapLibre GL */

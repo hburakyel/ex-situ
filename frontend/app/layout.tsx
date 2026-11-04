@@ -1,7 +1,6 @@
 import "./globals.css"
 import type React from "react"
 import ClientMapLibreCSS from "@/components/client-maplibre-css"
-import { Theme } from "@radix-ui/themes"
 import AnalyticsScript from "@/components/analytics-script"
 import { Noto_Sans_Mono } from "next/font/google"
 import { MAP_DEFAULT_TITLE, SITE_PREVIEW_IMAGE } from "@/lib/map-title"
@@ -53,10 +52,10 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        <Theme appearance="light" accentColor="gray" radius="large" scaling="100%" suppressHydrationWarning>
+        <div className="app-root">
           <ClientMapLibreCSS />
           {children}
-        </Theme>
+        </div>
         <AnalyticsScript />
       </body>
     </html>

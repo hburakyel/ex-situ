@@ -822,12 +822,12 @@ export interface ObjectImageProps {
 /**
  * **File:** components/ui/spinner.tsx
  *
- * Thin wrapper around `@radix-ui/themes` Spinner.
+ * Eight fading leaves, styled in app/globals.css. `Spinner` wraps `SpinnerMark` in a span.
  *
  * ### Anatomy
  * ```
  * span.{className}
- *   RadixSpinner size={size ?? "1"}
+ *   span.spinner.spinner-{size}
  * ```
  *
  * ### Usage
