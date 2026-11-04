@@ -114,6 +114,13 @@ function getTileSource(): string {
   return ""
 }
 
+// Label glyphs and the map's icons come from this site (public/map-assets, see BASEMAP.md).
+// MapLibre needs absolute URLs for them.
+function mapAssets() {
+  const base = `${window.location.origin}/map-assets`
+  return { glyphs: `${base}/fonts/{fontstack}/{range}.pbf`, sprite: `${base}/sprites/v4/black` }
+}
+
 export function protomapsCustomStyle(): StyleSpecification {
   const tileSource = getTileSource()
   const isCDN = tileSource.startsWith("https://")
@@ -140,7 +147,7 @@ export function protomapsCustomStyle(): StyleSpecification {
     version: 8,
     name: "Ex Situ Dark",
     sources: { protomaps: protomapsSource, ...exSituLabelSources },
-    glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
+    glyphs: mapAssets().glyphs,
     layers: withArcAnchor([...baseLayers, ...exSituLabelLayers]),
   } as StyleSpecification
 }
@@ -267,8 +274,7 @@ export function protomapsBlackStyle(): StyleSpecification {
     return {
       version: 8,
       name: "Ex Situ Black",
-      glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
-      sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/black",
+      ...mapAssets(),
       sources: {
         protomaps: {
           type: "vector",
@@ -284,10 +290,7 @@ export function protomapsBlackStyle(): StyleSpecification {
   return {
     version: 8,
     name: "Ex Situ Black",
-    glyphs:
-      "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
-    sprite:
-      "https://protomaps.github.io/basemaps-assets/sprites/v4/black",
+    ...mapAssets(),
     sources: {
       "protomaps-local": {
         type: "vector",

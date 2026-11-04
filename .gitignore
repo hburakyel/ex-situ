@@ -140,6 +140,9 @@ docs/DEPLOY.md
 # Licensed fonts (ABC Areal trial) — never commit
 frontend/public/fonts-local/
 
+# Map label glyphs and icons (36 MB): on the server and local disk, like the .pmtiles (BASEMAP.md)
+frontend/public/map-assets/
+
 # Notes for Claude (local only)
 CLAUDE.md
 

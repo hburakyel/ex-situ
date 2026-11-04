@@ -55,3 +55,16 @@ A self-hosted PostGIS gazetteer (`gazetteer_places` table, `geocode_place()` / `
 SQL functions — see `backend/database/migrations/013_add_gazetteer_geocoding.sql` and
 `etl/import_gazetteer.sh`) exists for the ETL pipeline's local geocoding, but the frontend route
 does not use it yet.
+
+## Fonts and icons
+
+Label glyphs and map icons are served from this site, from `public/map-assets/`. The folder
+is 36 MB, gitignored like the `.pmtiles`, and lives on the server and on local disks; without
+it the map has no labels. nginx serves it in production with a long cache.
+
+| Path | Source | Licence |
+| --- | --- | --- |
+| `fonts/Noto Sans Mono Regular/` | Generated with [fontnik](https://github.com/mapbox/node-fontnik) from `NotoSansMono[wdth,wght].ttf` in [google/fonts](https://github.com/google/fonts/tree/main/ofl/notosansmono), one `.pbf` per 256 code points | OFL (`fonts/OFL.txt`) |
+| `fonts/Noto Sans Regular/` | `noto-sans.zip` from [openmaptiles/fonts](https://github.com/openmaptiles/fonts/releases/tag/v2.0) | OFL |
+| `fonts/Noto Sans Devanagari Regular v1/` | [protomaps/basemaps-assets](https://github.com/protomaps/basemaps-assets) | OFL |
+| `sprites/v4/` | `black` sprites from protomaps/basemaps-assets | see that repository |
