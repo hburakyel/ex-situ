@@ -4,9 +4,8 @@ import { pressable, PRESSABLE_FOCUS } from "@/lib/pressable"
 
 import type React from "react"
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, useMemo, Fragment } from "react"
-import maplibregl from "maplibre-gl"
-import { Protocol } from "pmtiles"
-import { MapboxOverlay } from "@deck.gl/mapbox"
+import type maplibregl from "maplibre-gl"
+import type { MapboxOverlay } from "@deck.gl/mapbox"
 import type { MuseumObject, MapBounds, SelectedArc } from "../../types"
 import debounce from "lodash/debounce"
 import { ChevronDown, ChevronUp, Info, Minus, PanelLeft, Plus } from "lucide-react"
@@ -18,7 +17,7 @@ import { AboutText, FilterChips } from "./info-panel"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArcLayer, ScatterplotLayer } from "@deck.gl/layers"
+import type { ArcLayer } from "@deck.gl/layers"
 import { Spinner } from "@/components/ui/spinner"
 import { useGeospatialData, type GeospatialFilters as FilterState } from "@/hooks/use-geospatial-data"
 import { useSpatialDocuments } from "@/hooks/use-spatial-documents"
@@ -26,7 +25,6 @@ import { useArcWorker, type ArcDatum } from "@/hooks/use-arc-worker"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { WIKIPEDIA_COLLECTION, ENABLE_WIKIPEDIA } from "@/components/faceted-filter"
-import { ARC_ANCHOR_LAYER, protomapsDarkStyle } from "@/lib/protomaps-dark-style"
 import { eraToDateFilters, ERA_BUCKETS, collapseContiguousBuckets, type EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { resolveImageSrc } from "@/lib/image-src"
@@ -39,14 +37,6 @@ import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 import type { PrecisePlace } from "@/lib/api"
 import PrecisePlaceRows from "@/components/map/precise-place-rows"
-
-// Register PMTiles protocol adapter so MapLibre can read .pmtiles files directly
-let pmtilesRegistered = false
-if (typeof window !== "undefined" && !pmtilesRegistered) {
-  const protocol = new Protocol()
-  maplibregl.addProtocol("pmtiles", protocol.tile)
-  pmtilesRegistered = true
-}
 
 
 
@@ -62,11 +52,6 @@ export type FacetedFilters = {
   migrationEra?: EraBucket | null
 }
 
-// Protomaps dark style — see lib/protomaps-dark-style.ts
-// For full data sovereignty, the PMTiles planet file can be downloaded from
-// https://protomaps.com/downloads and served as a static file from
-// /public/basemap.pmtiles — this eliminates all external tile dependencies.
-const DARK_STYLE = protomapsDarkStyle()
 // With nothing chosen, arcs are a faint orange. A chosen place's or collection's
 // arcs, and a highlighted arc (clicked, or hovered on the map or in a panel), run
 // from blue at the origin to orange at the museum, so their direction reads.
@@ -393,6 +378,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
     const [isStreetZoom, setIsStreetZoom] = useState((initialZoom || 2) >= 7)
     const currentZoomRef = useRef(initialZoom || 2)
     const [isMapReady, setIsMapReady] = useState(false)
+    // lib/map-engine, loaded after mount. Everything that uses it needs the map, or is
+    // guarded by isMapReady, so it is always set there (hence engine!).
+    const [engine, setEngine] = useState<typeof import("@/lib/map-engine") | null>(null)
     const initialBoundsSet = useRef(false)
     const prevViewStateRef = useRef(initialViewState)
     const [mapLoaded, setMapLoaded] = useState(false)
@@ -576,7 +564,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       map: map.current,
       // Returns false while the map isn't created yet (the call did nothing).
       flyToLocation: (lng: number, lat: number, zoom: number = 10, duration: number = 800): boolean => {
-        if (!map.current) return false
+        if (!map.current) {
+          viewBeforeMap.current = { lng, lat, zoom }
+          return false
+        }
         isProgrammaticMove.current = true
         setViewportState({ longitude: lng, latitude: lat, zoom })
         lastViewRef.current = { lng, lat, zoom }
@@ -608,7 +599,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         if (box.width - padding.left - padding.right < 200) { padding.left = 40; padding.right = 40 }
         const camera = m.cameraForBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding })
         if (!camera?.center) return null
-        const center = maplibregl.LngLat.convert(camera.center)
+        const center = engine!.maplibregl.LngLat.convert(camera.center)
         const zoom = Math.min(camera.zoom ?? m.getZoom(), 6)
         isProgrammaticMove.current = true
         setViewportState({ longitude: center.lng, latitude: center.lat, zoom })
@@ -698,17 +689,34 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       }
     }, [])
 
+    // A place chosen in a panel before the map exists: the map opens there.
+    const viewBeforeMap = useRef<{ lng: number; lat: number; zoom: number } | null>(null)
+    useEffect(() => {
+      let unmounted = false
+      import("@/lib/map-engine").then(
+        (loaded) => {
+          if (!unmounted) setEngine(loaded)
+        },
+        () => {
+          if (unmounted) return
+          setMapError("Failed to initialize map")
+          onErrorRef.current?.("Failed to initialize map")
+        },
+      )
+      return () => { unmounted = true }
+    }, [])
+
     // ── Initialize map ──
     useEffect(() => {
-      if (!mapContainer.current || map.current) return
+      if (!engine || !mapContainer.current || map.current) return
 
       let mapInstance: maplibregl.Map
       try {
-        mapInstance = new maplibregl.Map({
+        mapInstance = new engine.maplibregl.Map({
           container: mapContainer.current,
-          style: DARK_STYLE,
-          center: [initialLongitude || 0, initialLatitude || 20],
-          zoom: initialZoom || 2,
+          style: engine.DARK_STYLE,
+          center: viewBeforeMap.current ? [viewBeforeMap.current.lng, viewBeforeMap.current.lat] : [initialLongitude || 0, initialLatitude || 20],
+          zoom: viewBeforeMap.current?.zoom ?? (initialZoom || 2),
           attributionControl: false,
         })
       } catch (error) {
@@ -719,7 +727,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
       // ── MapboxOverlay (deck.gl as MapLibre control — identical API) ──
       try {
-        deckOverlay.current = new MapboxOverlay({ interleaved: true, layers: [] })
+        deckOverlay.current = new engine.MapboxOverlay({ interleaved: true, layers: [] })
         mapInstance.addControl(deckOverlay.current as unknown as maplibregl.IControl)
       } catch (error) {
         console.error("Error creating deck.gl overlay:", error)
@@ -825,7 +833,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           }
         }
       }
-    }, [showControls])
+    }, [showControls, engine])
 
     const mapAttribution = (
       <span className="block text-[9px] leading-none text-white/50 whitespace-nowrap"><a href="https://protomaps.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Protomaps</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">OpenStreetMap contributors</a></span>
@@ -888,7 +896,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       const docs = spatialDocData.data
       if (!docs || docs.length === 0) return null
 
-      return new ScatterplotLayer({
+      return new engine!.ScatterplotLayer({
         id: 'wikipedia-documents-layer',
         data: docs,
         getPosition: (d: any) => [d.longitude || 0, d.latitude || 0],
@@ -1146,7 +1154,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       const isContext = (d: ArcDatum) => hasSelection && !isSelectedArc(d)
       const contextAlpha = isMobile ? 90 : 60
 
-      const mainLayer = new ArcLayer<ArcDatum>({
+      const mainLayer = new engine!.ArcLayer<ArcDatum>({
         id: layerId,
         data: arcLayerData,
         getSourcePosition: (d) => d.sourcePosition,
@@ -1247,7 +1255,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       const listHoverShown = !!listHover && validArcs.some((d) => matchesListHover(d.place_name, activeCountry ?? "", d.institution_name))
       const drillAlpha = (d: any) => listHoverShown && !matchesListHover(d.place_name, activeCountry ?? "", d.institution_name) ? 50 : isDense ? 90 : 150
       const contextAlpha = isMobile ? 90 : 60
-      const drillLayer = new ArcLayer({
+      const drillLayer = new engine!.ArcLayer({
         id: "arc-layer-drill",
         data: validArcs,
         getSourcePosition: (d: any) => [d.longitude, d.latitude],
@@ -1318,7 +1326,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       // zoom a raised arc only shows its lift-off (a widening wedge), so it lies flat
       // there; desktop keeps the curve at every zoom.
       const getHeight = isMobile && isStreetZoom ? 0 : 1
-      return result.map((layer) => layer instanceof ArcLayer ? layer.clone({ beforeId: ARC_ANCHOR_LAYER, getHeight }) : layer)
+      return result.map((layer) => layer instanceof engine!.ArcLayer ? layer.clone({ beforeId: engine!.ARC_ANCHOR_LAYER, getHeight }) : layer)
     }, [isMapReady, arcLayer, drillArcLayer, wikiLayer, isMobile, isStreetZoom])
 
     // Push layers to MapboxOverlay
@@ -1419,9 +1427,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
           {mapAttribution}
         </div>
 
-        {/* Loading overlay */}
+        {/* Loading overlay: the map's own background, not a gray flash before it appears */}
         {!mapLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#111] text-white">
             <Spinner size="2" />
           </div>
         )}
