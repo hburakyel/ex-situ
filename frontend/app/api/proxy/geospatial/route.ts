@@ -5,14 +5,8 @@ const responseCache: Map<string, { data: any; timestamp: number }> = new Map()
 const CACHE_DURATION_GLOBAL = 30 * 60 * 1000 // 30 minutes for zoom < 7 (country/city stats rarely change)
 const CACHE_DURATION_LOCAL  =  5 * 60 * 1000 // 5 minutes for zoom >= 7 (viewport-dependent)
 
-// Rate limiting - shared state
-let lastRequestTime = 0
-const MIN_REQUEST_INTERVAL = 300 // 300ms between requests for geospatial
-
 // In-flight deduplication — prevents multiple concurrent requests for the same key
 const inFlightRequests: Map<string, Promise<any>> = new Map()
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -76,14 +70,6 @@ export async function GET(request: NextRequest) {
       // If the in-flight request failed, fall through and retry
     }
   }
-
-  // Implement rate limiting
-  const now = Date.now()
-  const timeSinceLastRequest = now - lastRequestTime
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    await wait(MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-  }
-  lastRequestTime = Date.now()
 
   // Create a fetch promise and register it for deduplication
   const fetchPromise = (async () => {

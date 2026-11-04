@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore, Suspense } from "react"
-import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { useSearchParams, usePathname } from "next/navigation"
 import MapView, { type FacetedFilters } from "@/components/map/map-view"
 import ObjectPanel, { type ContainerSize } from "@/components/map/object-panel"
 import { fetchMuseumObjects, fetchObjectsByCountry, fetchDateBucketCounts, fetchPrecisePlaces, type DateBucketCounts, type PrecisePlace } from "@/lib/api"
@@ -110,7 +110,6 @@ const noopSubscribe = () => () => {}
 
 function MapContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const pathname = usePathname()
 
   // ── Read initial state from URL params ──
@@ -122,7 +121,7 @@ function MapContent() {
   const urlLng = searchParams.get("lng")
   const urlZoom = searchParams.get("zoom")
   const urlArtifactId = searchParams.get("artifactId")
-  // Capture on mount in a ref — router.replace will strip it from the URL but we still need it
+  // Capture on mount in a ref — the URL sync below strips it from the URL but we still need it
   const artifactIdRef = useRef(urlArtifactId)
 
   // Clamp and validate URL parameters to prevent NaN / extreme values
@@ -702,6 +701,10 @@ function MapContent() {
     return qs ? `${pathname}?${qs}` : pathname
   }, [pathname])
 
+  // Only the address bar changes: the page is already on screen, so router.replace would
+  // render /map on the server again for every map move. useSearchParams still sees it.
+  const replaceUrl = (url: string) => window.history.replaceState(null, "", url)
+
   // Immediate URL update for drill-down changes
   useEffect(() => {
     if (isRestoringFromUrl.current) {
@@ -709,7 +712,7 @@ function MapContent() {
       return
     }
     const newUrl = buildUrl(activeCountry, activeSite, activePrecise, activeInstitution, viewState.latitude, viewState.longitude, viewState.zoom)
-    router.replace(newUrl, { scroll: false })
+    replaceUrl(newUrl)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCountry, activeSite, activePrecise, activeInstitution])
 
@@ -719,7 +722,7 @@ function MapContent() {
     if (urlUpdateTimer.current) clearTimeout(urlUpdateTimer.current)
     urlUpdateTimer.current = setTimeout(() => {
       const newUrl = buildUrl(activeCountry, activeSite, activePrecise, activeInstitution, viewState.latitude, viewState.longitude, viewState.zoom)
-      router.replace(newUrl, { scroll: false })
+      replaceUrl(newUrl)
     }, 800)
     return () => { if (urlUpdateTimer.current) clearTimeout(urlUpdateTimer.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
