@@ -20,6 +20,9 @@ import { linkHost, track } from "@/lib/analytics"
 
 const hasImageUrl = (imgUrl?: string | null) => typeof imgUrl === "string" && imgUrl.trim().length > 0
 const MOBILE_CLOSE_SWIPE_THRESHOLD = 48
+// Full-size images already in the browser cache: they need no thumbnail in front,
+// which would only flash for a frame (next/previous, or the gallery remounting).
+const loadedImages = new Set<string>()
 
 interface ImageGalleryProps {
   objects: MuseumObject[]
@@ -41,7 +44,7 @@ export default function ImageGallery({
   // Start from the opening object's real state — it may have no image (withdrawn record).
   const startsWithImage = hasImageUrl(objects[initialIndex]?.attributes?.img_url)
   const [imageError, setImageError] = useState(!startsWithImage)
-  const [isLoading, setIsLoading] = useState(startsWithImage)
+  const [isLoading, setIsLoading] = useState(startsWithImage && !loadedImages.has(objects[initialIndex].attributes.img_url!))
   const [linkCopied, setLinkCopied] = useState(false)
   const [citeCopied, setCiteCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -63,19 +66,25 @@ export default function ImageGallery({
     if (n < 2) return
     for (const step of [1, -1, 2]) {
       const url = galleryObjects[(currentIndex + step + n) % n]?.attributes?.img_url
-      if (hasImageUrl(url)) new window.Image().src = resolveImageSrc(url!, LARGE_WIDTH)
+      if (!hasImageUrl(url)) continue
+      const preload = new window.Image()
+      preload.onload = () => loadedImages.add(url!)
+      preload.src = resolveImageSrc(url!, LARGE_WIDTH)
     }
   }, [galleryObjects, currentIndex])
 
   // Reset image/loading state synchronously during render (not in an effect) so the
   // browser never paints a stale frame — e.g. the previous object's "no image" fallback
   // flashing before the new object's image is known to exist.
-  const [trackedObjectId, setTrackedObjectId] = useState(currentObject?.id)
-  if (currentObject && currentObject.id !== trackedObjectId) {
-    setTrackedObjectId(currentObject.id)
-    const objectHasImage = hasImageUrl(currentObject.attributes?.img_url)
+  // Keyed on the image, not the object: a preview card swapped for its real object keeps
+  // the same image, which fires no new load event and would stay behind the thumbnail.
+  const currentImageUrl = currentObject?.attributes?.img_url
+  const [trackedImageUrl, setTrackedImageUrl] = useState(currentImageUrl)
+  if (currentObject && currentImageUrl !== trackedImageUrl) {
+    setTrackedImageUrl(currentImageUrl)
+    const objectHasImage = hasImageUrl(currentImageUrl)
     setImageError(!objectHasImage)
-    setIsLoading(objectHasImage)
+    setIsLoading(objectHasImage && !loadedImages.has(currentImageUrl!))
   }
 
   // One artifact_open per artifact shown: on open and on each previous/next.
@@ -149,6 +158,7 @@ export default function ImageGallery({
 
   const handleImageLoad = () => {
     skippedRef.current = 0
+    if (currentImageUrl) loadedImages.add(currentImageUrl)
     setIsLoading(false)
   }
 
@@ -446,6 +456,7 @@ export default function ImageGallery({
                 src={resolveImageSrc(currentObject.attributes.img_url!, THUMB_WIDTH)}
                 alt=""
                 aria-hidden="true"
+                decoding="sync"
                 // Same box as the full-size image below, so the swap only sharpens — no jump in size.
                 className="w-full h-full object-contain"
               />

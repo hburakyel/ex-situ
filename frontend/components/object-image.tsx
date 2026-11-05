@@ -67,12 +67,13 @@ export default function ObjectImage({
         src={resolveImageSrc(imageSrc, width)}
         alt={alt}
         loading={loading}
-        decoding="async"
+        // No fade: the image replaces the thumbnail in one frame, so it must be decoded by then.
+        decoding={fadeIn ? "async" : "sync"}
         className={cn(
           "relative block",
           fadeIn && "transition-opacity duration-500 ease-out",
           imgClassName,
-          isLoaded ? "opacity-100" : "opacity-0",
+          isLoaded || !fadeIn ? "opacity-100" : "opacity-0",
         )}
         style={imgStyle}
         onLoad={() => {
