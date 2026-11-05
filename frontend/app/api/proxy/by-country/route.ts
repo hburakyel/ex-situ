@@ -1,9 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// Simple in-memory cache
-const responseCache: Map<string, { data: any; timestamp: number }> = new Map()
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
@@ -16,15 +12,6 @@ export async function GET(request: NextRequest) {
   const institution = searchParams.get("institution")
   if (!country && !institution) {
     return NextResponse.json({ error: "country or institution parameter is required" }, { status: 400 })
-  }
-
-  // Cache key
-  const cacheKey = `by-country:${searchParams.toString()}`
-  const cached = responseCache.get(cacheKey)
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cached.data, {
-      headers: { "Cache-Control": "private, max-age=0", "X-Cache": "HIT" },
-    })
   }
 
 try {
@@ -59,21 +46,9 @@ try {
       )
     }
 
-    const data = await response.json()
-
-    // Cache response
-    responseCache.set(cacheKey, { data, timestamp: Date.now() })
-
-    // Evict old entries
-    if (responseCache.size > 50) {
-      const oldest = Array.from(responseCache.entries())
-        .sort(([, a], [, b]) => a.timestamp - b.timestamp)
-        .slice(0, 10)
-      oldest.forEach(([key]) => responseCache.delete(key))
-    }
-
-    return NextResponse.json(data, {
-      headers: { "Cache-Control": "private, max-age=0", "X-Cache": "MISS" },
+    // Cached by nginx in production.
+    return NextResponse.json(await response.json(), {
+      headers: { "Cache-Control": "public, max-age=300" },
     })
   } catch (error) {
     console.error("[by-country proxy] Fetch error:", error)
