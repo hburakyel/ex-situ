@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import sharp from "sharp"
-import { aicInfoUrl, aicUrlAtWidth } from "@/lib/image-src"
+import { aicAlternateUrl, aicInfoUrl, aicUrlAtWidth } from "@/lib/image-src"
 import { fetchAllowedImage, isAllowedImageUrl } from "@/lib/remote-image-url"
 
 export const runtime = "nodejs"
@@ -8,6 +8,10 @@ export const runtime = "nodejs"
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const DEFAULT_WIDTH = 300
 const MAX_WIDTH = 800
+const FETCH_TIMEOUT_MS = 10_000
+// AIC normally answers within about 1 s (300 sampled requests), but now and then one
+// size of an image stalls for 20-30 s while its other sizes answer at once.
+const AIC_FIRST_TRY_MS = 3_000
 
 // In-memory cache for resized images (key: url+width → { buffer, headers })
 const imageCache = new Map<string, { buffer: Buffer; contentType: string; timestamp: number }>()
@@ -56,9 +60,9 @@ export async function GET(request: NextRequest) {
 
   // Fetch original image. Some museum CDNs (e.g. id.smb.museum) hotlink-block
   // headerless requests, so spoof a browser-like User-Agent/Referer.
-  const fetchOriginal = async (target: string): Promise<Response> => {
+  const fetchOriginal = async (target: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> => {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10_000)
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
     try {
       return await fetchAllowedImage(target, {
         // Not Next's fetch data cache: it serializes image bodies to disk as JSON
@@ -82,15 +86,23 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const fetchAic = async (): Promise<Response> => {
+    let first: Response
+    try {
+      first = await fetchOriginal(url, AIC_FIRST_TRY_MS)
+    } catch {
+      return fetchOriginal(aicAlternateUrl(url))
+    }
+    if (first.ok) return first
+    // Sources narrower than the requested width: retry at the source's own width.
+    const info = await fetchOriginal(aicInfoUrl(url))
+    const sourceWidth = info.ok ? (await info.json()).width : undefined
+    return Number.isInteger(sourceWidth) ? fetchOriginal(aicUrlAtWidth(url, sourceWidth)) : first
+  }
+
   let response: Response
   try {
-    response = await fetchOriginal(url)
-    // Sources narrower than the requested width: retry at the source's own width.
-    if (!response.ok && new URL(url).hostname === "www.artic.edu") {
-      const info = await fetchOriginal(aicInfoUrl(url))
-      const sourceWidth = info.ok ? (await info.json()).width : undefined
-      if (Number.isInteger(sourceWidth)) response = await fetchOriginal(aicUrlAtWidth(url, sourceWidth))
-    }
+    response = new URL(url).hostname === "www.artic.edu" ? await fetchAic() : await fetchOriginal(url)
   } catch {
     return NextResponse.json({ error: "Failed to fetch image" }, { status: 502 })
   }

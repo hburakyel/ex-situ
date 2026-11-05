@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { aicInfoUrl, aicUrlAtWidth, LARGE_WIDTH, resolveImageSrc } from "./image-src"
+import { aicAlternateUrl, aicInfoUrl, aicUrlAtWidth, LARGE_WIDTH, resolveImageSrc } from "./image-src"
 
 describe("resolveImageSrc", () => {
   it("maps dead recherche.smb.museum URLs to search.smb.museum", () => {
@@ -52,6 +52,10 @@ describe("resolveImageSrc — Art Institute of Chicago (IIIF allowlist)", () => 
   })
   it("replaces the blocked fit-in box from older links", () => {
     expect(aicUrlAtWidth(stored.replace("843,", "!843,843"), 557)).toBe(stored.replace("843,", "557,"))
+  })
+  it("has another allowed size for a stalled request", () => {
+    expect(aicAlternateUrl(stored)).toBe(stored.replace("843,", "800,"))
+    expect(aicAlternateUrl(stored.replace("843,", "400,"))).toBe(stored.replace("843,", "600,"))
   })
   it("finds info.json next to the image", () => {
     expect(aicInfoUrl(stored)).toBe(

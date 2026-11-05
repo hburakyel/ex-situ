@@ -11,7 +11,8 @@
 //   (It must live under /api/proxy/: production nginx sends every other
 //   /api/* path to Strapi, not Next.) AIC also allows only some sizes (see
 //   AIC_THUMB_WIDTH); a source narrower than the width asked for is retried at
-//   its own width by the proxy (aicInfoUrl, aicUrlAtWidth).
+//   its own width by the proxy (aicInfoUrl, aicUrlAtWidth), and a size that
+//   stalls is asked for at another allowed width (aicAlternateUrl).
 // - id.smb.museum: hotlink-blocks headerless requests; proxied for the same reason.
 // - www.weltmuseumwien.at: /pics/ files are the full-size scans (often 300 KB+) and
 //   the page's own thumbnails have hashed names; proxied so tiles are resized.
@@ -53,6 +54,12 @@ export function aicInfoUrl(src: string): string {
 
 export function aicUrlAtWidth(src: string, sourceWidth: number): string {
   return src.replace(/\/full\/[^/]+\//, `/full/${Math.min(sourceWidth, AIC_LARGE_WIDTH)},/`)
+}
+
+// The next allowed size down, for a request that stalled at AIC: the proxy shrinks
+// to the width asked for, so tiles and the large view look the same.
+export function aicAlternateUrl(src: string): string {
+  return src.replace(`/full/${AIC_THUMB_WIDTH},/`, "/full/600,/").replace(`/full/${AIC_LARGE_WIDTH},/`, "/full/800,/")
 }
 
 export function resolveImageSrc(src: string, width: number = THUMB_WIDTH): string {
