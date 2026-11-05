@@ -1822,23 +1822,15 @@ export default function ObjectPanel({
   // cards bring the panel back (not a grid icon: the squares are the Display menu's).
   if (closed) {
     if (typeof document === "undefined") return null
-    const countLabel = `${totalCount.toLocaleString("en-US")} artifact${totalCount === 1 ? "" : "s"}`
     return createPortal(
       <div className="fixed z-20 flex items-center gap-2" style={{ top: "var(--edge)", right: "var(--edge)" }}>
         <div className="flex items-center gap-2 rounded-xl bg-white p-1 shadow-lg">
           {exportAndShare}
         </div>
-        {/* A card like the map's home button; the pill on its corner says what is waiting in
-            the panel. It grows to the left, so a long number stays on screen. */}
-        <button type="button" onClick={onShowContainer} title={`Show ${countLabel}`} aria-label={`Show ${countLabel}`}
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-lg hover:bg-gray-100">
+        {/* A card like the map's home button. */}
+        <button type="button" onClick={onShowContainer} title="Show artifacts" aria-label="Show artifacts"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-lg hover:bg-gray-100">
           <IconArtifacts className="h-5 w-5 text-gray-500" />
-          {/* In px: the mono figures sit high in their line, the 1px brings them to the middle. */}
-          {totalCount > 0 && (
-            <span aria-hidden="true" className="absolute flex items-center rounded-full bg-blue-500 text-white" style={{ top: -10, right: -8, height: 20, padding: "1px 7px 0", fontSize: 12, lineHeight: 1 }}>
-              {totalCount.toLocaleString("en-US")}
-            </span>
-          )}
         </button>
       </div>,
       document.body,
