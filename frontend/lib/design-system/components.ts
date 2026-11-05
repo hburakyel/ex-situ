@@ -140,7 +140,7 @@ export interface MapLayoutProps {
  * - `shadows.lg` (shadow-lg)
  * - `shadows.xl` (shadow-xl on wiki popup)
  * - `spacing.10` (top-10, left-10)
- * - `layout.headerPanelWidth` (sm:w-80)
+ * - `layout.headerPanelWidth` (SIDE_PANEL_WIDTH)
  * - `zIndex.panel` (z-20)
  * - `zIndex.tooltip` (z-50)
  * - `motion.fast` (transition-colors)

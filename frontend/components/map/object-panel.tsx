@@ -29,7 +29,7 @@ import InfoPanel from "./info-panel"
 import type { EraBucket } from "@/lib/era-buckets"
 import type { DateBucketCounts } from "@/lib/api"
 import { track } from "@/lib/analytics"
-import { OBJECT_PANEL_WIDTH } from "@/lib/desktop-layout"
+import { HALF_CONTROLS_RIGHT, HALF_PANEL_WIDTH, OBJECT_PANEL_WIDTH, SIDE_PANEL_WIDTH } from "@/lib/desktop-layout"
 import type { PrecisePlace } from "@/lib/api"
 import PrecisePlaceRows from "@/components/map/precise-place-rows"
 
@@ -137,6 +137,7 @@ interface ObjectPanelProps {
   onGalleryOpenChange?: (open: boolean) => void
   /** Desktop: the side panel is closed; in the grid view the panel takes its room. */
   sideCollapsed?: boolean
+  halfScreen?: boolean
   /** Desktop grid view: its map card is closed, and the header's button that closes/opens it. */
   gridMapHidden?: boolean
   onGridMapToggle?: () => void
@@ -155,7 +156,7 @@ function MapCardButtons({ onCard, children }: { onCard: boolean; children: React
   return createPortal(
     // Like the map's home button, 0.75rem inside the card (and its 1px stroke), in line with it.
     <div className="fixed z-40 overflow-hidden rounded-xl bg-white shadow-lg [&>button]:h-10 [&>button]:w-10"
-      style={{ top: "calc(2.75rem + 1px)", right: "calc(2.75rem + 1px)" }}>
+      style={{ top: "calc(var(--edge) + 0.75rem + 1px)", right: "calc(var(--edge) + 0.75rem + 1px)" }}>
       {children}
     </div>,
     document.body,
@@ -210,6 +211,7 @@ export default function ObjectPanel({
   onMapToggle,
   onGalleryOpenChange,
   sideCollapsed = false,
+  halfScreen = false,
   gridMapHidden = false,
   onGridMapToggle,
 }: ObjectPanelProps) {
@@ -259,7 +261,7 @@ export default function ObjectPanel({
   const unifiedPanel = isMobile && MOBILE_FULL_SCREEN
   // Grid view: the grid's right edge, 1rem from the map card, or the right margin
   // while the card is closed.
-  const gridRight = gridMapHidden ? "2rem" : `calc(${OBJECT_PANEL_WIDTH} + 3rem)`
+  const gridRight = gridMapHidden ? "var(--edge)" : halfScreen ? HALF_CONTROLS_RIGHT : `calc(${OBJECT_PANEL_WIDTH} + var(--edge) + 1rem)`
   const denseGrid = containerSize === "expanded" && (unifiedPanel || (gridView && gridMapHidden))
   const [showCopied, setShowCopied] = useState(false)
   // Grid density: null = the responsive default; otherwise a fixed column count
@@ -941,8 +943,8 @@ export default function ObjectPanel({
       case "expanded":
         return gridView ? {
           transition: desktopTransition,
-          // Grid view: the background right of the side panel (left-8 w-80).
-          left: sideCollapsed ? 0 : "22rem",
+          // Grid view: the background right of the side panel.
+          left: sideCollapsed ? 0 : `calc(var(--edge) + ${SIDE_PANEL_WIDTH})`,
         } : {
           transition: desktopTransition,
           // Full page, edge to edge.
@@ -953,7 +955,7 @@ export default function ObjectPanel({
       default:
         return {
           transition: desktopTransition,
-          width: OBJECT_PANEL_WIDTH,
+          width: halfScreen ? HALF_PANEL_WIDTH : OBJECT_PANEL_WIDTH,
           height: "auto",
         }
     }
@@ -1586,10 +1588,10 @@ export default function ObjectPanel({
 
   const sheetInner = (
     <div className="h-full flex flex-col"
-      // Grid view: header and grid between the side panel (left-8 w-80) and the map card
-      // (OBJECT_PANEL_WIDTH at right-8), 1rem from each; the count row level with the side
+      // Grid view: header and grid between the side panel and the map card
+      // (OBJECT_PANEL_WIDTH at the right margin), 1rem from each; the count row level with the side
       // panel's breadcrumb row (its pt-3 against this header's pt-2 + py-1: 6px).
-      style={gridView ? { paddingLeft: "1rem", paddingRight: gridRight, paddingTop: "calc(2rem + 6px)" } : undefined}>
+      style={gridView ? { paddingLeft: "1rem", paddingRight: gridRight, paddingTop: "calc(var(--edge) + 6px)" } : undefined}>
       {/* Mobile drag handle */}
       {isMobile && !MOBILE_FULL_SCREEN && (
         <div
@@ -1634,7 +1636,7 @@ export default function ObjectPanel({
           </div>
         ) : (
           // Grid view, side panel closed: the count clears the button that opens it.
-          <div className="sticky top-0 z-30 flex flex-row items-start bg-white" style={gridView && sideCollapsed ? { paddingLeft: "6rem" } : undefined}>
+          <div className="sticky top-0 z-30 flex flex-row items-start bg-white" style={gridView && sideCollapsed ? { paddingLeft: "var(--closed-side-room)" } : undefined}>
             <div className="flex-1 min-w-0">
               <InfoPanel
                 isMobile={isMobile}
@@ -1820,13 +1822,24 @@ export default function ObjectPanel({
   // cards bring the panel back (not a grid icon: the squares are the Display menu's).
   if (closed) {
     if (typeof document === "undefined") return null
+    const countLabel = `${totalCount.toLocaleString("en-US")} artifact${totalCount === 1 ? "" : "s"}`
     return createPortal(
-      <div className="fixed z-20 flex items-center gap-2 rounded-xl bg-white/95 p-1 shadow-sm"
-        style={{ top: "calc(2.5rem - 0.25rem)", right: "calc(3rem - 0.25rem)" }}>
-        {exportAndShare}
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onShowContainer} title="Show artifacts" aria-label="Show artifacts">
+      <div className="fixed z-20 flex items-center gap-2" style={{ top: "var(--edge)", right: "var(--edge)" }}>
+        <div className="flex items-center gap-2 rounded-xl bg-white p-1 shadow-lg">
+          {exportAndShare}
+        </div>
+        {/* A card like the map's home button; the pill on its corner says what is waiting in
+            the panel. It grows to the left, so a long number stays on screen. */}
+        <button type="button" onClick={onShowContainer} title={`Show ${countLabel}`} aria-label={`Show ${countLabel}`}
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-lg hover:bg-gray-100">
           <IconArtifacts className="h-5 w-5 text-gray-500" />
-        </Button>
+          {/* In px: the mono figures sit high in their line, the 1px brings them to the middle. */}
+          {totalCount > 0 && (
+            <span aria-hidden="true" className="absolute flex items-center rounded-full bg-blue-500 text-white" style={{ top: -10, right: -8, height: 20, padding: "1px 7px 0", fontSize: 12, lineHeight: 1 }}>
+              {totalCount.toLocaleString("en-US")}
+            </span>
+          )}
+        </button>
       </div>,
       document.body,
     )
@@ -1854,7 +1867,7 @@ export default function ObjectPanel({
       className={`fixed ${
         isMobile
           ? "bg-white" // all positioning/sizing handled by inline style
-          : containerSize === "expanded" ? "inset-0 bg-white" : "top-8 right-8 bottom-8 shadow-lg bg-white"
+          : containerSize === "expanded" ? "inset-0 bg-white" : "top-[var(--edge)] right-[var(--edge)] bottom-[var(--edge)] shadow-lg bg-white"
         // Grid view: under the side panel and the map card.
       } ${isMobile && MOBILE_FULL_SCREEN && galleryOpen ? "z-[60]" : gridView ? "z-10" : "z-20"} overflow-hidden`}
       style={{
@@ -1875,9 +1888,9 @@ export default function ObjectPanel({
             inset: 0,
             // Grid view: the gallery opens as it does in the panel beside the map: in the
             // objects' place (over the grid, the map card stays), between the cards' top and
-            // bottom margins (2rem), so it has the same height and header line in both views.
+            // bottom margins (--edge), so it has the same height and header line in both views.
             // Its white reaches the bottom edge, so the grid doesn't show below it.
-            ...(gridView ? { top: "2rem", bottom: 0, left: sideCollapsed ? 0 : "1rem", right: gridRight, background: "white" } : {}),
+            ...(gridView ? { top: "var(--edge)", bottom: 0, left: sideCollapsed ? 0 : "1rem", right: gridRight, background: "white" } : {}),
             zIndex: 59,
             // Mobile (full-screen panel): the gallery opens above the map at once — a fade
             // would show the panel or the map through it for a moment.
@@ -1888,7 +1901,7 @@ export default function ObjectPanel({
           }}
         >
           {/* Side panel closed: the white runs to the left edge, the gallery clears its buttons. */}
-          <div className="absolute inset-0" style={gridView ? { bottom: "2rem", left: sideCollapsed ? "7.25rem" : 0 } : undefined}>
+          <div className="absolute inset-0" style={gridView ? { bottom: "var(--edge)", left: sideCollapsed ? "calc(var(--closed-side-room) + 1.25rem)" : 0 } : undefined}>
           <ImageGallery
             key={galleryKey}
             objects={galleryArtifact ? [galleryArtifact] : (gallerySnapshot.current.length > 0 ? gallerySnapshot.current : galleryObjects)}

@@ -2,8 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+@media (max-width: 1199px) {
+  :root {
+    --edge: 1rem;
+    --closed-side-room: 3rem;
+  }
+}
+
 @layer base {
   :root {
+    /* Map page, desktop: the margin around the panels, and the room the closed side
+       panel's buttons take beside the header. Narrow windows give both to the content. */
+    --edge: 2rem;
+    --closed-side-room: 6rem;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 

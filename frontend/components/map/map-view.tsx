@@ -32,7 +32,7 @@ import { placeDisplayLabels, siteRowLabel } from "@/lib/place-label"
 import { sharedRequest } from "@/lib/api"
 import { COUNTRY_LABELS_URL, ORIGIN_LABELS_SOURCE, buildCountryIndex, countryKey } from "@/lib/country-labels"
 import { track } from "@/lib/analytics"
-import { OBJECT_PANEL_WIDTH } from "@/lib/desktop-layout"
+import { HALF_CONTROLS_RIGHT, OBJECT_PANEL_WIDTH, SIDE_PANEL_WIDTH } from "@/lib/desktop-layout"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 import type { PrecisePlace } from "@/lib/api"
@@ -299,6 +299,7 @@ interface MapViewProps {
   onWhite?: boolean
   /** Desktop: the side panel is closed to the left; the page takes its room. */
   sideCollapsed?: boolean
+  halfScreen?: boolean
   onSideCollapsedChange?: (collapsed: boolean) => void
   /** Desktop: the switch between the map and the artifacts as the page. */
   onViewToggle?: () => void
@@ -360,6 +361,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       mapCard = false,
       onWhite = false,
       sideCollapsed = false,
+      halfScreen = false,
       onSideCollapsedChange,
       onViewToggle,
     },
@@ -461,6 +463,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     // Guard against update loops from programmatic map moves
     const isProgrammaticMove = useRef(false)
+    const lastFit = useRef<[number, number][] | null>(null)
     const lastViewRef = useRef({
       lng: initialViewState.longitude || 0,
       lat: initialViewState.latitude || 20,
@@ -564,6 +567,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
       map: map.current,
       // Returns false while the map isn't created yet (the call did nothing).
       flyToLocation: (lng: number, lat: number, zoom: number = 10, duration: number = 800): boolean => {
+        lastFit.current = null
         if (!map.current) {
           viewBeforeMap.current = { lng, lat, zoom }
           return false
@@ -593,12 +597,15 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         document.querySelectorAll("[data-map-cover]").forEach((el) => {
           const r = el.getBoundingClientRect()
           if (r.width === 0 || r.width > box.width / 2) return
-          if (r.left + r.width / 2 < box.left + box.width / 2) padding.left = Math.max(padding.left, r.right - box.left + 48)
+          // The map controls stand beside the object panel, even when that is the middle.
+          const onRight = (el as HTMLElement).dataset.mapCover === "right"
+          if (!onRight && r.left + r.width / 2 < box.left + box.width / 2) padding.left = Math.max(padding.left, r.right - box.left + 48)
           else padding.right = Math.max(padding.right, box.right - r.left + 48)
         })
         if (box.width - padding.left - padding.right < 200) { padding.left = 40; padding.right = 40 }
         const camera = m.cameraForBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding })
         if (!camera?.center) return null
+        lastFit.current = points
         const center = engine!.maplibregl.LngLat.convert(camera.center)
         const zoom = Math.min(camera.zoom ?? m.getZoom(), 6)
         isProgrammaticMove.current = true
@@ -607,6 +614,10 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         prevViewStateRef.current = { longitude: center.lng, latitude: center.lat, zoom } as any
         m.flyTo({ center, zoom, essential: true, duration: 1400 })
         return { longitude: center.lng, latitude: center.lat, zoom }
+      },
+      // The panels changed size: frame the last points again, unless the map was moved since.
+      refit(this: { centerOnPoints: (points: [number, number][]) => { longitude: number; latitude: number; zoom: number } | null }) {
+        return lastFit.current ? this.centerOnPoints(lastFit.current) : null
       },
       jumpToLocation: (lng: number, lat: number, zoom: number = 10) => {
         if (map.current) {
@@ -683,6 +694,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
 
     const handleResetView = useCallback(() => {
       if (map.current) {
+        lastFit.current = null
         isProgrammaticMove.current = true
         lastViewRef.current = { lng: 0, lat: 20, zoom: 1 }
         map.current.flyTo({ center: [0, 20], zoom: 1, pitch: 0, bearing: 0, essential: true, duration: 1800 })
@@ -751,7 +763,8 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         }
       })
 
-      mapInstance.on("movestart", () => {
+      mapInstance.on("movestart", (e: { originalEvent?: unknown }) => {
+        if (e.originalEvent) lastFit.current = null
         // Clear hover tooltips immediately when map starts moving / animating
         // Prevents tooltips from getting stuck on screen during fly animations
         setHoveredArc(null)
@@ -1391,13 +1404,13 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         />
 
         {/* Desktop map controls, bottom right as on most maps (left of the object panel,
-            OBJECT_PANEL_WIDTH at right-8): back to the globe, like the breadcrumb root, and
+            OBJECT_PANEL_WIDTH at the right margin): back to the globe, like the breadcrumb root, and
             zoom for those who don't scroll or pinch. In the grid view they sit inside the
             map card. */}
         {showControls && !isMobile && (
-          <div className="absolute z-20 flex flex-col gap-2" data-map-cover
+          <div className="absolute z-20 flex flex-col gap-2" data-map-cover="right"
             style={gridView ? { right: "0.75rem", bottom: "0.75rem" }
-              : { bottom: "2rem", right: isObjectContainerVisible ? `calc(${OBJECT_PANEL_WIDTH} + 3rem)` : "2rem" }}>
+              : { bottom: "var(--edge)", right: halfScreen ? HALF_CONTROLS_RIGHT : isObjectContainerVisible ? `calc(${OBJECT_PANEL_WIDTH} + var(--edge) + 1rem)` : "var(--edge)" }}>
             {[
               // A house, "back to the start" (as the breadcrumb root): the globe is "show map".
               [{ label: "Back to the start", icon: IconHome, onClick: () => onBreadcrumbClick?.("global") }],
@@ -1419,11 +1432,11 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
         )}
 
         {/* Map attribution. Desktop: bottom right, on the panels' right edge, in the
-            2rem margin under them. Phones and the grid view's map card: the bottom-left
+            margin under them. Phones and the grid view's map card: the bottom-left
             corner. */}
         <div className={isMobile || gridView
           ? "absolute bottom-1 left-1 z-10 px-1.5 py-0.5"
-          : "absolute bottom-3 right-8 z-10"}>
+          : "absolute bottom-0 min-[1200px]:bottom-3 right-[var(--edge)] z-10"}>
           {mapAttribution}
         </div>
 
@@ -1539,12 +1552,12 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             invisible); this stays put. Its stroke there is a ring, which takes no room, so
             nothing in it moves when the view changes. */}
         {!isMobile && (
-        <div className={`fixed z-20 visible ${sideCollapsed ? "top-[2.5rem] left-[2.375rem]" : `top-8 left-8 sm:w-80 ${onWhite ? "rounded-2xl ring-1 ring-gray-200" : ""}`}`} data-map-cover>
+        <div className={`fixed z-20 visible ${sideCollapsed ? "top-[calc(var(--edge)+0.5rem)] left-[calc(var(--edge)+0.375rem)]" : `top-[var(--edge)] left-[var(--edge)] ${onWhite ? "rounded-2xl ring-1 ring-gray-200" : ""}`}`} style={sideCollapsed ? undefined : { width: SIDE_PANEL_WIDTH }} data-map-cover={sideCollapsed ? undefined : ""}>
         {/* As tall as the object panel at most; its lists share the height (useSharedListHeights). */}
         {/* On white (grid view) a stroke and a light shadow, not the shadow it has on the map. */}
         {/* Closed, the card is just the button: the map's home button on the map, no stroke
             or shadow on white. Its left and top keep the button where the open panel has it. */}
-        <div ref={sidePanelRef} className={`bg-white ${sideCollapsed ? `rounded-xl ${onWhite ? "" : "shadow-lg"}` : `rounded-2xl ${onWhite ? "shadow-sm" : "shadow-lg"}`} flex flex-col relative max-h-[calc(100dvh-4rem)] overflow-y-auto`}>
+        <div ref={sidePanelRef} className={`bg-white ${sideCollapsed ? `rounded-xl ${onWhite ? "" : "shadow-lg"}` : `rounded-2xl ${onWhite ? "shadow-sm" : "shadow-lg"}`} flex flex-col relative max-h-[calc(100dvh_-_2_*_var(--edge))] overflow-y-auto`}>
           {/* ── Header: close to the left, name, About ── */}
           {/* Same row as the object panel's count row (pt-2 + py-1, 32px tall, leading-normal),
               so "Ex Situ" and "N artifacts" sit on one baseline. Closed, only the button
@@ -1577,9 +1590,9 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
             </>
             )}
             {/* Map or artifacts as the page: a switch, the knob to the right for artifacts,
-                named on hover like the site rows. It stays beside the button when the side
-                panel is closed. */}
+                named on hover like the site rows. Below 1200px it closes with the side panel. */}
             {onViewToggle && (
+              <div className={sideCollapsed ? "hidden min-[1200px]:contents" : "contents"}>
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1590,6 +1603,7 @@ const MapView = forwardRef<{ map: maplibregl.Map | null }, MapViewProps>(
                   <TooltipContent side="bottom">{onWhite ? "Map view" : "Artifacts view"}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              </div>
             )}
           </div>
           {/* Hidden, not removed: the lists keep their scroll and open sections. */}

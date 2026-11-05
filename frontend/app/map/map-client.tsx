@@ -25,7 +25,7 @@ import { MAP_DEFAULT_TITLE, mapTitle, withSiteName } from "@/lib/map-title"
 import { useInstitutionPlaces } from "@/lib/institution-places"
 import { siteKey } from "@/lib/site-key"
 import { objectsAcrossPlaces } from "@/lib/arc-total"
-import { OBJECT_PANEL_WIDTH } from "@/lib/desktop-layout"
+import { HALF_PANEL_WIDTH, NARROW_DESKTOP, OBJECT_PANEL_WIDTH } from "@/lib/desktop-layout"
 
 // ── SubArc type (zoom=4 site-level data) ──
 interface SubArc {
@@ -339,6 +339,46 @@ function MapContent() {
   // Mobile: picking an arc, place, site or collection brings the object sheet up to
   // half height when it is minimized or hidden (a full-screen sheet is left as is).
   const selectionKey = `${selectedArc?.key ?? ""}|${drillLevel}|${activeCountry ?? ""}|${activeSite ?? ""}|${activeInstitution ?? ""}`
+
+  // A narrow desktop window has no room for both panels and the map. A selection closes
+  // the side panel (its button opens it again, and it then stays open); the first view
+  // keeps it, as search is there. The grid view starts without its map card. What was
+  // closed here comes back when the room does.
+  const narrowDesktop = useMediaQuery(NARROW_DESKTOP)
+  const hasSelection = drillLevel !== "global" || !!activeInstitution
+  const squeezed = narrowDesktop && isObjectContainerVisible && hasSelection && (!gridView || gridMapCard)
+  const halfScreen = narrowDesktop && sideCollapsed && isObjectContainerVisible
+  // The side panel closes just after a selection framed its arcs: frame them for the halves.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => {
+      const view = mapRef.current?.refit?.()
+      if (view) setViewState((prev) => ({ ...prev, ...view }))
+    }))
+    return () => cancelAnimationFrame(frame)
+  }, [halfScreen])
+  const sideClosedForRoom = useRef(false)
+  useEffect(() => {
+    if (squeezed) {
+      sideClosedForRoom.current = !sideCollapsed
+      setSideCollapsed(true)
+    } else if (sideClosedForRoom.current) {
+      sideClosedForRoom.current = false
+      setSideCollapsed(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the room, not to the button
+  }, [squeezed])
+  const narrowGrid = narrowDesktop && gridView
+  const mapClosedForRoom = useRef(false)
+  useEffect(() => {
+    if (narrowGrid) {
+      mapClosedForRoom.current = !gridMapHidden
+      setGridMapHidden(true)
+    } else if (mapClosedForRoom.current) {
+      mapClosedForRoom.current = false
+      setGridMapHidden(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the room, not to the button
+  }, [narrowGrid])
   const prevSelectionKey = useRef(selectionKey)
   useEffect(() => {
     if (prevSelectionKey.current === selectionKey) return
@@ -1494,10 +1534,10 @@ function MapContent() {
             // Grid view: the object panel's card (place, size, corners), with a stroke on white.
             // z-30: it (and the side panel in it) lies over the panel, which is the background.
             // Closed, it is hidden; the side panel in it stays (visible, map-view.tsx).
-            : gridView ? `fixed top-8 right-8 bottom-8 z-30 overflow-hidden rounded-2xl border border-gray-200 bg-[#111] shadow-sm ${gridMapHidden ? "invisible" : ""}`
+            : gridView ? `fixed top-[var(--edge)] right-[var(--edge)] bottom-[var(--edge)] z-30 overflow-hidden rounded-2xl border border-gray-200 bg-[#111] shadow-sm ${gridMapHidden ? "invisible" : ""}`
             : "absolute inset-0"}
           style={isMobile && mobileMap !== "full" ? { bottom: "calc(12px + env(safe-area-inset-bottom))" }
-            : gridView ? { width: OBJECT_PANEL_WIDTH } : undefined}
+            : gridView ? { width: halfScreen ? HALF_PANEL_WIDTH : OBJECT_PANEL_WIDTH } : undefined}
           aria-hidden={isMobile && (mobileMap === "hidden" || mobileGalleryOpen) ? true : undefined}
         >
         <MapView
@@ -1556,6 +1596,7 @@ function MapContent() {
           onWhite={gridView}
           sideCollapsed={sideCollapsed}
           onSideCollapsedChange={setSideCollapsed}
+          halfScreen={halfScreen}
           onViewToggle={() => {
             if (!gridView) panelOpenInMapView.current = isObjectContainerVisible
             setIsObjectContainerVisible(gridView ? panelOpenInMapView.current : true)
@@ -1697,6 +1738,7 @@ function MapContent() {
             onMapToggle={() => setMobileMap((m) => (m === "hidden" ? "card" : "hidden"))}
             onGalleryOpenChange={setMobileGalleryOpen}
             sideCollapsed={sideCollapsed}
+            halfScreen={halfScreen}
             gridMapHidden={gridMapHidden}
             onGridMapToggle={() => setGridMapHidden((h) => !h)}
           />

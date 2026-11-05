@@ -461,7 +461,7 @@ export const layout = {
   /** Right-side panel width (desktop default): as wide as the map between the panels.
    *  @source lib/desktop-layout.ts (OBJECT_PANEL_WIDTH)
    */
-  panelWidthDefault: "calc((100vw - 24rem) / 2)",
+  panelWidthDefault: "max(22rem, calc((100vw - 2 * var(--edge) - clamp(16rem, 26vw, 20rem)) / 2))",
 
   /** Right-side panel width (desktop expanded).
    *  @source object-panel.tsx (width: "calc(100% - 5rem)")
@@ -491,9 +491,9 @@ export const layout = {
   mobileSheetInset: "20px",
 
   /** Header panel width (desktop, top-left of map).
-   *  @source map-view.tsx (sm:w-80)  → 320px
+   *  @source lib/desktop-layout.ts (SIDE_PANEL_WIDTH)
    */
-  headerPanelWidth: "20rem",
+  headerPanelWidth: "clamp(16rem, 26vw, 20rem)",
 
   /** Header panel insets.
    *  @source map-view.tsx (top-10 left-10)  → 40px
