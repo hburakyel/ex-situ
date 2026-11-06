@@ -30,6 +30,8 @@ module.exports = [
         process.env.PUBLIC_URL,
         'https://exsitu.app',
         'https://www.exsitu.app',
+        'https://exsitu.org',
+        'https://www.exsitu.org',
         ...devOrigins,
       ].filter(Boolean),
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
